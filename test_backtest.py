@@ -165,7 +165,7 @@ class TestComputeMetrics:
         # Portfolio should gain 50% (50k in AAPL doubles to 100k, 50k in MSFT stays)
         # Final value: 100k + 50k = 150k
         final_value = table["portfolio_value"].iloc[-1]
-        assert final_value == pytest.approx(125_000, rel=0.01)
+        assert final_value == pytest.approx(150_000, rel=0.01)
 
     def test_missing_data_error(self):
         dates = pd.date_range("2020-01-01", periods=5, freq="D")
@@ -294,8 +294,8 @@ class TestMain:
                         "max_drawdown": 0.0,
                     }
 
-                    # Weights that don't sum to 1
-                    backtest.main(["--tickers", "A", "B", "--weights", "2", "3"])
+                    # Weights that don't sum to 1, using C as benchmark
+                    backtest.main(["--tickers", "A", "B", "--weights", "2", "3", "--benchmark", "C"])
 
                     # Check that normalized weights were passed
                     call_args = mock_compute.call_args
