@@ -212,41 +212,48 @@ if run_backtest:
     # Display in columns
     col1, col2, col3 = st.columns(3)
 
+    # Metric labels mapping
+    metric_labels = {
+        "ending_value": "Ending Value",
+        "total_return": "Total Return",
+        "cagr": "CAGR",
+        "volatility": "Volatility",
+        "sharpe_ratio": "Sharpe Ratio",
+        "sortino_ratio": "Sortino Ratio",
+        "max_drawdown": "Max Drawdown"
+    }
+
     with col1:
         st.markdown("### Portfolio")
         for key, value in portfolio_summary.items():
-            if isinstance(value, float):
-                if 'Return' in key or 'CAGR' in key or 'Drawdown' in key:
-                    st.metric(key, f"{value:.2%}")
-                elif 'Ratio' in key:
-                    st.metric(key, f"{value:.3f}")
-                elif 'Value' in key:
-                    st.metric(key, f"${value:,.2f}")
-                else:
-                    st.metric(key, f"{value:.2%}")
+            label = metric_labels.get(key, key)
+            if key == "ending_value":
+                st.metric(label, f"${value:,.2f}")
+            elif key in ["total_return", "cagr", "volatility", "max_drawdown"]:
+                st.metric(label, f"{value:.2%}")
+            elif key in ["sharpe_ratio", "sortino_ratio"]:
+                st.metric(label, f"{value:.3f}")
             else:
-                st.metric(key, value)
+                st.metric(label, f"{value:.2f}")
 
     with col2:
         st.markdown("### Benchmark")
         for key, value in benchmark_summary.items():
-            if isinstance(value, float):
-                if 'Return' in key or 'CAGR' in key or 'Drawdown' in key:
-                    st.metric(key, f"{value:.2%}")
-                elif 'Ratio' in key:
-                    st.metric(key, f"{value:.3f}")
-                elif 'Value' in key:
-                    st.metric(key, f"${value:,.2f}")
-                else:
-                    st.metric(key, f"{value:.2%}")
+            label = metric_labels.get(key, key)
+            if key == "ending_value":
+                st.metric(label, f"${value:,.2f}")
+            elif key in ["total_return", "cagr", "volatility", "max_drawdown"]:
+                st.metric(label, f"{value:.2%}")
+            elif key in ["sharpe_ratio", "sortino_ratio"]:
+                st.metric(label, f"{value:.3f}")
             else:
-                st.metric(key, value)
+                st.metric(label, f"{value:.2f}")
 
     with col3:
         st.markdown("### Relative Performance")
-        excess_return = portfolio_summary['Total Return'] - benchmark_summary['Total Return']
-        excess_cagr = portfolio_summary['CAGR'] - benchmark_summary['CAGR']
-        excess_sharpe = portfolio_summary['Sharpe Ratio'] - benchmark_summary['Sharpe Ratio']
+        excess_return = portfolio_summary['total_return'] - benchmark_summary['total_return']
+        excess_cagr = portfolio_summary['cagr'] - benchmark_summary['cagr']
+        excess_sharpe = portfolio_summary['sharpe_ratio'] - benchmark_summary['sharpe_ratio']
 
         st.metric("Excess Return", f"{excess_return:.2%}", delta=None)
         st.metric("Excess CAGR", f"{excess_cagr:.2%}", delta=None)
