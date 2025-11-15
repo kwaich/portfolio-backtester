@@ -87,8 +87,9 @@ This opens an interactive web application in your browser with:
 
 - **Interactive Forms**: Configure tickers, weights, benchmarks, and date ranges
 - **Real-time Results**: View comprehensive metrics and charts instantly
-- **Visual Dashboard**: 2x2 grid of professional charts with formatted axes
-- **Download Options**: Export both CSV data and PNG charts
+- **Hover Tooltips**: See exact values by hovering over any point on the charts
+- **Interactive Charts**: Zoom, pan, and explore data visually
+- **Download Options**: Export both CSV data and interactive HTML charts
 - **Data Caching**: Toggle cache for faster subsequent runs
 - **No Command-Line Required**: Perfect for non-technical users
 
@@ -106,15 +107,16 @@ This opens an interactive web application in your browser with:
    - All metrics: Total Return, CAGR, Volatility, Sharpe, Sortino, Max Drawdown
    - Portfolio composition table
 
-3. **Visualizations**:
-   - Portfolio vs Benchmark Value (currency-formatted axes)
-   - Cumulative Returns (percentage-formatted)
-   - Active Return (green/red zones)
-   - Drawdown Over Time (with annotations)
+3. **Interactive Visualizations**:
+   - Portfolio vs Benchmark Value (hover for exact values)
+   - Cumulative Returns (hover for precise percentages)
+   - Active Return (hover for difference at any point)
+   - Drawdown Over Time (hover for exact drawdown %)
+   - Zoom, pan, and explore interactively
 
 4. **Export Options**:
    - Download results as CSV
-   - Download charts as high-resolution PNG
+   - Download interactive charts as HTML (with hover functionality preserved)
    - View raw data in expandable table
 
 ### Usage Example
@@ -272,6 +274,7 @@ The codebase follows these conventions:
 - matplotlib >= 3.7.0
 - pytest >= 7.0.0 (for testing)
 - streamlit >= 1.28.0 (for web UI)
+- plotly >= 5.14.0 (for interactive charts)
 
 ## Data Source
 

@@ -141,9 +141,10 @@ python -m pip install numpy pandas yfinance matplotlib pytest streamlit
 - **numpy** (>=1.24.0): Numerical computations (weights, calculations)
 - **pandas** (>=2.0.0): Time-series data handling and manipulation
 - **yfinance** (>=0.2.0): Yahoo Finance API wrapper for price data
-- **matplotlib** (>=3.7.0): Plotting and visualization
+- **matplotlib** (>=3.7.0): Plotting and visualization (for plot_backtest.py)
 - **pytest** (>=7.0.0): Testing framework
 - **streamlit** (>=1.28.0): Web UI framework for interactive dashboard
+- **plotly** (>=5.14.0): Interactive charts with hover tooltips in web UI
 
 ### Testing
 ```bash
