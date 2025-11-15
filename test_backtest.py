@@ -288,6 +288,76 @@ class TestComputeMetrics:
         assert table.index[0] == pd.Timestamp("2020-01-06")
 
 
+class TestRetryLogic:
+    """Test retry logic with exponential backoff"""
+
+    def test_retry_decorator_success_first_attempt(self):
+        """Test that function succeeds on first attempt."""
+        call_count = 0
+
+        @backtest.retry_with_backoff(max_retries=3, base_delay=0.1)
+        def test_func():
+            nonlocal call_count
+            call_count += 1
+            return "success"
+
+        result = test_func()
+        assert result == "success"
+        assert call_count == 1
+
+    def test_retry_decorator_success_after_failures(self):
+        """Test that function retries and eventually succeeds."""
+        call_count = 0
+
+        @backtest.retry_with_backoff(max_retries=3, base_delay=0.1)
+        def test_func():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                raise ValueError("Transient error")
+            return "success"
+
+        result = test_func()
+        assert result == "success"
+        assert call_count == 3
+
+    def test_retry_decorator_max_retries_exceeded(self):
+        """Test that function raises after max retries."""
+        call_count = 0
+
+        @backtest.retry_with_backoff(max_retries=3, base_delay=0.1)
+        def test_func():
+            nonlocal call_count
+            call_count += 1
+            raise ValueError("Persistent error")
+
+        with pytest.raises(ValueError, match="Persistent error"):
+            test_func()
+
+        assert call_count == 3
+
+    def test_retry_decorator_exponential_backoff(self):
+        """Test that retry delays follow exponential backoff."""
+        import time
+        call_times = []
+
+        @backtest.retry_with_backoff(max_retries=3, base_delay=0.1, max_delay=1.0)
+        def test_func():
+            call_times.append(time.time())
+            if len(call_times) < 3:
+                raise ValueError("Error")
+            return "success"
+
+        test_func()
+
+        # Check delays: should be ~0.1s, ~0.2s
+        delay1 = call_times[1] - call_times[0]
+        delay2 = call_times[2] - call_times[1]
+
+        assert 0.05 < delay1 < 0.2  # ~0.1s with tolerance
+        assert 0.15 < delay2 < 0.3  # ~0.2s with tolerance
+
+
 class TestDownloadPrices:
     """Test price download functionality"""
 

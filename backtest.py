@@ -20,8 +20,9 @@ import logging
 import pickle
 import sys
 import time
+from functools import wraps
 from pathlib import Path
-from typing import List
+from typing import Any, Callable, List
 
 import numpy as np
 import pandas as pd
@@ -45,6 +46,45 @@ logger = logging.getLogger(__name__)
 TRADING_DAYS_PER_YEAR = 252
 DEFAULT_CACHE_TTL_HOURS = 24
 CACHE_VERSION = "1.0"
+
+
+def retry_with_backoff(
+    max_retries: int = 3,
+    base_delay: float = 2.0,
+    max_delay: float = 60.0,
+    exceptions: tuple = (Exception,)
+) -> Callable:
+    """Decorator to retry function with exponential backoff.
+
+    Args:
+        max_retries: Maximum number of retry attempts (default: 3)
+        base_delay: Initial delay in seconds (default: 2.0)
+        max_delay: Maximum delay in seconds (default: 60.0)
+        exceptions: Tuple of exception types to catch (default: all Exception)
+
+    Returns:
+        Decorated function with retry logic
+    """
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs) -> Any:
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as e:
+                    if attempt == max_retries - 1:
+                        # Last attempt failed, raise the exception
+                        raise
+
+                    delay = min(base_delay * (2 ** attempt), max_delay)
+                    logger.warning(
+                        f"{func.__name__} failed (attempt {attempt + 1}/{max_retries}): {e}. "
+                        f"Retrying in {delay:.1f}s..."
+                    )
+                    time.sleep(delay)
+            return None  # Should never reach here
+        return wrapper
+    return decorator
 
 
 def parse_args(argv: List[str]) -> argparse.Namespace:
@@ -179,6 +219,30 @@ def save_cached_prices(cache_path: Path, prices: pd.DataFrame) -> None:
         logger.warning(f"Failed to save cache: {e}")
 
 
+@retry_with_backoff(max_retries=3, base_delay=2.0)
+def _download_from_yfinance(tickers: List[str], start: str, end: str) -> Any:
+    """Internal function to download from yfinance with retry logic.
+
+    Args:
+        tickers: List of ticker symbols
+        start: Start date
+        end: End date
+
+    Returns:
+        Raw data from yfinance (format varies based on number of tickers)
+    """
+    logger.info(f"Downloading data for {len(tickers)} ticker(s) from {start} to {end}")
+
+    return yf.download(
+        tickers=tickers,
+        start=start,
+        end=end,
+        interval="1d",
+        auto_adjust=True,
+        progress=False,
+    )
+
+
 def download_prices(
     tickers: List[str],
     start: str,
@@ -206,16 +270,8 @@ def download_prices(
         if cached_data is not None:
             return cached_data
 
-    logger.info(f"Downloading data for {len(tickers)} ticker(s) from {start} to {end}")
-
-    data = yf.download(
-        tickers=tickers,
-        start=start,
-        end=end,
-        interval="1d",
-        auto_adjust=True,
-        progress=False,
-    )
+    # Download with retry logic
+    data = _download_from_yfinance(tickers, start, end)
 
     # Check if data is empty before processing
     if data.empty:
