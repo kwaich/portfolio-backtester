@@ -25,10 +25,11 @@ portfolio-backtester/
 │   ├── ui_components.py    # Reusable UI rendering (184 lines)
 │   ├── charts.py           # Plotly chart generation (306 lines)
 │   └── main.py             # Main orchestration (459 lines)
-├── backtest.py             # Core backtesting engine (669 lines, ENHANCED Phase 1)
-├── plot_backtest.py        # Visualization helper (365 lines, ENHANCED Phase 2)
-├── test_backtest.py        # Unit tests for backtest.py (635 lines, 51 tests)
+├── backtest.py             # Core backtesting engine (830 lines, ENHANCED Phase 1+3)
+├── plot_backtest.py        # Visualization helper (395 lines, ENHANCED Phase 2+3)
+├── test_backtest.py        # Unit tests for backtest.py (858 lines, 68 tests)
 ├── test_app.py             # Unit tests for app.py UI (933 lines, 62 tests)
+├── test_integration.py     # Integration tests (420 lines, 25 tests, NEW Phase 3)
 ├── requirements.txt        # Python dependencies
 ├── README.md               # Main user documentation
 ├── PROJECT_SUMMARY.md      # Additional documentation
@@ -36,6 +37,7 @@ portfolio-backtester/
 ├── IMPLEMENTATION_PLAN.md  # Code improvement roadmap
 ├── IMPLEMENTATION_CHECKLIST.md # Progress tracking
 ├── TEST_REPORT.md          # Comprehensive validation report
+├── PHASE3_SUMMARY.md       # Phase 3 completion summary
 ├── .gitignore              # Git ignore patterns
 ├── .venv/                  # Python virtual environment (gitignored)
 ├── .cache/                 # Price data cache (gitignored)
@@ -135,32 +137,36 @@ portfolio-backtester/
 - Error handling with user-friendly messages
 - Run with: `streamlit run app.py` (via wrapper) or `streamlit run app/main.py` (direct)
 
-**backtest.py** (~450 lines, ENHANCED Phase 1)
+**backtest.py** (830 lines, ENHANCED Phase 1+3)
 - Core backtesting logic with CLI interface
 - Downloads price data via yfinance with intelligent caching (TTL-based)
 - Automatic retry logic with exponential backoff for API resilience
-- Comprehensive input validation (tickers, dates, ranges)
+- Comprehensive input and data quality validation
 - Computes comprehensive portfolio metrics
 - Uses logging for better observability
 - Exports time-series data to CSV
-- **Phase 1 Enhancements**: Cache expiration, retry logic, validation
+- **Phase 1 Enhancements**: Cache expiration, retry logic, input validation
+- **Phase 3 Enhancements**: Batch downloads, data quality validation, minimum data checks
 - Key functions:
   - `parse_args()`: CLI argument parsing (includes --no-cache, --cache-ttl)
   - `get_cache_key()`, `get_cache_path()`: Cache management with MD5 hashing
   - `load_cached_prices()`: Cache I/O with TTL checking and auto-migration
   - `save_cached_prices()`: Cache I/O with metadata (timestamp, version)
-  - **NEW: `retry_with_backoff()`**: Decorator for exponential backoff retry (2s→4s→8s)
-  - **NEW: `validate_ticker()`**: Individual ticker validation (returns tuple[bool, str])
-  - **NEW: `validate_tickers()`**: Batch ticker validation with aggregated errors
-  - **NEW: `validate_date_string()`**: Flexible date parsing and normalization
-  - `download_prices()`: Fetches adjusted close prices with caching and retry logic
-  - `compute_metrics()`: Calculates portfolio vs benchmark metrics
+  - `retry_with_backoff()`: Decorator for exponential backoff retry (2s→4s→8s)
+  - `validate_ticker()`: Individual ticker validation (returns tuple[bool, str])
+  - `validate_tickers()`: Batch ticker validation with aggregated errors
+  - `validate_date_string()`: Flexible date parsing and normalization
+  - **NEW Phase 3: `validate_price_data()`**: Data quality validation (NaN%, zero/negative prices, extreme changes)
+  - **NEW Phase 3: `_process_yfinance_data()`**: Helper to process and validate yfinance data
+  - `download_prices()`: Fetches prices with optimized batch caching (per-ticker cache checks)
+  - `compute_metrics()`: Calculates metrics with minimum data validation (≥2 days required)
   - `summarize()`: Generates comprehensive statistics (Sharpe, Sortino, drawdown, etc.)
   - `main()`: Orchestrates the backtest workflow with early validation
 
-**plot_backtest.py** (365 lines, ENHANCED Phase 2)
+**plot_backtest.py** (395 lines, ENHANCED Phase 2+3)
 - Comprehensive visualization utility for backtest results
 - **Consistent logging** (Phase 2.5): Uses logging module instead of print()
+- **Data validation** (Phase 3): Minimum data checks, quality validation
 - Reads CSV output from backtest.py
 - Generates four professional plots:
   1. Portfolio vs benchmark value (currency-formatted axes)
@@ -171,31 +177,40 @@ portfolio-backtester/
 - Professional color scheme (blue/purple palette with green/red zones)
 - Customizable: --style, --dpi, --dashboard options
 - Supports both interactive display and PNG export
+- **Phase 3 Validation**:
+  - Minimum 2 rows required for plotting
+  - Warning for < 30 data points
+  - All-NaN column detection
+  - Excessive missing data warnings (>50%)
 - Logging configuration: INFO level with timestamps
 - 5 logger.info() calls for key operations (data loading, chart generation, file saving)
 
-**test_backtest.py** (~550 lines, EXPANDED Phase 1)
+**test_backtest.py** (858 lines, EXPANDED Phase 1+3)
 - Comprehensive unit test suite using pytest
-- **51 tests total** (was 24 tests, +113% increase)
+- **68 tests total** (was 24 tests, +183% increase)
 - Tests all major functions and edge cases
 - Mocks external dependencies (yfinance) for isolation
-- Covers caching, error handling, calculations, and CLI
-- **NEW: Phase 1 Tests (28 new tests)**:
+- Covers caching, error handling, calculations, validation, and CLI
+- **Phase 1 Tests (28 new tests)**:
   - Cache expiration and TTL (6 tests)
   - Retry logic with exponential backoff (4 tests)
   - Ticker validation for multiple formats (11 tests)
   - Date validation and normalization (7 tests)
+- **Phase 3 Tests (15 new tests)**:
+  - Batch download optimization (5 tests)
+  - Data quality validation (10 tests)
 - Run with: `pytest test_backtest.py -v`
-- Test classes (10 total):
+- Test classes (11 total):
   - `TestParseArgs`: CLI argument parsing (7 tests)
-  - `TestCacheFunctions`: Cache with TTL and migration (6 tests) 🆕
+  - `TestCacheFunctions`: Cache with TTL and migration (6 tests)
   - `TestSummarize`: Statistics calculation (4 tests)
   - `TestComputeMetrics`: Backtest computation (4 tests)
-  - `TestRetryLogic`: Exponential backoff decorator (4 tests) 🆕
-  - `TestTickerValidation`: Ticker format validation (11 tests) 🆕
-  - `TestDateValidation`: Date parsing and ranges (7 tests) 🆕
-  - `TestDownloadPrices`: Price fetching with caching (4 tests)
-  - `TestMain`: Integration tests (4 tests)
+  - `TestRetryLogic`: Exponential backoff decorator (4 tests)
+  - `TestTickerValidation`: Ticker format validation (11 tests)
+  - `TestDateValidation`: Date parsing and ranges (7 tests)
+  - `TestDownloadPrices`: Price fetching with batch caching (9 tests)
+  - **NEW Phase 3: `TestDataValidation`**: Data quality checks (10 tests) 🆕
+  - `TestMain`: Integration tests (6 tests)
 
 **test_app.py** (~933 lines, COMPREHENSIVE)
 - Comprehensive test suite for Streamlit UI (62 tests - 170% increase!)
@@ -221,6 +236,43 @@ portfolio-backtester/
   - `TestMultipleBenchmarks`: Multi-benchmark logic (9 tests) 🆕
   - `TestDeltaIndicators`: Delta calculation and formatting (7 tests) 🆕
   - `TestRollingReturns`: Rolling returns windows (8 tests) 🆕
+
+**test_integration.py** (420 lines, NEW Phase 3)
+- Comprehensive integration test suite
+- **25 tests total** covering end-to-end workflows and edge cases
+- Tests system integration and real-world scenarios
+- Mocks yfinance for isolated, reproducible tests
+- Run with: `pytest test_integration.py -v`
+- Test classes (6 total):
+  - `TestEndToEndWorkflow`: Complete workflows (3 tests)
+    - CLI to CSV workflow
+    - Multi-ticker portfolio workflow
+    - Cache workflow (download → cache → reload)
+  - `TestEdgeCases`: Boundary conditions (8 tests)
+    - Single day backtest (should fail)
+    - Leap year date handling
+    - Extreme drawdowns (>90%)
+    - Zero volatility periods
+    - Very short date ranges
+    - Missing ticker data
+    - Negative returns
+    - Different start dates alignment
+  - `TestDataQuality`: Data validation (5 tests)
+    - All-NaN data rejection
+    - Excessive missing data
+    - Negative prices detection
+    - Zero prices detection
+    - Extreme price changes
+  - `TestValidation`: Input validation (5 tests)
+    - Ticker format validation
+    - Date format validation
+    - Future date rejection
+    - Historical date limits
+  - `TestStatisticalEdgeCases`: Statistical calculations (4 tests)
+    - Sharpe ratio with zero volatility
+    - Sortino ratio with no downside
+    - CAGR calculation precision
+    - Max drawdown recovery
 
 **requirements.txt** (NEW)
 - Pin all Python dependencies with minimum versions
@@ -503,16 +555,16 @@ class TestPortfolioPresets:
 
 ### Test Metrics and Goals
 
-**Current Status (Phase 1 Complete)**:
-- Total tests: 113 (51 backtest + 62 UI) ✅
-- Pass rate: 100% (113/113) ✅
-- Test-to-code ratio: ~0.85:1 ✅
+**Current Status (Phase 3 Complete)**:
+- Total tests: 155 (68 backtest + 62 UI + 25 integration) ✅
+- Pass rate: 100% (155/155) ✅
+- Test-to-code ratio: ~0.90:1 ✅
 - Coverage: ~88% ✅
 
 **Goals**: ✅ **ALL EXCEEDED**
-- Total tests: 70+ tests → **113 tests** ✅ (+61% over goal)
+- Total tests: 70+ tests → **155 tests** ✅ (+121% over goal)
 - Pass rate: 100% (always) → **100%** ✅
-- Test-to-code ratio: >0.80:1 → **~0.85:1** ✅ **ACHIEVED**
+- Test-to-code ratio: >0.80:1 → **~0.90:1** ✅ **EXCEEDED**
 - Coverage: 85%+ → **~88%** ✅
 
 **Achievement Details**:
@@ -523,12 +575,17 @@ class TestPortfolioPresets:
 - Ticker Validation (multiple formats): 11 tests ✅
 - Date Validation & Normalization: 7 tests ✅
 
-**UI Enhancements** (+39 tests):
+**Phase 2: UI Enhancements** (+39 tests):
 - Portfolio Presets: 8 tests ✅
 - Date Range Presets: 7 tests ✅
 - Multiple Benchmarks: 9 tests ✅
 - Delta Indicators: 7 tests ✅
 - Rolling Returns: 8 tests ✅
+
+**Phase 3: Performance & Data Quality** (+40 tests):
+- Batch Download Optimization: 5 tests ✅
+- Data Quality Validation: 10 tests ✅
+- Integration Tests: 25 tests ✅
 
 ### Running Tests in Development
 
@@ -1018,11 +1075,30 @@ rm -rf .cache/
 
 ---
 
-**Last Updated**: 2025-11-15 (Latest: **Phase 2 Complete** - Modular architecture, code quality, and organization)
-**Repository State**: Production-ready with Phase 1 & 2 enhancements deployed
-**Current Branch**: claude/review-implementation-plan-01CNKXvBZAn7UQMEcwXn5eGw
-**Test Coverage**: ~88% overall (113 tests, 100% passing)
-**Key Files**: app/ package (7 modules, 1,358 lines), app.py (43 line wrapper), backtest.py (669 lines), plot_backtest.py (365 lines), test_backtest.py (635 lines), test_app.py (933 lines), README.md, requirements.txt, CLAUDE.md, PROJECT_SUMMARY.md, IMPLEMENTATION_PLAN.md, IMPLEMENTATION_CHECKLIST.md, TEST_REPORT.md
+**Last Updated**: 2025-11-15 (Latest: **Phase 3 Complete** - Performance optimization and data validation)
+**Repository State**: Production-ready with Phase 1, 2 & 3 enhancements deployed
+**Current Branch**: claude/read-imple-01QaXd8PwRSeMGMtHvEeqFGf
+**Test Coverage**: ~88% overall (155 tests, 100% passing)
+**Key Files**: app/ package (7 modules, 1,358 lines), app.py (43 line wrapper), backtest.py (830 lines), plot_backtest.py (395 lines), test_backtest.py (858 lines), test_app.py (933 lines), test_integration.py (420 lines), README.md, requirements.txt, CLAUDE.md, PROJECT_SUMMARY.md, IMPLEMENTATION_PLAN.md, IMPLEMENTATION_CHECKLIST.md, TEST_REPORT.md, PHASE3_SUMMARY.md
+
+**Phase 3 Enhancements (Completed)**:
+- **Batch Download Optimization**: Per-ticker caching for efficient multi-ticker downloads
+  - Checks cache individually for each ticker
+  - Downloads only uncached tickers in single API call
+  - Significant performance improvement for repeat backtests
+- **Data Quality Validation**: Comprehensive validation of price data
+  - All-NaN detection
+  - Excessive NaN (>50% threshold)
+  - Zero/negative price detection
+  - Extreme price changes (>90%/day - likely errors)
+- **Minimum Data Requirements**:
+  - Minimum 2 trading days required for backtest
+  - Warning for <30 days (statistics unreliable)
+  - Minimum 2 rows for plotting
+- **Integration Tests**: 25 comprehensive tests covering end-to-end workflows, edge cases, and data quality
+- **New Functions**:
+  - `validate_price_data()`: Data quality validation
+  - `_process_yfinance_data()`: Helper to process yfinance data
 
 **Phase 2 Enhancements (Completed)**:
 - **Modular Architecture**: Refactored monolithic app.py (874 lines) into 7 focused modules (1,358 organized lines)

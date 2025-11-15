@@ -11,7 +11,9 @@ A lightweight, flexible Python utility for backtesting ETF portfolio strategies 
 - **Input Validation**: Comprehensive validation for tickers, dates, and parameters before execution
 - **Flexible Visualization**: Generate publication-ready charts or interactive plots
 - **Easy CLI**: Simple command-line interface with sensible defaults
-- **Well-Tested**: Comprehensive unit test coverage with 113 tests (100% pass rate)
+- **Data Quality Validation**: Automatic detection of data issues (missing values, invalid prices, extreme changes)
+- **Optimized Performance**: Batch downloads with per-ticker caching for faster multi-ticker operations
+- **Well-Tested**: Comprehensive test coverage with 155 tests including integration tests (100% pass rate)
 
 ## Quick Start
 
@@ -288,6 +290,60 @@ python backtest.py --start 2023-12-31 --end 2023-01-01
 ERROR: Invalid date range: start (2023-12-31) must be before end (2023-01-01)
 ```
 
+### Data Quality Validation
+
+Comprehensive validation ensures reliable results by detecting data issues early:
+
+**Price Data Validation**:
+- Detects all-NaN data (no prices available)
+- Flags excessive missing data (>50% NaN values)
+- Identifies zero or negative prices (data errors)
+- Detects extreme price changes (>90% single-day moves - likely errors)
+- Validates minimum data requirements (≥2 trading days)
+- Warns for limited data (<30 days - statistics may be unreliable)
+
+**Example Data Quality Error**:
+```bash
+# Data with quality issues
+python backtest.py --tickers BADINVALID
+ERROR: Price data quality issues detected:
+  • BADINVALID: all values are NaN (no price data available)
+
+# Or for data with extreme movements:
+ERROR: Price data quality issues detected:
+  • TICKER: contains extreme price change (99.0%/day - possible data error)
+```
+
+### Performance Optimization
+
+**Batch Downloads with Smart Caching**:
+
+When downloading multiple tickers (e.g., portfolio + benchmarks), the system:
+- Checks cache individually for each ticker
+- Downloads only uncached tickers in a single API call
+- Combines cached and fresh data seamlessly
+- Significantly reduces download time for repeat backtests
+
+**Example Performance Benefit**:
+```bash
+# First run: Downloads AAPL, MSFT, SPY (3 API calls worth)
+python backtest.py --tickers AAPL MSFT --benchmark SPY
+> Downloaded 3 ticker(s)
+
+# Second run: AAPL and MSFT cached, only downloads new ticker GOOGL
+python backtest.py --tickers AAPL MSFT GOOGL --benchmark SPY
+> Cache hit for AAPL
+> Cache hit for MSFT
+> Cache hit for SPY
+> Downloading 1 uncached ticker(s): GOOGL
+> Batch download complete: 4 ticker(s) (3 cached, 1 downloaded)
+```
+
+This optimization is especially beneficial when:
+- Testing multiple portfolio variations with the same benchmark
+- Comparing different benchmarks against the same portfolio
+- Running backtests with overlapping tickers
+
 ## Project Structure
 
 ```
@@ -303,14 +359,17 @@ portfolio-backtester/
 │   └── main.py             # Main application orchestration
 ├── backtest.py             # Core backtesting engine
 ├── plot_backtest.py        # Visualization utility
-├── test_backtest.py        # Unit tests for backtest.py (51 tests)
+├── test_backtest.py        # Unit tests for backtest.py (68 tests)
 ├── test_app.py             # Unit tests for app.py UI (62 tests)
+├── test_integration.py     # Integration tests (25 tests)
 ├── requirements.txt        # Python dependencies
 ├── README.md               # This file
 ├── PROJECT_SUMMARY.md      # Additional documentation
 ├── CLAUDE.md               # AI assistant guide
 ├── IMPLEMENTATION_PLAN.md  # Code improvement roadmap
+├── IMPLEMENTATION_CHECKLIST.md  # Progress tracking
 ├── TEST_REPORT.md          # Comprehensive validation report
+├── PHASE3_SUMMARY.md       # Phase 3 completion summary
 ├── .gitignore              # Git ignore rules
 ├── .venv/                  # Virtual environment (gitignored)
 ├── .cache/                 # Price data cache (gitignored)
@@ -343,17 +402,20 @@ The Streamlit web UI has been refactored into a clean, modular architecture:
 
 ### Running Tests
 
-The project has comprehensive test coverage with **113 tests** achieving **100% pass rate**.
+The project has comprehensive test coverage with **155 tests** achieving **100% pass rate**.
 
 ```bash
-# Run all tests (113 tests: 51 backtest + 62 UI)
+# Run all tests (155 tests: 68 backtest + 62 UI + 25 integration)
 pytest -v
 
-# Run only backtest tests (51 tests)
+# Run only backtest tests (68 tests)
 pytest test_backtest.py -v
 
 # Run only UI tests (62 tests)
 pytest test_app.py -v
+
+# Run only integration tests (25 tests)
+pytest test_integration.py -v
 
 # Run with coverage report
 pytest --cov=backtest --cov=app --cov-report=term-missing
@@ -365,6 +427,7 @@ open htmlcov/index.html
 # Run specific test class
 pytest test_backtest.py::TestSummarize -v
 pytest test_app.py::TestMetricLabels -v
+pytest test_integration.py::TestEndToEndWorkflow -v
 ```
 
 ### Test Coverage
@@ -373,21 +436,25 @@ pytest test_app.py::TestMetricLabels -v
 
 | Component | Tests | Coverage | Status |
 |-----------|-------|----------|--------|
-| backtest.py | 51 tests | 95% | ✅ Excellent |
+| backtest.py | 68 tests | 95% | ✅ Excellent |
 | app.py | 62 tests | 82% | ✅ Good |
-| **Total** | **113 tests** | **~88%** | **✅ Production-ready** |
+| Integration | 25 tests | - | ✅ Comprehensive |
+| **Total** | **155 tests** | **~88%** | **✅ Production-ready** |
 
 **Test Breakdown**:
 
-**Backtest Engine** (51 tests):
+**Backtest Engine** (68 tests):
 - CLI argument parsing (7 tests)
 - Cache functions with TTL (6 tests)
 - Performance metrics calculation (4 tests)
 - Portfolio computation (4 tests)
-- **NEW: Retry logic** (4 tests)
-- **NEW: Ticker validation** (11 tests)
-- **NEW: Date validation** (7 tests)
-- Price downloads and integration (8 tests)
+- Retry logic (4 tests)
+- Ticker validation (11 tests)
+- Date validation (7 tests)
+- Price downloads (4 tests)
+- **NEW: Batch downloads** (5 tests)
+- **NEW: Data validation** (10 tests)
+- Main integration (6 tests)
 
 **Web UI** (62 tests):
 - Integration and formatting (23 tests)
@@ -397,7 +464,14 @@ pytest test_app.py::TestMetricLabels -v
 - Delta Indicators (7 tests)
 - Rolling Returns (8 tests)
 
-All tests pass with **100% success rate** in ~3 seconds.
+**Integration Tests** (25 tests):
+- End-to-end workflows (3 tests)
+- Edge cases (8 tests)
+- Data quality validation (5 tests)
+- Input validation (5 tests)
+- Statistical edge cases (4 tests)
+
+All tests pass with **100% success rate**.
 
 ### Code Quality
 
