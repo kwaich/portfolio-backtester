@@ -220,7 +220,8 @@ backtester/
 ├── app.py               # Streamlit web UI
 ├── backtest.py          # Main backtesting engine
 ├── plot_backtest.py     # Visualization utility
-├── test_backtest.py     # Unit tests
+├── test_backtest.py     # Unit tests for backtest.py
+├── test_app.py          # Unit tests for app.py (UI)
 ├── requirements.txt     # Python dependencies
 ├── README.md            # This file
 ├── PROJECT_SUMMARY.md   # Additional documentation
@@ -237,14 +238,21 @@ backtester/
 ### Running Tests
 
 ```bash
-# Run all tests
+# Run all tests (backtest + UI)
+pytest -v
+
+# Run only backtest tests
 pytest test_backtest.py -v
 
+# Run only UI tests
+pytest test_app.py -v
+
 # Run with coverage
-pytest test_backtest.py --cov=backtest --cov-report=html
+pytest --cov=backtest --cov-report=html
 
 # Run specific test class
 pytest test_backtest.py::TestSummarize -v
+pytest test_app.py::TestMetricLabels -v
 ```
 
 ### Code Quality

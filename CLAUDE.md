@@ -19,7 +19,8 @@ backtester/
 ├── app.py               # Streamlit web UI (NEW)
 ├── backtest.py          # Main backtesting engine
 ├── plot_backtest.py     # Visualization helper
-├── test_backtest.py     # Unit tests (NEW)
+├── test_backtest.py     # Unit tests for backtest.py
+├── test_app.py          # Unit tests for app.py (NEW)
 ├── requirements.txt     # Python dependencies (NEW)
 ├── README.md            # Main documentation (NEW)
 ├── PROJECT_SUMMARY.md   # Additional documentation
@@ -78,12 +79,31 @@ backtester/
 - Customizable: --style, --dpi, --dashboard options
 - Supports both interactive display and PNG export
 
-**test_backtest.py** (~370 lines, NEW)
+**test_backtest.py** (~370 lines)
 - Comprehensive unit test suite using pytest
 - Tests all major functions and edge cases
 - Mocks external dependencies (yfinance) for isolation
 - Covers caching, error handling, calculations, and CLI
 - Run with: `pytest test_backtest.py -v`
+
+**test_app.py** (~426 lines, NEW)
+- Comprehensive test suite for Streamlit UI (23 tests)
+- Tests UI workflow integration with backtest module
+- Validates metric formatting and display logic
+- Tests error handling and input validation
+- Covers portfolio composition, chart data, and export functionality
+- Mocks Streamlit components for isolated testing
+- Run with: `pytest test_app.py -v`
+- Test classes:
+  - `TestMetricLabels`: Metric display formatting
+  - `TestBacktestIntegration`: UI workflow with backtest.py
+  - `TestMetricFormatting`: Currency, percentage, ratio formatting
+  - `TestErrorHandling`: Invalid input scenarios
+  - `TestPortfolioComposition`: Table generation
+  - `TestChartData`: Drawdown and active return calculations
+  - `TestDownloadFunctionality`: CSV and PNG export
+  - `TestCacheToggle`: Cache enable/disable behavior
+  - `TestInputValidation`: Form input validation
 
 **requirements.txt** (NEW)
 - Pin all Python dependencies with minimum versions
@@ -127,14 +147,21 @@ python -m pip install numpy pandas yfinance matplotlib pytest streamlit
 
 ### Testing
 ```bash
-# Run all tests
+# Run all tests (backtest + UI)
+pytest -v
+
+# Run only backtest tests
 pytest test_backtest.py -v
+
+# Run only UI tests
+pytest test_app.py -v
 
 # Run with coverage
 pytest test_backtest.py --cov=backtest --cov-report=html
 
 # Run specific test class
 pytest test_backtest.py::TestSummarize -v
+pytest test_app.py::TestMetricLabels -v
 ```
 
 ## Code Conventions
@@ -464,7 +491,8 @@ streamlit run app.py
 - **Metrics**: backtest.py:272-307 (`summarize`)
 - **Main flow**: backtest.py:310-373 (`main`)
 - **Plotting**: plot_backtest.py:35-61 (`main`)
-- **Tests**: test_backtest.py (all test classes)
+- **Backtest tests**: test_backtest.py (24 test classes)
+- **UI tests**: test_app.py (9 test classes, 23 tests)
 - **User docs**: README.md
 - **AI docs**: CLAUDE.md (this file)
 
@@ -521,7 +549,7 @@ rm -rf .cache/
 
 ---
 
-**Last Updated**: 2025-11-15 (Major update: web UI, caching, metrics, tests, docs)
+**Last Updated**: 2025-11-15 (Major update: web UI, UI tests, caching, metrics, docs)
 **Repository State**: Multiple commits, comprehensive improvements
 **Current Branch**: claude/create-ui-framework-01D656RsUmycaEV3SNmffGrx
-**Key Files**: app.py (458 lines), backtest.py (377 lines), test_backtest.py (370 lines), README.md, requirements.txt
+**Key Files**: app.py (458 lines), backtest.py (377 lines), test_backtest.py (370 lines), test_app.py (426 lines), README.md, requirements.txt
