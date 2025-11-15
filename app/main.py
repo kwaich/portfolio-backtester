@@ -145,7 +145,7 @@ def main() -> None:
             f"Ticker {i+1}",
             default_value=default_ticker,
             key=f"ticker_{i}",
-            help_text="Enter ticker or search Yahoo Finance"
+            help_text="Enter ticker symbol or company name, then click 🔍 to search"
         )
         tickers.append(ticker)
 
@@ -193,7 +193,7 @@ def main() -> None:
             f"Benchmark {i+1}",
             default_value=default_bench,
             key=f"benchmark_{i}",
-            help_text="Ticker to compare against or search Yahoo Finance"
+            help_text="Enter ticker symbol or company name, then click 🔍 to search"
         )
         if bench_ticker:
             benchmarks.append(bench_ticker)

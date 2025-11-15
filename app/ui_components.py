@@ -194,9 +194,14 @@ def render_searchable_ticker_input(
     """Render a searchable ticker input with Yahoo Finance integration.
 
     This component provides:
-    1. Text input for direct ticker entry
-    2. Search button to find tickers on Yahoo Finance
+    1. Text input for direct ticker entry or search query
+    2. Search button to find tickers using the input value
     3. Click-to-select from search results
+
+    Workflow:
+    - User types ticker symbol or company name (e.g., "AAPL" or "apple")
+    - Click 🔍 Search button to find matching tickers
+    - Click any result to populate the field
 
     Args:
         label: Label for the input field
@@ -209,12 +214,11 @@ def render_searchable_ticker_input(
 
     Examples:
         >>> ticker = render_searchable_ticker_input("Portfolio Ticker 1", "AAPL")
-        # User can type ticker or search Yahoo Finance
+        # User can type "AAPL" directly or "apple" then search
     """
     # Create unique keys for widgets
     input_key = f"{key}_input" if key else None
     search_key = f"{key}_search" if key else None
-    query_key = f"{key}_query" if key else None
     pending_key = f"{key}_pending" if key else None
 
     # Check for pending ticker selection (from previous run)
@@ -236,8 +240,8 @@ def render_searchable_ticker_input(
         ticker_input = st.text_input(
             label,
             key=input_key,
-            help=help_text or "Enter ticker symbol or click Search to find tickers",
-            placeholder="e.g., AAPL, MSFT, VWRA.L"
+            help=help_text or "Enter ticker symbol or company name, then click 🔍 to search",
+            placeholder="e.g., AAPL, apple, vanguard"
         )
 
     with col2:
@@ -250,20 +254,15 @@ def render_searchable_ticker_input(
         if key:
             st.session_state[f"{key}_show_search"] = True
 
-        # Search query input
-        search_query = st.text_input(
-            "Search Yahoo Finance",
-            key=query_key,
-            placeholder="e.g., 'apple', 'vanguard s&p', 'tesla'",
-            help="Search by ticker symbol or company name"
-        )
+        # Use the ticker input value as the search query
+        search_query = ticker_input.strip()
 
         if search_query and len(search_query) >= 2:
             with st.spinner(f"Searching for '{search_query}'..."):
                 results = search_tickers_with_yahoo(search_query, limit=10)
 
             if results:
-                st.caption(f"Found {len(results)} result(s):")
+                st.caption(f"Found {len(results)} result(s) for '{search_query}':")
 
                 # Display results as clickable buttons
                 for idx, (ticker, name) in enumerate(results):
@@ -279,7 +278,9 @@ def render_searchable_ticker_input(
                         st.rerun()
             else:
                 st.warning(f"No results found for '{search_query}'. Try a different search term.")
-        elif search_query:
+        elif not search_query:
+            st.info("💡 Enter a ticker symbol or company name in the field above, then click Search")
+        else:
             st.info("Enter at least 2 characters to search")
 
         # Close search button
