@@ -23,7 +23,7 @@ plotting helper (`plot_backtest.py`). The workflow is:
       --output results/backtest_series.csv
   ```
 
-- `plot_backtest.py` — Reads the CSV (must include `date` index and the columns
+- `plot_backtest.py` — Reads the CSV (must include a `date` column plus the columns
   emitted by `backtest.py`) and plots portfolio vs. benchmark value plus active
   return. Use `--output charts/run` to save PNGs (`run_value.png`,
   `run_active.png`); omit `--output` to show the plots interactively.
@@ -34,5 +34,5 @@ plotting helper (`plot_backtest.py`). The workflow is:
   `./.venv/bin/python -m pip install --upgrade pip` if desired.
 - Both scripts rely on network access to fetch data from Yahoo Finance via
   yfinance.
-- `results.csv` is an example output from the backtest; you can delete/regenerate
-  it as needed.
+- Export CSVs into a `results/` folder (ignored by git) to keep working copies
+  out of version control.

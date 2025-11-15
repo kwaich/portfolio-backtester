@@ -18,6 +18,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
+plt.style.use("seaborn-v0_8")
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Plot portfolio vs benchmark")
@@ -32,7 +34,10 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    df = pd.read_csv(args.csv, parse_dates=["date"], index_col="date")
+    df = pd.read_csv(args.csv)
+    if "date" not in df.columns:
+        raise SystemExit("CSV missing 'date' column; run backtest.py with --output")
+    df = df.set_index(pd.to_datetime(df["date"]))
 
     fig, ax = plt.subplots(figsize=(10, 5))
     df[["portfolio_value", "benchmark_value"]].plot(ax=ax)

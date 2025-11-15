@@ -1,10 +1,11 @@
 """Simple ETF backtest for VDCP.L/VHYD.L versus VWRA.L.
 
-Usage with the virtualenv:
+Typical workflow:
 
 source .venv/bin/activate
 python backtest.py --start 2018-01-01 --end 2024-12-31 \
-    --capital 100000 --weights 0.5 0.5 --benchmark VWRA.L
+    --capital 100000 --weights 0.5 0.5 --benchmark VWRA.L \
+    --output results/backtest_series.csv
 
 The script downloads daily adjusted closes via yfinance, models a
 buy-and-hold portfolio with static weights, and prints summary stats plus
@@ -107,6 +108,10 @@ def download_prices(tickers: List[str], start: str, end: str) -> pd.DataFrame:
         raise ValueError("No price rows returned; check tickers or date range")
     if isinstance(prices, pd.Series):
         prices = prices.to_frame(name=tickers[0])
+    missing = [ticker for ticker in tickers if ticker not in prices.columns]
+    if missing:
+        raise ValueError(f"Missing data for tickers: {', '.join(missing)}")
+    prices = prices.loc[:, tickers]
     return prices
 
 
@@ -118,7 +123,12 @@ def compute_metrics(
 ) -> pd.DataFrame:
     """Builds the backtest table and summary columns."""
 
-    aligned = prices.dropna(how="any")
+    prices = prices.sort_index()
+    first_valid_points = [series.first_valid_index() for _, series in prices.items()]
+    if any(idx is None for idx in first_valid_points):
+        raise ValueError("One or more tickers have no valid prices in this window")
+    start_date = max(first_valid_points)
+    aligned = prices.loc[start_date:].ffill().dropna()
     if aligned.empty:
         raise ValueError(
             "Not enough overlapping history for portfolio tickers; try a later start"
@@ -130,8 +140,13 @@ def compute_metrics(
     portfolio_return = portfolio_value / capital - 1
 
     # Align benchmark to the same index, forward-filling gaps once it starts trading
-    benchmark = benchmark.reindex(aligned.index).ffill().dropna()
-    benchmark = benchmark.loc[aligned.index.min() : aligned.index.max()]
+    benchmark = benchmark.sort_index()
+    bench_start = benchmark.first_valid_index()
+    if bench_start is None:
+        raise ValueError("Benchmark has no data in this window")
+    combined_start = max(aligned.index[0], bench_start)
+    aligned = aligned.loc[combined_start:]
+    benchmark = benchmark.loc[combined_start:].reindex(aligned.index).ffill().dropna()
     if benchmark.empty:
         raise ValueError("Benchmark has no overlapping data in this window")
     bench_units = capital / benchmark.iloc[0]
