@@ -1,4 +1,4 @@
-# ETF Backtester
+# Portfolio Backtester
 
 A lightweight, flexible Python utility for backtesting ETF portfolio strategies against benchmarks. Download historical price data, calculate performance metrics, and visualize results with ease.
 
@@ -227,7 +227,7 @@ Price data is automatically cached in `.cache/` to speed up repeated backtests:
 ## Project Structure
 
 ```
-backtester/
+portfolio-backtester/
 ├── app.py               # Streamlit web UI
 ├── backtest.py          # Main backtesting engine
 ├── plot_backtest.py     # Visualization utility

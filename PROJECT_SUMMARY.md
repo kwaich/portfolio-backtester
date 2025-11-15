@@ -1,4 +1,4 @@
-# Backtest Utility
+# Portfolio Backtester Utility
 
 This directory contains a comprehensive ETF backtesting system with both CLI and web UI interfaces.
 The system includes `backtest.py` (core engine), `app.py` (Streamlit web UI), and `plot_backtest.py` (visualization helper).
@@ -153,7 +153,7 @@ Price data is automatically cached in `.cache/` for faster repeated backtests:
 ## File Structure
 
 ```
-backtester/
+portfolio-backtester/
 ├── app.py                # Streamlit web UI (~700 lines, ENHANCED)
 ├── backtest.py           # Main backtesting engine (~391 lines)
 ├── plot_backtest.py      # Visualization helper (~354 lines, ENHANCED)
