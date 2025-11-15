@@ -56,10 +56,7 @@ portfolio-backtester/
     ├── FILE_REFERENCE.md         # Detailed file documentation
     ├── TESTING_GUIDE.md          # TDD rules and test patterns
     ├── DEVELOPER_GUIDE.md        # Development workflows
-    ├── IMPLEMENTATION_PLAN.md    # Code improvement roadmap
-    ├── IMPLEMENTATION_CHECKLIST.md # Progress tracking (87.5% complete)
-    ├── CHANGELOG.md              # Version history (v2.1.0)
-    ├── TEST_REPORT.md            # Phase 2 validation report
+    ├── CHANGELOG.md              # Version history with rolling Sharpe feature
     └── PROJECT_SUMMARY.md        # Additional project documentation
 ```
 
@@ -439,11 +436,7 @@ git commit -m "feat: add new_metric calculation"
 
 **📄 [README.md](README.md)**: User documentation with quick start, usage examples, CLI reference, troubleshooting.
 
-**📄 [IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)**: Phases 1-4 roadmap with task breakdown and timeline.
-
-**📄 [IMPLEMENTATION_CHECKLIST.md](docs/IMPLEMENTATION_CHECKLIST.md)**: Task tracking (14/16 complete - 87.5%).
-
-**📄 [CHANGELOG.md](docs/CHANGELOG.md)**: Version history and release notes (v1.0.0 → v2.1.0).
+**📄 [CHANGELOG.md](docs/CHANGELOG.md)**: Version history and release notes with rolling Sharpe ratio feature.
 
 ---
 

@@ -278,18 +278,10 @@ This document provides detailed information about each file in the portfolio-bac
 ### PROJECT_SUMMARY.md
 - Additional project documentation
 
-### IMPLEMENTATION_PLAN.md
-- Code improvement roadmap
-
-### IMPLEMENTATION_CHECKLIST.md
-- Progress tracking (87.5% complete)
-
-### TEST_REPORT.md
-- Phase 2 validation report
-
 ### CHANGELOG.md
 - Version history
-- Release notes (v2.1.0 latest)
+- Release notes with rolling Sharpe ratio feature
+- Detailed feature descriptions and test coverage updates
 
 ---
 

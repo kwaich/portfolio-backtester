@@ -340,13 +340,11 @@ Phase 1, 2 & 3 improvements implemented as part of comprehensive code review and
 - **Phase 2**: Code quality and modular architecture refactoring
 - **Phase 3**: Performance optimization and data validation enhancement
 
-See `IMPLEMENTATION_PLAN.md` and `IMPLEMENTATION_CHECKLIST.md` for full details.
-
 ## Links
 
 - [README.md](../README.md) - User documentation
 - [CLAUDE.md](../CLAUDE.md) - AI assistant development guide
 - [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) - Additional project documentation
-- [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) - Full improvement roadmap
-- [IMPLEMENTATION_CHECKLIST.md](IMPLEMENTATION_CHECKLIST.md) - Progress tracking (87.5% complete)
-- [TEST_REPORT.md](TEST_REPORT.md) - Phase 2 validation report
+- [FILE_REFERENCE.md](FILE_REFERENCE.md) - Detailed file documentation
+- [TESTING_GUIDE.md](TESTING_GUIDE.md) - TDD rules and test patterns
+- [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) - Development workflows

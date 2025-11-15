@@ -399,10 +399,7 @@ portfolio-backtester/
 │   ├── FILE_REFERENCE.md         # Detailed file documentation
 │   ├── TESTING_GUIDE.md          # TDD rules and test patterns
 │   ├── DEVELOPER_GUIDE.md        # Development workflows
-│   ├── IMPLEMENTATION_PLAN.md    # Code improvement roadmap
-│   ├── IMPLEMENTATION_CHECKLIST.md # Progress tracking
 │   ├── CHANGELOG.md              # Version history
-│   ├── TEST_REPORT.md            # Validation report
 │   └── PROJECT_SUMMARY.md        # Additional documentation
 ├── .gitignore              # Git ignore rules
 ├── .venv/                  # Virtual environment (gitignored)
