@@ -149,6 +149,17 @@ def download_prices(tickers: List[str], start: str, end: str, use_cache: bool = 
         progress=False,
     )
 
+    # Check if data is empty before processing
+    if data.empty:
+        raise ValueError(
+            f"No price data returned for period {start} to {end}.\n"
+            f"Tickers requested: {', '.join(tickers)}\n"
+            f"Please verify:\n"
+            f"  1. Tickers are valid symbols\n"
+            f"  2. Tickers were trading during this period\n"
+            f"  3. Date range is valid (not in the future)"
+        )
+
     if isinstance(data, pd.Series):  # single ticker result
         prices = data.to_frame(name=tickers[0])
     elif isinstance(data.columns, pd.MultiIndex):
@@ -229,11 +240,6 @@ def compute_metrics(
             f"Try using a later start date or different tickers."
         )
 
-    first_prices = aligned.iloc[0]
-    units = (capital * weights) / first_prices
-    portfolio_value = (aligned * units).sum(axis=1)
-    portfolio_return = portfolio_value / capital - 1
-
     # Align benchmark to the same index, forward-filling gaps once it starts trading
     benchmark = benchmark.sort_index()
     bench_start = benchmark.first_valid_index()
@@ -252,6 +258,14 @@ def compute_metrics(
             f"Benchmark starts: {bench_start.strftime('%Y-%m-%d')}\n"
             f"Try adjusting the date range or choose a different benchmark."
         )
+
+    # Calculate portfolio value with the aligned data
+    first_prices = aligned.iloc[0]
+    units = (capital * weights) / first_prices
+    portfolio_value = (aligned * units).sum(axis=1)
+    portfolio_return = portfolio_value / capital - 1
+
+    # Calculate benchmark value
     bench_units = capital / benchmark.iloc[0]
     bench_value = benchmark * bench_units
     bench_return = bench_value / capital - 1

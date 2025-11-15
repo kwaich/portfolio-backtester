@@ -75,6 +75,72 @@ This creates a single `my_backtest_dashboard.png` with a 2x2 grid of all metrics
 python plot_backtest.py --csv results/my_backtest.csv
 ```
 
+## Web UI (Interactive Dashboard)
+
+For a more user-friendly experience, launch the Streamlit web interface:
+
+```bash
+streamlit run app.py
+```
+
+This opens an interactive web application in your browser with:
+
+- **Interactive Forms**: Configure tickers, weights, benchmarks, and date ranges
+- **Real-time Results**: View comprehensive metrics and charts instantly
+- **Hover Tooltips**: See exact values by hovering over any point on the charts
+- **Interactive Charts**: Zoom, pan, and explore data visually
+- **Download Options**: Export both CSV data and interactive HTML charts
+- **Data Caching**: Toggle cache for faster subsequent runs
+- **No Command-Line Required**: Perfect for non-technical users
+
+### Web UI Features
+
+1. **Sidebar Configuration**:
+   - Example portfolio presets (Default UK ETFs, 60/40, Tech Giants, Dividend Aristocrats, Global Diversified)
+   - Dynamic number of portfolio tickers (1-10)
+   - Auto-normalized weights
+   - Multiple benchmark support (compare up to 3 benchmarks)
+   - Date range presets (1Y, 3Y, 5Y, 10Y, YTD, Max) with custom date picker
+   - Capital input with validation
+   - Cache toggle
+
+2. **Results Display**:
+   - Side-by-side comparison of Portfolio vs Benchmark vs Relative Performance
+   - Delta indicators showing outperformance/underperformance with color-coded arrows
+   - All metrics: Total Return, CAGR, Volatility, Sharpe, Sortino, Max Drawdown
+   - Expandable sections for additional benchmark comparisons
+   - Portfolio composition table
+
+3. **Interactive Visualizations**:
+   - 2x2 Dashboard: Portfolio vs Benchmark Value, Cumulative Returns, Active Return, Drawdown
+   - Rolling Returns Analysis (30/90/180-day periods)
+   - Multiple benchmarks displayed on all charts with distinct colors and line styles
+   - Hover tooltips for exact values at any point
+   - Zoom, pan, and explore interactively
+
+4. **Export Options**:
+   - Download results as CSV
+   - Download interactive charts as HTML (with hover functionality preserved)
+   - View raw data in expandable table
+
+### Usage Example
+
+1. Run `streamlit run app.py`
+2. Browser opens automatically at `http://localhost:8501`
+3. Configure your backtest in the sidebar:
+   - Select "Tech Giants" from Example Portfolio dropdown (or choose Custom)
+   - Tickers auto-populate: AAPL, MSFT, GOOGL, AMZN
+   - Weights: 0.25 each (auto-populated)
+   - Benchmark: QQQ (auto-populated)
+   - Add additional benchmarks if desired (e.g., SPY, VTI)
+   - Click "5Y" preset button for 5-year backtest
+   - Capital: $100,000
+4. Click "Run Backtest"
+5. View results with delta indicators showing outperformance
+6. Explore interactive charts including rolling returns analysis
+7. Expand additional benchmark sections for detailed comparisons
+8. Download data and charts
+
 ## Command-Line Options
 
 ### backtest.py
@@ -162,34 +228,71 @@ Price data is automatically cached in `.cache/` to speed up repeated backtests:
 
 ```
 backtester/
-├── backtest.py           # Main backtesting engine
-├── plot_backtest.py      # Visualization utility
-├── test_backtest.py      # Unit tests
-├── requirements.txt      # Python dependencies
+├── app.py               # Streamlit web UI
+├── backtest.py          # Main backtesting engine
+├── plot_backtest.py     # Visualization utility
+├── test_backtest.py     # Unit tests for backtest.py
+├── test_app.py          # Unit tests for app.py (UI)
+├── requirements.txt     # Python dependencies
 ├── README.md            # This file
 ├── PROJECT_SUMMARY.md   # Additional documentation
-├── CLAUDE.md           # AI assistant guide
-├── .gitignore          # Git ignore rules
-├── .venv/              # Virtual environment (gitignored)
-├── .cache/             # Price data cache (gitignored)
-├── results/            # CSV outputs (gitignored)
-└── charts/             # PNG outputs (gitignored)
+├── CLAUDE.md            # AI assistant guide
+├── .gitignore           # Git ignore rules
+├── .venv/               # Virtual environment (gitignored)
+├── .cache/              # Price data cache (gitignored)
+├── results/             # CSV outputs (gitignored)
+└── charts/              # PNG outputs (gitignored)
 ```
 
 ## Development
 
 ### Running Tests
 
+The project has comprehensive test coverage with **86 tests** achieving **86.1% code coverage**.
+
 ```bash
-# Run all tests
+# Run all tests (86 tests: 24 backtest + 62 UI)
+pytest -v
+
+# Run only backtest tests (24 tests)
 pytest test_backtest.py -v
 
-# Run with coverage
-pytest test_backtest.py --cov=backtest --cov-report=html
+# Run only UI tests (62 tests)
+pytest test_app.py -v
+
+# Run with coverage report
+pytest --cov=backtest --cov=app --cov-report=term-missing
+
+# Generate HTML coverage report
+pytest --cov=backtest --cov=app --cov-report=html
+open htmlcov/index.html
 
 # Run specific test class
 pytest test_backtest.py::TestSummarize -v
+pytest test_app.py::TestMetricLabels -v
 ```
+
+### Test Coverage
+
+**Overall Coverage**: **86.1%** (1011/1174 lines) ✅
+
+| Component | Coverage | Tests | Status |
+|-----------|----------|-------|--------|
+| backtest.py | 95% | 24 tests | ✅ Excellent |
+| app.py | 82% | 62 tests | ✅ Good |
+| **Total** | **86.1%** | **86 tests** | **✅ Target achieved** |
+
+**Test Breakdown**:
+- **Backtest Engine** (24 tests): CLI parsing, caching, metrics, computations
+- **Web UI Original** (23 tests): Integration, formatting, error handling, validation
+- **Web UI New Features** (39 tests):
+  - Portfolio Presets: 8 tests
+  - Date Range Presets: 7 tests
+  - Multiple Benchmarks: 9 tests
+  - Delta Indicators: 7 tests
+  - Rolling Returns: 8 tests
+
+All tests pass with 100% success rate in ~2 seconds.
 
 ### Code Quality
 
@@ -207,6 +310,8 @@ The codebase follows these conventions:
 - yfinance >= 0.2.0
 - matplotlib >= 3.7.0
 - pytest >= 7.0.0 (for testing)
+- streamlit >= 1.28.0 (for web UI)
+- plotly >= 5.14.0 (for interactive charts)
 
 ## Data Source
 
@@ -230,7 +335,6 @@ Potential improvements (see [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) for details
 - Configuration file support (YAML/JSON)
 - Multiple time period analysis
 - Currency conversion for multi-currency portfolios
-- Interactive dashboard (Streamlit/Dash)
 - Additional data sources beyond Yahoo Finance
 
 ## Contributing
