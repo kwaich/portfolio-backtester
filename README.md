@@ -116,7 +116,7 @@ This opens an interactive web application in your browser with:
    - Delta indicators showing outperformance/underperformance with color-coded arrows
    - All metrics: Total Return, CAGR, Volatility, Sharpe, Sortino, Max Drawdown
    - Expandable sections for additional benchmark comparisons
-   - Portfolio composition table with ticker names, symbols, and weights
+   - Portfolio composition table with ticker symbols, full company/fund names (fetched from Yahoo Finance), and weights
 
 3. **Interactive Visualizations**:
    - 2x2 Dashboard: Portfolio vs Benchmark Value, Cumulative Returns, Active Return, Drawdown
@@ -168,7 +168,9 @@ The web UI includes a powerful ticker search feature:
 - Sector ETFs: XLK, XLF, XLE
 - Popular Stocks: AAPL, MSFT, GOOGL, AMZN, TSLA, and more
 
-**Note**: Yahoo Finance search may be rate-limited or blocked. The app will automatically fall back to the curated list.
+**Notes**:
+- Yahoo Finance search may be rate-limited or blocked. The app will automatically fall back to the curated list.
+- **Ticker names** are fetched dynamically from Yahoo Finance when displaying results. This ensures you always see accurate, up-to-date company/fund names for any ticker.
 
 ## Command-Line Options
 

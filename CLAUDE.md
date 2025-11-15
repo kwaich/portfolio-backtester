@@ -21,7 +21,7 @@ This is a lightweight Python-based ETF backtesting utility that allows users to:
 
 **Current Status**:
 - **Version**: v2.2.0-dev (Unreleased - 2025-11-15)
-- **Test Coverage**: ~88% (177 tests, 100% passing)
+- **Test Coverage**: ~88% (179 tests, 100% passing)
 - **Progress**: 87.5% complete (14/16 tasks)
 - **Branch**: claude/make-ticker-searchable-01Nb4CzjMJBJ9y2PugkUtCW7
 
@@ -45,7 +45,7 @@ portfolio-backtester/
 ├── plot_backtest.py          # Visualization utility (395 lines - Phases 2 & 3)
 ├── test_backtest.py          # Unit tests for backtest.py (858 lines, 67 tests)
 ├── test_app.py               # Unit tests for app.py UI (933 lines, 64 tests)
-├── test_ticker_data.py       # Unit tests for ticker_data.py (NEW - 30 tests)
+├── test_ticker_data.py       # Unit tests for ticker_data.py (NEW - 32 tests)
 ├── test_integration.py       # Integration tests (420 lines, 16 tests - Phase 3)
 ├── requirements.txt          # Python dependencies (includes requests)
 ├── README.md                 # Main user documentation
@@ -112,7 +112,7 @@ portfolio-backtester/
 **Features**:
 - Portfolio presets (6 pre-configured portfolios)
 - **Searchable ticker inputs**: Search from 50+ popular ETFs/stocks or use Yahoo Finance API
-- **Portfolio composition table**: Displays ticker symbols, full company/fund names, and weights
+- **Portfolio composition table**: Displays ticker symbols, full company/fund names (fetched dynamically from Yahoo Finance), and weights
 - Date range presets (1Y, 3Y, 5Y, 10Y, YTD, Max)
 - Multiple benchmarks (up to 3 simultaneously)
 - Delta indicators (color-coded outperformance)
@@ -128,10 +128,12 @@ portfolio-backtester/
 - 100% backward compatibility
 
 **Searchable Ticker Feature** (New):
-- **Curated List**: 50+ popular ETFs (Global, US, European, Fixed Income, Sector) and stocks
+- **Curated List**: 50+ popular ETFs (Global, US, European, Fixed Income, Sector) and stocks for search
 - **Yahoo Finance Integration**: Optional live search (may be rate-limited)
-- **Graceful Fallback**: Uses curated list if Yahoo Finance is unavailable
+- **Dynamic Ticker Names**: Company/fund names fetched from Yahoo Finance API in real-time (not hardcoded)
+- **Graceful Fallback**: Uses curated list if Yahoo Finance search unavailable; returns empty name if ticker info unavailable
 - **User-Friendly**: Click-to-select from search results or manual entry
+- **LRU Caching**: Ticker names cached (500 entries) to minimize API calls
 
 #### 3. Visualization (plot_backtest.py - 395 lines)
 
@@ -152,7 +154,7 @@ portfolio-backtester/
 - **Phase 2**: Logging instead of print statements
 - **Phase 3**: Data quality validation (min 2 rows, NaN checks)
 
-#### 4. Testing Infrastructure (3 test files, 177 tests)
+#### 4. Testing Infrastructure (4 test files, 179 tests)
 
 **Test Coverage**: ~88% overall, 100% pass rate
 
@@ -165,13 +167,15 @@ portfolio-backtester/
 - **test_app.py** (933 lines, 64 tests): Unit tests for web UI
   - Portfolio presets, date presets, multiple benchmarks
   - Delta indicators, rolling returns, metric formatting
-  - Portfolio composition with ticker names
+  - Portfolio composition with ticker names (fetched from yfinance)
   - 14 test classes with comprehensive coverage
 
-- **test_ticker_data.py** (30 tests): Unit tests for ticker search functionality
+- **test_ticker_data.py** (32 tests): Unit tests for ticker search and name fetching
   - Curated ticker list validation
   - Search functionality (by symbol and name)
-  - Yahoo Finance API mocking
+  - Yahoo Finance API mocking (search and ticker info)
+  - Dynamic ticker name fetching with yfinance
+  - Fallback to shortName, error handling
   - Cache clearing and edge cases
 
 - **test_integration.py** (420 lines, 16 tests - Phase 3): Integration tests
@@ -309,7 +313,7 @@ python backtest.py --tickers AAPL MSFT --weights 0.6 0.4 --benchmark SPY
 # Plot results
 python plot_backtest.py --csv results/backtest.csv --output charts/test
 
-# Run all tests (177 tests)
+# Run all tests (179 tests)
 pytest -v
 
 # Run with coverage
@@ -463,5 +467,5 @@ git commit -m "feat: add new_metric calculation"
 **Last Updated**: 2025-11-15
 **Version**: v2.2.0-dev (Unreleased)
 **Current Branch**: claude/make-ticker-searchable-01Nb4CzjMJBJ9y2PugkUtCW7
-**Test Coverage**: ~88% (177 tests, 100% passing)
+**Test Coverage**: ~88% (179 tests, 100% passing)
 **Progress**: 87.5% complete (14/16 tasks, Phase 4 in progress)
