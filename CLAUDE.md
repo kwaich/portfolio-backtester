@@ -1,6 +1,6 @@
 # CLAUDE.md - AI Assistant Development Guide
 
-This document provides comprehensive guidance for AI assistants working on the backtester repository.
+This document provides comprehensive guidance for AI assistants working on the portfolio-backtester repository.
 
 ## Project Overview
 
@@ -15,7 +15,7 @@ This is a lightweight Python-based ETF backtesting utility that allows users to:
 ## Repository Structure
 
 ```
-backtester/
+portfolio-backtester/
 ├── app.py               # Streamlit web UI (NEW)
 ├── backtest.py          # Main backtesting engine
 ├── plot_backtest.py     # Visualization helper
