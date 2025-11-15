@@ -3,9 +3,9 @@
 **Purpose**: Concise guidance for AI assistants working on the portfolio-backtester repository.
 
 **Detailed Documentation**:
-- **[FILE_REFERENCE.md](FILE_REFERENCE.md)**: Comprehensive file-by-file documentation
-- **[TESTING_GUIDE.md](TESTING_GUIDE.md)**: Test-driven development rules and patterns
-- **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)**: Development workflows and best practices
+- **[FILE_REFERENCE.md](docs/FILE_REFERENCE.md)**: Comprehensive file-by-file documentation
+- **[TESTING_GUIDE.md](docs/TESTING_GUIDE.md)**: Test-driven development rules and patterns
+- **[DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md)**: Development workflows and best practices
 
 ---
 
@@ -48,14 +48,16 @@ portfolio-backtester/
 ├── requirements.txt          # Python dependencies
 ├── README.md                 # Main user documentation
 ├── CLAUDE.md                 # This file - AI assistant guide
-├── FILE_REFERENCE.md         # Detailed file documentation
-├── TESTING_GUIDE.md          # TDD rules and test patterns
-├── DEVELOPER_GUIDE.md        # Development workflows
-├── IMPLEMENTATION_PLAN.md    # Code improvement roadmap
-├── IMPLEMENTATION_CHECKLIST.md # Progress tracking (87.5% complete)
-├── CHANGELOG.md              # Version history (v2.1.0)
-├── PHASE3_SUMMARY.md         # Phase 3 completion summary
-└── TEST_REPORT.md            # Phase 2 validation report
+└── docs/                     # Documentation directory
+    ├── FILE_REFERENCE.md         # Detailed file documentation
+    ├── TESTING_GUIDE.md          # TDD rules and test patterns
+    ├── DEVELOPER_GUIDE.md        # Development workflows
+    ├── IMPLEMENTATION_PLAN.md    # Code improvement roadmap
+    ├── IMPLEMENTATION_CHECKLIST.md # Progress tracking (87.5% complete)
+    ├── CHANGELOG.md              # Version history (v2.1.0)
+    ├── PHASE3_SUMMARY.md         # Phase 3 completion summary
+    ├── TEST_REPORT.md            # Phase 2 validation report
+    └── PROJECT_SUMMARY.md        # Additional project documentation
 ```
 
 **Gitignored Directories** (do not commit):
@@ -158,7 +160,7 @@ portfolio-backtester/
   - Statistical edge cases, multi-ticker scenarios
   - 6 test classes covering real-world usage
 
-**See**: [TESTING_GUIDE.md](TESTING_GUIDE.md) for comprehensive testing rules and patterns.
+**See**: [TESTING_GUIDE.md](docs/TESTING_GUIDE.md) for comprehensive testing rules and patterns.
 
 ---
 
@@ -181,7 +183,7 @@ pytest -v
 # If tests fail, fix them before committing
 ```
 
-**See**: [TESTING_GUIDE.md](TESTING_GUIDE.md) for detailed testing guidelines.
+**See**: [TESTING_GUIDE.md](docs/TESTING_GUIDE.md) for detailed testing guidelines.
 
 ### Code Style
 
@@ -300,7 +302,7 @@ rm -rf .cache/
 
 ### Key File Locations
 
-**See [FILE_REFERENCE.md](FILE_REFERENCE.md) for comprehensive documentation.**
+**See [FILE_REFERENCE.md](docs/FILE_REFERENCE.md) for comprehensive documentation.**
 
 **Quick Links**:
 - Core logic: `backtest.py:199-307` (compute_metrics, summarize)
@@ -356,7 +358,7 @@ rm -rf .cache/
 5. **Document**: Update README.md, CLAUDE.md, FILE_REFERENCE.md as needed
 6. **Commit**: `pytest -v && git commit -m "feat: description"`
 
-**See**: [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for detailed workflows and scenarios.
+**See**: [DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) for detailed workflows and scenarios.
 
 ### Example: Adding New Metric
 
@@ -390,25 +392,25 @@ git commit -m "feat: add new_metric calculation"
 
 **Critical Constraints**: Network required (yfinance), Yahoo Finance data may have gaps, `.cache/` gitignored, testing required before commits.
 
-**Edge Cases**: Missing data (forward-fill & validate), short date ranges (<30 days warned), weight mismatch (auto-normalize), network failures (retry with backoff), bad data (comprehensive validation). See [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for details.
+**Edge Cases**: Missing data (forward-fill & validate), short date ranges (<30 days warned), weight mismatch (auto-normalize), network failures (retry with backoff), bad data (comprehensive validation). See [DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) for details.
 
 ---
 
 ## Detailed Documentation References
 
-**📄 [FILE_REFERENCE.md](FILE_REFERENCE.md)**: File-by-file documentation with line counts, purposes, key functions.
+**📄 [FILE_REFERENCE.md](docs/FILE_REFERENCE.md)**: File-by-file documentation with line counts, purposes, key functions.
 
-**📄 [TESTING_GUIDE.md](TESTING_GUIDE.md)**: TDD rules, test structure, coverage requirements, mocking patterns.
+**📄 [TESTING_GUIDE.md](docs/TESTING_GUIDE.md)**: TDD rules, test structure, coverage requirements, mocking patterns.
 
-**📄 [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)**: Environment setup, code conventions, git workflow, common tasks.
+**📄 [DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md)**: Environment setup, code conventions, git workflow, common tasks.
 
 **📄 [README.md](README.md)**: User documentation with quick start, usage examples, CLI reference, troubleshooting.
 
-**📄 [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)**: Phases 1-4 roadmap with task breakdown and timeline.
+**📄 [IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)**: Phases 1-4 roadmap with task breakdown and timeline.
 
-**📄 [IMPLEMENTATION_CHECKLIST.md](IMPLEMENTATION_CHECKLIST.md)**: Task tracking (14/16 complete - 87.5%).
+**📄 [IMPLEMENTATION_CHECKLIST.md](docs/IMPLEMENTATION_CHECKLIST.md)**: Task tracking (14/16 complete - 87.5%).
 
-**📄 [CHANGELOG.md](CHANGELOG.md)**: Version history and release notes (v1.0.0 → v2.1.0).
+**📄 [CHANGELOG.md](docs/CHANGELOG.md)**: Version history and release notes (v1.0.0 → v2.1.0).
 
 ---
 

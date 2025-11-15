@@ -2,7 +2,7 @@
 
 **Purpose**: Comprehensive documentation of all project files and their functions.
 
-This document provides detailed information about each file in the portfolio-backtester project. For a quick overview, see [CLAUDE.md](CLAUDE.md).
+This document provides detailed information about each file in the portfolio-backtester project. For a quick overview, see [CLAUDE.md](../CLAUDE.md).
 
 ---
 
@@ -325,4 +325,4 @@ This document provides detailed information about each file in the portfolio-bac
 
 **Last Updated**: 2025-11-15  
 **For**: Portfolio Backtester v2.1.0  
-**See Also**: [CLAUDE.md](CLAUDE.md), [TESTING_GUIDE.md](TESTING_GUIDE.md), [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)
+**See Also**: [CLAUDE.md](../CLAUDE.md), [TESTING_GUIDE.md](TESTING_GUIDE.md), [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)

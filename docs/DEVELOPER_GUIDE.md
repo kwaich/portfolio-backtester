@@ -4,7 +4,7 @@
 
 For file-specific documentation, see [FILE_REFERENCE.md](FILE_REFERENCE.md).
 For testing guidelines, see [TESTING_GUIDE.md](TESTING_GUIDE.md).
-For AI development guidance, see [CLAUDE.md](CLAUDE.md).
+For AI development guidance, see [CLAUDE.md](../CLAUDE.md).
 
 ---
 
@@ -816,4 +816,4 @@ See [FILE_REFERENCE.md](FILE_REFERENCE.md) for comprehensive file documentation.
 
 **Last Updated**: 2025-11-15
 **For**: Portfolio Backtester v2.1.0
-**See Also**: [FILE_REFERENCE.md](FILE_REFERENCE.md), [TESTING_GUIDE.md](TESTING_GUIDE.md), [CLAUDE.md](CLAUDE.md)
+**See Also**: [FILE_REFERENCE.md](FILE_REFERENCE.md), [TESTING_GUIDE.md](TESTING_GUIDE.md), [CLAUDE.md](../CLAUDE.md)

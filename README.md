@@ -364,12 +364,17 @@ portfolio-backtester/
 ├── test_integration.py     # Integration tests (25 tests)
 ├── requirements.txt        # Python dependencies
 ├── README.md               # This file
-├── PROJECT_SUMMARY.md      # Additional documentation
 ├── CLAUDE.md               # AI assistant guide
-├── IMPLEMENTATION_PLAN.md  # Code improvement roadmap
-├── IMPLEMENTATION_CHECKLIST.md  # Progress tracking
-├── TEST_REPORT.md          # Comprehensive validation report
-├── PHASE3_SUMMARY.md       # Phase 3 completion summary
+├── docs/                   # Documentation directory
+│   ├── FILE_REFERENCE.md         # Detailed file documentation
+│   ├── TESTING_GUIDE.md          # TDD rules and test patterns
+│   ├── DEVELOPER_GUIDE.md        # Development workflows
+│   ├── IMPLEMENTATION_PLAN.md    # Code improvement roadmap
+│   ├── IMPLEMENTATION_CHECKLIST.md # Progress tracking
+│   ├── CHANGELOG.md              # Version history
+│   ├── PHASE3_SUMMARY.md         # Phase 3 completion summary
+│   ├── TEST_REPORT.md            # Validation report
+│   └── PROJECT_SUMMARY.md        # Additional documentation
 ├── .gitignore              # Git ignore rules
 ├── .venv/                  # Virtual environment (gitignored)
 ├── .cache/                 # Price data cache (gitignored)
@@ -512,7 +517,7 @@ Historical price data is fetched from Yahoo Finance via the [yfinance](https://g
 
 ## Future Enhancements
 
-Potential improvements (see [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) for details):
+Potential improvements (see [PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md) for details):
 
 - Periodic rebalancing strategies
 - Transaction cost modeling
@@ -616,7 +621,7 @@ This project is open source and available for educational and personal use.
 
 For issues, questions, or suggestions:
 - Open an issue in the repository
-- Check existing documentation in PROJECT_SUMMARY.md
+- Check existing documentation in [docs/PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md)
 - Review unit tests for usage examples
 
 ---

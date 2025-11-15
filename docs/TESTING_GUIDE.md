@@ -3,7 +3,7 @@
 **Purpose**: Comprehensive testing guidelines and best practices for the portfolio-backtester project.
 
 For file-specific documentation, see [FILE_REFERENCE.md](FILE_REFERENCE.md).
-For AI development guidance, see [CLAUDE.md](CLAUDE.md).
+For AI development guidance, see [CLAUDE.md](../CLAUDE.md).
 
 ---
 
@@ -619,4 +619,4 @@ pytest --cov=backtest --cov=app --cov-report=html
 
 **Last Updated**: 2025-11-15
 **For**: Portfolio Backtester v2.1.0
-**See Also**: [FILE_REFERENCE.md](FILE_REFERENCE.md), [CLAUDE.md](CLAUDE.md), [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)
+**See Also**: [FILE_REFERENCE.md](FILE_REFERENCE.md), [CLAUDE.md](../CLAUDE.md), [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)
