@@ -15,6 +15,9 @@ an optional CSV of the full time series if --output is provided.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import logging
+import pickle
 import sys
 from pathlib import Path
 from typing import List
@@ -28,6 +31,14 @@ except ImportError as exc:  # pragma: no cover - dependency guard
     raise SystemExit(
         "Missing dependency yfinance. Install it via 'pip install yfinance'."
     ) from exc
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 
 
 def parse_args(argv: List[str]) -> argparse.Namespace:
@@ -71,11 +82,63 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
         type=Path,
         help="Optional CSV destination for the full time-series table",
     )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Disable price data caching (always download fresh data)",
+    )
     return parser.parse_args(argv)
 
 
-def download_prices(tickers: List[str], start: str, end: str) -> pd.DataFrame:
+def get_cache_key(tickers: List[str], start: str, end: str) -> str:
+    """Generate a unique cache key for the given parameters."""
+    key_str = f"{'_'.join(sorted(tickers))}_{start}_{end}"
+    return hashlib.md5(key_str.encode()).hexdigest()
+
+
+def get_cache_path(tickers: List[str], start: str, end: str) -> Path:
+    """Get the cache file path for the given parameters."""
+    cache_dir = Path(".cache")
+    cache_dir.mkdir(exist_ok=True)
+    cache_key = get_cache_key(tickers, start, end)
+    return cache_dir / f"{cache_key}.pkl"
+
+
+def load_cached_prices(cache_path: Path) -> pd.DataFrame | None:
+    """Load cached price data if it exists and is valid."""
+    if not cache_path.exists():
+        return None
+    try:
+        with open(cache_path, "rb") as f:
+            data = pickle.load(f)
+        logger.info(f"Loaded cached data from {cache_path}")
+        return data
+    except Exception as e:
+        logger.warning(f"Failed to load cache: {e}")
+        return None
+
+
+def save_cached_prices(cache_path: Path, prices: pd.DataFrame) -> None:
+    """Save price data to cache."""
+    try:
+        with open(cache_path, "wb") as f:
+            pickle.dump(prices, f)
+        logger.info(f"Saved data to cache: {cache_path}")
+    except Exception as e:
+        logger.warning(f"Failed to save cache: {e}")
+
+
+def download_prices(tickers: List[str], start: str, end: str, use_cache: bool = True) -> pd.DataFrame:
     """Fetch adjusted closes for the requested tickers."""
+
+    # Try to load from cache first
+    if use_cache:
+        cache_path = get_cache_path(tickers, start, end)
+        cached_data = load_cached_prices(cache_path)
+        if cached_data is not None:
+            return cached_data
+
+    logger.info(f"Downloading data for {len(tickers)} ticker(s) from {start} to {end}")
 
     data = yf.download(
         tickers=tickers,
@@ -105,13 +168,31 @@ def download_prices(tickers: List[str], start: str, end: str) -> pd.DataFrame:
 
     prices = prices.dropna(how="all")
     if prices.empty:
-        raise ValueError("No price rows returned; check tickers or date range")
+        raise ValueError(
+            f"No price data returned for period {start} to {end}.\n"
+            f"Tickers requested: {', '.join(tickers)}\n"
+            f"Please verify:\n"
+            f"  1. Tickers are valid symbols\n"
+            f"  2. Tickers were trading during this period\n"
+            f"  3. Date range is valid (not in the future)"
+        )
     if isinstance(prices, pd.Series):
         prices = prices.to_frame(name=tickers[0])
     missing = [ticker for ticker in tickers if ticker not in prices.columns]
     if missing:
-        raise ValueError(f"Missing data for tickers: {', '.join(missing)}")
+        available = [t for t in tickers if t not in missing]
+        raise ValueError(
+            f"Missing data for ticker(s): {', '.join(missing)}\n"
+            f"Date range: {start} to {end}\n"
+            f"Available ticker(s): {', '.join(available) if available else 'None'}\n"
+            f"Verify the missing tickers were trading during this period."
+        )
     prices = prices.loc[:, tickers]
+
+    # Save to cache
+    if use_cache:
+        save_cached_prices(cache_path, prices)
+
     return prices
 
 
@@ -126,12 +207,26 @@ def compute_metrics(
     prices = prices.sort_index()
     first_valid_points = [series.first_valid_index() for _, series in prices.items()]
     if any(idx is None for idx in first_valid_points):
-        raise ValueError("One or more tickers have no valid prices in this window")
+        tickers_status = [
+            f"{ticker}: {'OK' if idx is not None else 'NO DATA'}"
+            for ticker, idx in zip(prices.columns, first_valid_points)
+        ]
+        raise ValueError(
+            f"One or more tickers have no valid prices in this window:\n"
+            + "\n".join(f"  - {s}" for s in tickers_status)
+        )
     start_date = max(first_valid_points)
     aligned = prices.loc[start_date:].ffill().dropna()
     if aligned.empty:
+        earliest_dates = {
+            ticker: idx.strftime("%Y-%m-%d") if idx else "N/A"
+            for ticker, idx in zip(prices.columns, first_valid_points)
+        }
         raise ValueError(
-            "Not enough overlapping history for portfolio tickers; try a later start"
+            f"Not enough overlapping history for portfolio tickers.\n"
+            f"Ticker start dates: {earliest_dates}\n"
+            f"Common start would be: {start_date.strftime('%Y-%m-%d')}\n"
+            f"Try using a later start date or different tickers."
         )
 
     first_prices = aligned.iloc[0]
@@ -143,12 +238,20 @@ def compute_metrics(
     benchmark = benchmark.sort_index()
     bench_start = benchmark.first_valid_index()
     if bench_start is None:
-        raise ValueError("Benchmark has no data in this window")
+        raise ValueError(
+            "Benchmark has no data in the requested window.\n"
+            "Verify the benchmark ticker is valid and traded during this period."
+        )
     combined_start = max(aligned.index[0], bench_start)
     aligned = aligned.loc[combined_start:]
     benchmark = benchmark.loc[combined_start:].reindex(aligned.index).ffill().dropna()
     if benchmark.empty:
-        raise ValueError("Benchmark has no overlapping data in this window")
+        raise ValueError(
+            f"Benchmark has no overlapping data in this window.\n"
+            f"Portfolio starts: {aligned.index[0].strftime('%Y-%m-%d')}\n"
+            f"Benchmark starts: {bench_start.strftime('%Y-%m-%d')}\n"
+            f"Try adjusting the date range or choose a different benchmark."
+        )
     bench_units = capital / benchmark.iloc[0]
     bench_value = benchmark * bench_units
     bench_return = bench_value / capital - 1
@@ -174,10 +277,33 @@ def summarize(series: pd.Series, capital: float) -> dict[str, float]:
     total_return = ending_value / capital - 1
     days = max(1, (series.index[-1] - series.index[0]).days)
     cagr = (ending_value / capital) ** (365 / days) - 1
+
+    # Calculate daily returns for additional metrics
+    daily_returns = series.pct_change().dropna()
+
+    # Volatility (annualized standard deviation)
+    volatility = daily_returns.std() * np.sqrt(252)
+
+    # Sharpe ratio (assuming 0% risk-free rate for simplicity)
+    sharpe_ratio = (cagr / volatility) if volatility > 0 else 0.0
+
+    # Maximum drawdown
+    cumulative = series / series.expanding().max()
+    drawdown = (cumulative - 1).min()
+
+    # Sortino ratio (downside deviation only)
+    downside_returns = daily_returns[daily_returns < 0]
+    downside_std = downside_returns.std() * np.sqrt(252) if len(downside_returns) > 0 else 0.0
+    sortino_ratio = (cagr / downside_std) if downside_std > 0 else 0.0
+
     return {
         "ending_value": ending_value,
         "total_return": total_return,
         "cagr": cagr,
+        "volatility": volatility,
+        "sharpe_ratio": sharpe_ratio,
+        "sortino_ratio": sortino_ratio,
+        "max_drawdown": drawdown,
     }
 
 
@@ -189,39 +315,62 @@ def main(argv: List[str]) -> None:
     if len(tickers) != len(weights):
         raise SystemExit("Number of weights must match number of tickers")
     if not np.isclose(weights.sum(), 1.0):
+        logger.info(f"Normalizing weights from {weights} to sum to 1.0")
         weights = weights / weights.sum()
 
     universe = list(dict.fromkeys(tickers + [args.benchmark]))
-    prices = download_prices(universe, args.start, args.end)
+    use_cache = not args.no_cache
+    prices = download_prices(universe, args.start, args.end, use_cache=use_cache)
 
     portfolio_prices = prices[tickers]
     benchmark_prices = prices[args.benchmark]
 
+    logger.info("Computing backtest metrics...")
     table = compute_metrics(portfolio_prices, weights, benchmark_prices, args.capital)
 
     portfolio_stats = summarize(table["portfolio_value"], args.capital)
     benchmark_stats = summarize(table["benchmark_value"], args.capital)
 
-    print("Portfolio vs Benchmark (capital: {:.2f})".format(args.capital))
-    print("Time span: {} → {}".format(table.index[0].date(), table.index[-1].date()))
-    print(
-        "Portfolio Ending={ending_value:,.2f} Total={total_return:.2%} CAGR={cagr:.2%}".format(
-            **portfolio_stats
-        )
-    )
-    print(
-        "Benchmark Ending={ending_value:,.2f} Total={total_return:.2%} CAGR={cagr:.2%}".format(
-            **benchmark_stats
-        )
-    )
-    active = portfolio_stats["total_return"] - benchmark_stats["total_return"]
-    print("Active Return vs Benchmark: {:+.2%}".format(active))
+    # Print results
+    print("\n" + "="*70)
+    print("BACKTEST RESULTS")
+    print("="*70)
+    print(f"Capital: ${args.capital:,.2f}")
+    print(f"Time Span: {table.index[0].date()} → {table.index[-1].date()}")
+    print(f"Portfolio: {', '.join(f'{t} ({w:.1%})' for t, w in zip(tickers, weights))}")
+    print(f"Benchmark: {args.benchmark}")
+    print("-"*70)
+
+    print("\nPORTFOLIO PERFORMANCE:")
+    print(f"  Ending Value:    ${portfolio_stats['ending_value']:>15,.2f}")
+    print(f"  Total Return:    {portfolio_stats['total_return']:>15.2%}")
+    print(f"  CAGR:            {portfolio_stats['cagr']:>15.2%}")
+    print(f"  Volatility:      {portfolio_stats['volatility']:>15.2%}")
+    print(f"  Sharpe Ratio:    {portfolio_stats['sharpe_ratio']:>15.2f}")
+    print(f"  Sortino Ratio:   {portfolio_stats['sortino_ratio']:>15.2f}")
+    print(f"  Max Drawdown:    {portfolio_stats['max_drawdown']:>15.2%}")
+
+    print("\nBENCHMARK PERFORMANCE:")
+    print(f"  Ending Value:    ${benchmark_stats['ending_value']:>15,.2f}")
+    print(f"  Total Return:    {benchmark_stats['total_return']:>15.2%}")
+    print(f"  CAGR:            {benchmark_stats['cagr']:>15.2%}")
+    print(f"  Volatility:      {benchmark_stats['volatility']:>15.2%}")
+    print(f"  Sharpe Ratio:    {benchmark_stats['sharpe_ratio']:>15.2f}")
+    print(f"  Sortino Ratio:   {benchmark_stats['sortino_ratio']:>15.2f}")
+    print(f"  Max Drawdown:    {benchmark_stats['max_drawdown']:>15.2%}")
+
+    print("\nRELATIVE PERFORMANCE:")
+    active_return = portfolio_stats["total_return"] - benchmark_stats["total_return"]
+    active_cagr = portfolio_stats["cagr"] - benchmark_stats["cagr"]
+    print(f"  Active Return:   {active_return:>15.2%}")
+    print(f"  Active CAGR:     {active_cagr:>15.2%}")
+    print("="*70 + "\n")
 
     if args.output:
         output_path = args.output
         output_path.parent.mkdir(parents=True, exist_ok=True)
         table.to_csv(output_path, index_label="date")
-        print(f"Saved detailed series to {output_path}")
+        logger.info(f"Saved detailed series to {output_path}")
 
 
 if __name__ == "__main__":
