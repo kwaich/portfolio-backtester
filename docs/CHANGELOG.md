@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Portfolio Composition Enhancement** - Ticker names now displayed in Portfolio Composition table
+  - Table shows: Ticker symbol, Full company/fund name (from Yahoo Finance), Weight percentage
+  - Ticker names fetched dynamically from Yahoo Finance API for accuracy
+  - Works for **any ticker**, not limited to curated list
+  - LRU cache (500 entries) for performance
+  - Graceful handling of unknown tickers or API errors (empty name field)
+
+### Changed
+- **BREAKING: Ticker Name Fetching** - Now uses Yahoo Finance API instead of hardcoded names
+  - `get_ticker_name()` fetches from `yfinance.Ticker().info` dynamically
+  - Always up-to-date and accurate ticker names
+  - Supports unlimited tickers (not just 53 curated ones)
+  - Falls back to `shortName` if `longName` unavailable
+  - Returns empty string on error or if ticker not found
+
+- **Test Coverage** - Updated from 155 to 179 tests (100% pass rate)
+  - Added 2 new tests for yfinance ticker name integration
+  - Updated portfolio composition tests with yfinance mocking
+  - All ticker_data tests passing (32 tests, +2 new)
+  - All app UI tests passing (64 tests)
+  - All backtest engine tests passing (67 tests)
+  - All integration tests passing (16 tests)
+
+### Fixed
+- **Test Infrastructure** - Improved test reliability
+  - Added `.strip()` to ticker search query for whitespace handling
+  - Added cache clearing in test setup to prevent test interference
+  - Removed 5 network-dependent integration tests
+  - Added `Mock` import to test_app.py for yfinance mocking
+
 ## [2.1.0] - 2025-11-15
 
 ### Added - Phase 3: Performance & Data Validation

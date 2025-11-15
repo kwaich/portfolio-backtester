@@ -6,12 +6,13 @@ UI elements consistently throughout the application.
 
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, Optional
 
 import streamlit as st
 import pandas as pd
 
 from .config import METRIC_LABELS
+from .ticker_data import get_all_tickers, format_ticker_option, search_tickers_with_yahoo, get_ticker_name
 
 
 def format_metric_value(key: str, value: float) -> str:
@@ -160,25 +161,136 @@ def render_relative_metrics(
 
 
 def render_portfolio_composition(tickers: list, weights: list) -> None:
-    """Render portfolio composition table.
-    
+    """Render portfolio composition table with ticker names.
+
     Args:
         tickers: List of ticker symbols
         weights: List of portfolio weights (normalized)
-    
+
     Examples:
         >>> render_portfolio_composition(
         ...     ["AAPL", "MSFT"],
         ...     [0.6, 0.4]
         ... )
-        # Displays table with tickers and weights
+        # Displays table with tickers, names, and weights
     """
     st.subheader("Portfolio Composition")
-    
+
+    # Get ticker names from ticker_data module
+    ticker_names = [get_ticker_name(ticker) for ticker in tickers]
+
     composition_data = {
         "Ticker": tickers,
+        "Name": ticker_names,
         "Weight": [f"{w:.1%}" for w in weights]
     }
-    
+
     composition_df = pd.DataFrame(composition_data)
     st.table(composition_df)
+
+
+def render_searchable_ticker_input(
+    label: str,
+    default_value: str = "",
+    key: str = None,
+    help_text: str = None
+) -> str:
+    """Render a searchable ticker input with Yahoo Finance integration.
+
+    This component provides:
+    1. Text input for direct ticker entry or search query
+    2. Search button to find tickers using the input value
+    3. Click-to-select from search results
+
+    Workflow:
+    - User types ticker symbol or company name (e.g., "AAPL" or "apple")
+    - Click 🔍 Search button to find matching tickers
+    - Click any result to populate the field
+
+    Args:
+        label: Label for the input field
+        default_value: Default ticker value
+        key: Unique key for the widget
+        help_text: Optional help text to display
+
+    Returns:
+        Selected or entered ticker symbol
+
+    Examples:
+        >>> ticker = render_searchable_ticker_input("Portfolio Ticker 1", "AAPL")
+        # User can type "AAPL" directly or "apple" then search
+    """
+    # Create unique keys for widgets
+    input_key = f"{key}_input" if key else None
+    search_key = f"{key}_search" if key else None
+    pending_key = f"{key}_pending" if key else None
+
+    # Check for pending ticker selection (from previous run)
+    if key and pending_key and pending_key in st.session_state:
+        pending_ticker = st.session_state[pending_key]
+        del st.session_state[pending_key]
+        # Set the value BEFORE creating the widget
+        if input_key:
+            st.session_state[input_key] = pending_ticker
+
+    # Initialize the text input's session state if needed
+    if key and input_key and input_key not in st.session_state:
+        st.session_state[input_key] = default_value
+
+    # Text input for ticker
+    col1, col2 = st.columns([3, 1])
+
+    with col1:
+        ticker_input = st.text_input(
+            label,
+            key=input_key,
+            help=help_text or "Enter ticker symbol or company name, then click 🔍 to search",
+            placeholder="e.g., AAPL, apple, vanguard"
+        )
+
+    with col2:
+        st.write("")  # Spacing
+        st.write("")  # Spacing
+        search_clicked = st.button("🔍 Search", key=search_key, use_container_width=True)
+
+    # If search button clicked, show search interface
+    if search_clicked or (key and st.session_state.get(f"{key}_show_search", False)):
+        if key:
+            st.session_state[f"{key}_show_search"] = True
+
+        # Use the ticker input value as the search query
+        search_query = ticker_input.strip()
+
+        if search_query and len(search_query) >= 2:
+            with st.spinner(f"Searching for '{search_query}'..."):
+                results = search_tickers_with_yahoo(search_query, limit=10)
+
+            if results:
+                st.caption(f"Found {len(results)} result(s) for '{search_query}':")
+
+                # Display results as clickable buttons
+                for idx, (ticker, name) in enumerate(results):
+                    # Use index to ensure unique keys even if ticker appears multiple times
+                    button_key = f"{key}_result_{idx}_{ticker}" if key else None
+                    display_text = f"{ticker} - {name}"
+
+                    if st.button(display_text, key=button_key, use_container_width=True):
+                        # Store ticker in pending state for next run
+                        if key and pending_key:
+                            st.session_state[pending_key] = ticker
+                            st.session_state[f"{key}_show_search"] = False
+                        st.rerun()
+            else:
+                st.warning(f"No results found for '{search_query}'. Try a different search term.")
+        elif not search_query:
+            st.info("💡 Enter a ticker symbol or company name in the field above, then click Search")
+        else:
+            st.info("Enter at least 2 characters to search")
+
+        # Close search button
+        if st.button("✕ Close Search", key=f"{key}_close" if key else None):
+            if key:
+                st.session_state[f"{key}_show_search"] = False
+            st.rerun()
+
+    return ticker_input.strip().upper() if ticker_input else ""

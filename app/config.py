@@ -53,6 +53,22 @@ DEFAULT_TICKER_2 = "VHYD.L"
 DEFAULT_BENCHMARK = "VWRA.L"
 
 # =============================================================================
+# Rebalancing Configuration
+# =============================================================================
+
+# Rebalancing frequency options
+REBALANCE_OPTIONS = {
+    "Buy-and-Hold (No Rebalancing)": None,
+    "Daily": "D",
+    "Weekly": "W",
+    "Monthly": "M",
+    "Quarterly": "Q",
+    "Yearly": "Y"
+}
+
+DEFAULT_REBALANCE_STRATEGY = "Buy-and-Hold (No Rebalancing)"
+
+# =============================================================================
 # Chart Configuration
 # =============================================================================
 

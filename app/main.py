@@ -49,7 +49,8 @@ try:
         CUSTOM_CSS, MAIN_TITLE, SUBTITLE, SIDEBAR_HEADER,
         DEFAULT_TICKER_1, DEFAULT_TICKER_2, DEFAULT_BENCHMARK,
         MAX_TICKERS, MIN_BENCHMARKS, MAX_BENCHMARKS,
-        DEFAULT_CAPITAL, MIN_CAPITAL, MAX_CAPITAL
+        DEFAULT_CAPITAL, MIN_CAPITAL, MAX_CAPITAL,
+        REBALANCE_OPTIONS, DEFAULT_REBALANCE_STRATEGY
     )
     from .presets import get_portfolio_presets, get_date_presets
     from .validation import (
@@ -58,7 +59,7 @@ try:
     )
     from .ui_components import (
         render_metrics_column, render_relative_metrics,
-        render_portfolio_composition
+        render_portfolio_composition, render_searchable_ticker_input
     )
     from .charts import create_main_dashboard, create_rolling_returns_chart
 except ImportError as e:
@@ -129,44 +130,41 @@ def main() -> None:
     preset_weights = st.session_state.get('preset_weights', [])
     
     for i in range(num_tickers):
-        col1, col2 = st.sidebar.columns([2, 1])
-        
-        with col1:
-            # Determine default ticker
-            if i < len(preset_tickers):
-                default_ticker = preset_tickers[i]
-            elif i == 0:
-                default_ticker = DEFAULT_TICKER_1
-            elif i == 1:
-                default_ticker = DEFAULT_TICKER_2
-            else:
-                default_ticker = ""
-            
-            ticker = col1.text_input(
-                f"Ticker {i+1}",
-                value=default_ticker,
-                key=f"ticker_{i}",
-                help="Enter ticker symbol (e.g., VDCP.L, AAPL)"
-            )
-            tickers.append(ticker)
-        
-        with col2:
-            # Determine default weight
-            if i < len(preset_weights):
-                default_weight = preset_weights[i]
-            else:
-                default_weight = 1.0 / num_tickers
-            
-            weight = col2.number_input(
-                f"Weight {i+1}",
-                min_value=0.0,
-                max_value=1.0,
-                value=default_weight,
-                step=0.05,
-                key=f"weight_{i}",
-                help="Portfolio weight (will be normalized)"
-            )
-            weights.append(weight)
+        # Determine default ticker
+        if i < len(preset_tickers):
+            default_ticker = preset_tickers[i]
+        elif i == 0:
+            default_ticker = DEFAULT_TICKER_1
+        elif i == 1:
+            default_ticker = DEFAULT_TICKER_2
+        else:
+            default_ticker = ""
+
+        # Use searchable ticker input
+        ticker = render_searchable_ticker_input(
+            f"Ticker {i+1}",
+            default_value=default_ticker,
+            key=f"ticker_{i}",
+            help_text="Enter ticker symbol or company name, then click 🔍 to search"
+        )
+        tickers.append(ticker)
+
+        # Weight input
+        if i < len(preset_weights):
+            default_weight = preset_weights[i]
+        else:
+            default_weight = 1.0 / num_tickers
+
+        weight = st.sidebar.number_input(
+            f"Weight {i+1}",
+            min_value=0.0,
+            max_value=1.0,
+            value=default_weight,
+            step=0.05,
+            key=f"weight_{i}",
+            help="Portfolio weight (will be normalized)"
+        )
+        weights.append(weight)
     
     # Benchmark
     st.sidebar.subheader("Benchmark")
@@ -189,12 +187,13 @@ def main() -> None:
             default_bench = "SPY"
         else:
             default_bench = ""
-        
-        bench_ticker = st.sidebar.text_input(
+
+        # Use searchable ticker input for benchmarks
+        bench_ticker = render_searchable_ticker_input(
             f"Benchmark {i+1}",
-            value=default_bench,
+            default_value=default_bench,
             key=f"benchmark_{i}",
-            help="Ticker to compare against (e.g., VWRA.L, SPY)"
+            help_text="Enter ticker symbol or company name, then click 🔍 to search"
         )
         if bench_ticker:
             benchmarks.append(bench_ticker)
@@ -240,7 +239,17 @@ def main() -> None:
         format="%0.2f",
         help="Initial investment amount"
     )
-    
+
+    # Rebalancing strategy
+    st.sidebar.subheader("Rebalancing Strategy")
+    rebalance_strategy = st.sidebar.selectbox(
+        "Rebalancing Frequency",
+        options=list(REBALANCE_OPTIONS.keys()),
+        index=0,
+        help="How often to rebalance the portfolio back to target weights"
+    )
+    rebalance_freq = REBALANCE_OPTIONS[rebalance_strategy]
+
     # Cache option
     st.sidebar.subheader("Options")
     use_cache = st.sidebar.checkbox(
@@ -251,11 +260,12 @@ def main() -> None:
     
     # Run button
     run_backtest = st.sidebar.button("🚀 Run Backtest", type="primary", use_container_width=True)
-    
+
     # =========================================================================
     # Main Content Area
     # =========================================================================
-    
+
+    # Run backtest and store results in session state
     if run_backtest:
         # Validate inputs
         is_valid, error_msg = validate_backtest_inputs(tickers, benchmarks, start_date, end_date)
@@ -312,20 +322,46 @@ def main() -> None:
         with st.spinner("Computing backtest metrics..."):
             try:
                 # Compute metrics for primary benchmark
-                results = compute_metrics(portfolio_prices, weights_array, benchmark_prices, capital)
-                
+                results = compute_metrics(portfolio_prices, weights_array, benchmark_prices, capital, rebalance_freq=rebalance_freq)
+
                 # Compute metrics for additional benchmarks
                 all_benchmark_results = {}
                 for bench_name, bench_prices in all_benchmark_prices.items():
-                    bench_result = compute_metrics(portfolio_prices, weights_array, bench_prices, capital)
+                    bench_result = compute_metrics(portfolio_prices, weights_array, bench_prices, capital, rebalance_freq=rebalance_freq)
                     all_benchmark_results[bench_name] = bench_result
-                
+
+                # Store results in session state
+                st.session_state.backtest_results = {
+                    'results': results,
+                    'all_benchmark_results': all_benchmark_results,
+                    'tickers': tickers,
+                    'benchmarks': benchmarks,
+                    'weights_array': weights_array,
+                    'capital': capital,
+                    'rebalance_strategy': rebalance_strategy,
+                    'rebalance_freq': rebalance_freq
+                }
+                st.session_state.backtest_completed = True
+
                 st.success("✅ Backtest completed successfully!")
-                
+
             except Exception as e:
                 st.error(f"❌ Error computing metrics: {str(e)}")
                 st.stop()
-        
+
+    # Display results from session state (persists across reruns)
+    if st.session_state.get('backtest_completed', False):
+        # Retrieve stored results
+        stored = st.session_state.backtest_results
+        results = stored['results']
+        all_benchmark_results = stored['all_benchmark_results']
+        tickers = stored['tickers']
+        benchmarks = stored['benchmarks']
+        weights_array = stored['weights_array']
+        capital = stored['capital']
+        rebalance_strategy = stored['rebalance_strategy']
+        rebalance_freq = stored['rebalance_freq']
+
         # Display results
         st.divider()
         st.header("📊 Backtest Results")
@@ -371,14 +407,27 @@ def main() -> None:
         # Portfolio composition
         st.divider()
         render_portfolio_composition(tickers, weights_array)
-        
+
+        # Display rebalancing strategy
+        if rebalance_freq:
+            st.info(f"📊 **Strategy**: {rebalance_strategy}")
+        else:
+            st.info(f"📊 **Strategy**: {rebalance_strategy}")
+
         # Charts
         st.divider()
         st.header("📈 Interactive Visualizations")
         st.caption("💡 Hover over the charts to see exact values")
-        
+
+        # Log scale toggle
+        log_scale = st.checkbox(
+            "Use logarithmic scale for portfolio value chart",
+            value=False,
+            help="Logarithmic scale is useful for viewing long-term exponential growth"
+        )
+
         # Create main dashboard
-        fig = create_main_dashboard(results, all_benchmark_results, benchmarks)
+        fig = create_main_dashboard(results, all_benchmark_results, benchmarks, log_scale=log_scale)
         st.plotly_chart(fig, use_container_width=True)
         
         # Rolling returns analysis
