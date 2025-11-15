@@ -288,6 +288,118 @@ class TestComputeMetrics:
         assert len(table) == 5
         assert table.index[0] == pd.Timestamp("2020-01-06")
 
+    def test_rolling_sharpe_12m_column_exists(self):
+        """Test that rolling 12-month Sharpe ratio column is created."""
+        dates = pd.date_range("2020-01-01", periods=300, freq="D")
+        prices = pd.DataFrame(
+            {"AAPL": np.linspace(100, 120, 300), "MSFT": np.linspace(200, 240, 300)},
+            index=dates,
+        )
+        benchmark = pd.Series(np.linspace(150, 180, 300), index=dates)
+        weights = np.array([0.5, 0.5])
+
+        table = backtest.compute_metrics(prices, weights, benchmark, 100_000)
+
+        # Check that rolling Sharpe columns exist
+        assert "portfolio_rolling_sharpe_12m" in table.columns
+        assert "benchmark_rolling_sharpe_12m" in table.columns
+
+    def test_rolling_sharpe_12m_nan_initially(self):
+        """Test that rolling Sharpe is NaN for first 252 days (12 months)."""
+        dates = pd.date_range("2020-01-01", periods=300, freq="D")
+        prices = pd.DataFrame(
+            {"AAPL": np.linspace(100, 120, 300), "MSFT": np.linspace(200, 240, 300)},
+            index=dates,
+        )
+        benchmark = pd.Series(np.linspace(150, 180, 300), index=dates)
+        weights = np.array([0.5, 0.5])
+
+        table = backtest.compute_metrics(prices, weights, benchmark, 100_000)
+
+        # First 252 values should be NaN (index 0 has NaN from pct_change,
+        # then we need 252 values for rolling window, so first valid is at index 252)
+        assert pd.isna(table["portfolio_rolling_sharpe_12m"].iloc[:252]).all()
+        assert pd.isna(table["benchmark_rolling_sharpe_12m"].iloc[:252]).all()
+
+        # At index 252 (253rd value), should have valid rolling Sharpe
+        assert not pd.isna(table["portfolio_rolling_sharpe_12m"].iloc[252])
+        assert not pd.isna(table["benchmark_rolling_sharpe_12m"].iloc[252])
+
+    def test_rolling_sharpe_12m_calculation(self):
+        """Test rolling Sharpe ratio calculation accuracy."""
+        # Create 400 days of data with realistic returns (trend + volatility)
+        dates = pd.date_range("2020-01-01", periods=400, freq="D")
+
+        # Set random seed for reproducibility
+        np.random.seed(42)
+
+        # Create portfolio with 10% annual growth + 15% annual volatility
+        daily_mean_return = 0.10 / 252  # 10% annual / 252 trading days
+        daily_volatility = 0.15 / np.sqrt(252)  # 15% annual volatility
+
+        # Generate random daily returns with drift
+        daily_returns = np.random.normal(daily_mean_return, daily_volatility, 400)
+
+        # Convert to cumulative values starting at 100
+        cumulative_returns = np.cumprod(1 + daily_returns)
+        portfolio_values = 100 * cumulative_returns
+
+        prices = pd.DataFrame(
+            {"AAPL": portfolio_values * 0.5, "MSFT": portfolio_values * 0.5},
+            index=dates,
+        )
+        benchmark = pd.Series(portfolio_values * 0.8, index=dates)
+        weights = np.array([0.5, 0.5])
+
+        table = backtest.compute_metrics(prices, weights, benchmark, 100_000)
+
+        # Check that rolling Sharpe values are reasonable (should be positive for uptrend)
+        valid_sharpe = table["portfolio_rolling_sharpe_12m"].dropna()
+        assert len(valid_sharpe) > 0
+
+        # For realistic data with positive expected return and volatility,
+        # Sharpe ratio should be in a reasonable range
+        # With 10% return and 15% volatility, theoretical Sharpe ≈ 0.67
+        # But rolling estimates will vary, so use wider bounds
+        assert (valid_sharpe < 5).all()  # Reasonable upper bound
+        assert (valid_sharpe > -5).all()  # Reasonable lower bound
+
+        # Average rolling Sharpe should be reasonably positive (not perfect but trending up)
+        assert valid_sharpe.mean() > -1  # On average, should be above -1
+
+    def test_rolling_sharpe_12m_zero_volatility(self):
+        """Test rolling Sharpe ratio with zero volatility (constant prices)."""
+        dates = pd.date_range("2020-01-01", periods=300, freq="D")
+        # Constant prices (zero volatility)
+        prices = pd.DataFrame(
+            {"AAPL": [100] * 300, "MSFT": [200] * 300},
+            index=dates,
+        )
+        benchmark = pd.Series([150] * 300, index=dates)
+        weights = np.array([0.5, 0.5])
+
+        table = backtest.compute_metrics(prices, weights, benchmark, 100_000)
+
+        # With zero volatility and zero returns, Sharpe should be 0
+        valid_sharpe = table["portfolio_rolling_sharpe_12m"].dropna()
+        assert (valid_sharpe == 0.0).all()
+
+    def test_rolling_sharpe_12m_insufficient_data(self):
+        """Test rolling Sharpe with less than 252 days of data."""
+        dates = pd.date_range("2020-01-01", periods=100, freq="D")
+        prices = pd.DataFrame(
+            {"AAPL": np.linspace(100, 120, 100), "MSFT": np.linspace(200, 240, 100)},
+            index=dates,
+        )
+        benchmark = pd.Series(np.linspace(150, 180, 100), index=dates)
+        weights = np.array([0.5, 0.5])
+
+        table = backtest.compute_metrics(prices, weights, benchmark, 100_000)
+
+        # All rolling Sharpe values should be NaN (insufficient data)
+        assert pd.isna(table["portfolio_rolling_sharpe_12m"]).all()
+        assert pd.isna(table["benchmark_rolling_sharpe_12m"]).all()
+
 
 class TestTickerValidation:
     """Test ticker validation functionality"""

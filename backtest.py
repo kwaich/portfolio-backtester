@@ -781,6 +781,49 @@ def compute_metrics(
         }
     )
 
+    # Calculate rolling 12-month Sharpe ratio (252 trading days)
+    # This shows how risk-adjusted performance evolves over time
+    window = 252  # Approximately 12 months of trading days
+
+    def calculate_rolling_sharpe(values: pd.Series, window_size: int) -> pd.Series:
+        """Calculate rolling Sharpe ratio over a specified window.
+
+        Args:
+            values: Series of portfolio/benchmark values
+            window_size: Rolling window size in trading days
+
+        Returns:
+            Series of rolling Sharpe ratios (NaN for insufficient data)
+        """
+        # Calculate daily returns
+        daily_returns = values.pct_change()
+
+        # Calculate rolling mean and std of returns
+        rolling_mean = daily_returns.rolling(window=window_size).mean()
+        rolling_std = daily_returns.rolling(window=window_size).std()
+
+        # Annualize: mean * 252, std * sqrt(252)
+        annualized_return = rolling_mean * TRADING_DAYS_PER_YEAR
+        annualized_volatility = rolling_std * np.sqrt(TRADING_DAYS_PER_YEAR)
+
+        # Sharpe ratio = annualized_return / annualized_volatility
+        # Division will produce NaN for insufficient data (from rolling window)
+        # and inf for zero volatility
+        sharpe = annualized_return / annualized_volatility
+
+        # Replace inf/-inf (from zero volatility) with 0, but preserve NaN
+        sharpe = sharpe.replace([np.inf, -np.inf], 0.0)
+
+        return sharpe
+
+    table["portfolio_rolling_sharpe_12m"] = calculate_rolling_sharpe(portfolio_value, window)
+    table["benchmark_rolling_sharpe_12m"] = calculate_rolling_sharpe(bench_value, window)
+
+    logger.info(
+        f"Calculated rolling 12-month Sharpe ratio "
+        f"({len(table[table['portfolio_rolling_sharpe_12m'].notna()])} valid values)"
+    )
+
     return table
 
 

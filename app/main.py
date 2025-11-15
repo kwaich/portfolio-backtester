@@ -61,7 +61,7 @@ try:
         render_metrics_column, render_relative_metrics,
         render_portfolio_composition, render_searchable_ticker_input
     )
-    from .charts import create_main_dashboard, create_rolling_returns_chart
+    from .charts import create_main_dashboard, create_rolling_returns_chart, create_rolling_sharpe_chart
 except ImportError as e:
     st.error(f"❌ Failed to import app modules: {e}")
     st.stop()
@@ -434,10 +434,18 @@ def main() -> None:
         st.divider()
         st.subheader("📊 Rolling Returns Analysis")
         st.caption("💡 Rolling returns show performance consistency over different time periods")
-        
+
         fig_rolling = create_rolling_returns_chart(results, all_benchmark_results, benchmarks)
         st.plotly_chart(fig_rolling, use_container_width=True)
-        
+
+        # Rolling Sharpe ratio analysis
+        st.divider()
+        st.subheader("📈 Rolling 12-Month Sharpe Ratio")
+        st.caption("💡 Rolling Sharpe ratio shows how risk-adjusted performance evolves over time (12-month window)")
+
+        fig_sharpe = create_rolling_sharpe_chart(results, all_benchmark_results, benchmarks)
+        st.plotly_chart(fig_sharpe, use_container_width=True)
+
         # Download options
         st.divider()
         st.subheader("💾 Download Results")

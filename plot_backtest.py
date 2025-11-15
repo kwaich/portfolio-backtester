@@ -234,6 +234,47 @@ def create_drawdown_plot(df: pd.DataFrame, style: str) -> tuple:
     return fig, ax
 
 
+def create_rolling_sharpe_plot(df: pd.DataFrame, style: str) -> tuple:
+    """Create rolling 12-month Sharpe ratio plot."""
+    plt.style.use(style)
+    fig, ax = plt.subplots(figsize=(12, 5))
+
+    # Check if rolling Sharpe columns exist
+    if 'portfolio_rolling_sharpe_12m' not in df.columns or 'benchmark_rolling_sharpe_12m' not in df.columns:
+        logger.warning("Rolling Sharpe columns not found in CSV. Skipping rolling Sharpe plot.")
+        plt.close(fig)
+        return None, None
+
+    # Plot rolling Sharpe ratios
+    df["portfolio_rolling_sharpe_12m"].plot(
+        ax=ax,
+        color=PORTFOLIO_COLOR,
+        linewidth=2,
+        label="Portfolio 12M Sharpe"
+    )
+    df["benchmark_rolling_sharpe_12m"].plot(
+        ax=ax,
+        color=BENCHMARK_COLOR,
+        linewidth=2,
+        alpha=0.8,
+        label="Benchmark 12M Sharpe"
+    )
+
+    # Add reference lines
+    ax.axhline(0, color='black', linewidth=1, linestyle='-', alpha=0.5)
+    ax.axhline(1, color='green', linewidth=0.8, linestyle='--', alpha=0.4, label="Sharpe = 1")
+    ax.axhline(2, color='darkgreen', linewidth=0.8, linestyle='--', alpha=0.4, label="Sharpe = 2")
+
+    ax.set_title("Rolling 12-Month Sharpe Ratio", fontsize=14, fontweight='bold')
+    ax.set_ylabel("Rolling 12-Month Sharpe Ratio", fontsize=11)
+    ax.set_xlabel("Date", fontsize=11)
+    ax.legend(loc="upper left", framealpha=0.9, fontsize=10)
+    ax.grid(True, alpha=0.3, linestyle='--')
+    plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
+
+    return fig, ax
+
+
 def create_dashboard(df: pd.DataFrame, style: str) -> tuple:
     """Create a comprehensive 2x2 dashboard with all metrics."""
     plt.style.use(style)
@@ -374,6 +415,11 @@ def main() -> None:
         # Drawdown plot
         fig_drawdown, _ = create_drawdown_plot(df, args.style)
         figures.append(("drawdown", fig_drawdown))
+
+        # Rolling Sharpe ratio plot (if columns exist)
+        fig_sharpe, ax_sharpe = create_rolling_sharpe_plot(df, args.style)
+        if fig_sharpe is not None:
+            figures.append(("rolling_sharpe", fig_sharpe))
 
         if args.output:
             args.output.parent.mkdir(parents=True, exist_ok=True)

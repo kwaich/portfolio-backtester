@@ -21,7 +21,7 @@ This is a lightweight Python-based ETF backtesting utility that allows users to:
 
 **Current Status**:
 - **Version**: v2.2.0-dev (Unreleased - 2025-11-15)
-- **Test Coverage**: ~88% (179 tests, 100% passing)
+- **Test Coverage**: ~88% (184 tests, 100% passing)
 - **Progress**: 87.5% complete (14/16 tasks)
 - **Branch**: claude/make-ticker-searchable-01Nb4CzjMJBJ9y2PugkUtCW7
 
@@ -43,10 +43,12 @@ portfolio-backtester/
 │   └── main.py               # Application orchestration
 ├── backtest.py               # Core backtesting engine (830 lines - Phases 1 & 3)
 ├── plot_backtest.py          # Visualization utility (395 lines - Phases 2 & 3)
-├── test_backtest.py          # Unit tests for backtest.py (858 lines, 67 tests)
-├── test_app.py               # Unit tests for app.py UI (933 lines, 64 tests)
-├── test_ticker_data.py       # Unit tests for ticker_data.py (NEW - 32 tests)
-├── test_integration.py       # Integration tests (420 lines, 16 tests - Phase 3)
+├── tests/                    # Test suite (184 tests, ~88% coverage)
+│   ├── conftest.py           # pytest configuration
+│   ├── test_backtest.py      # Unit tests for backtest.py (72 tests)
+│   ├── test_app.py           # Unit tests for app.py UI (64 tests)
+│   ├── test_ticker_data.py   # Unit tests for ticker_data.py (32 tests)
+│   └── test_integration.py   # Integration tests (16 tests)
 ├── requirements.txt          # Python dependencies (includes requests)
 ├── README.md                 # Main user documentation
 ├── CLAUDE.md                 # This file - AI assistant guide
@@ -54,10 +56,7 @@ portfolio-backtester/
     ├── FILE_REFERENCE.md         # Detailed file documentation
     ├── TESTING_GUIDE.md          # TDD rules and test patterns
     ├── DEVELOPER_GUIDE.md        # Development workflows
-    ├── IMPLEMENTATION_PLAN.md    # Code improvement roadmap
-    ├── IMPLEMENTATION_CHECKLIST.md # Progress tracking (87.5% complete)
-    ├── CHANGELOG.md              # Version history (v2.1.0)
-    ├── TEST_REPORT.md            # Phase 2 validation report
+    ├── CHANGELOG.md              # Version history with rolling Sharpe feature
     └── PROJECT_SUMMARY.md        # Additional project documentation
 ```
 
@@ -117,6 +116,7 @@ portfolio-backtester/
 - Multiple benchmarks (up to 3 simultaneously)
 - Delta indicators (color-coded outperformance)
 - Rolling returns (30/90/180-day windows)
+- Rolling 12-month Sharpe ratio chart (252-day window for risk-adjusted performance tracking)
 - Rebalancing strategies (buy-and-hold, daily, weekly, monthly, quarterly, yearly)
 - Logarithmic scale toggle for portfolio value charts
 - CSV & HTML export
@@ -144,6 +144,7 @@ portfolio-backtester/
 2. Cumulative Returns (percentage-formatted)
 3. Active Return with colored zones (outperformance/underperformance)
 4. Drawdown Over Time with max drawdown annotations
+5. Rolling 12-Month Sharpe Ratio with reference lines (Sharpe = 1, 2)
 
 **Modes**:
 - Dashboard mode: single 2x2 grid
@@ -154,23 +155,24 @@ portfolio-backtester/
 - **Phase 2**: Logging instead of print statements
 - **Phase 3**: Data quality validation (min 2 rows, NaN checks)
 
-#### 4. Testing Infrastructure (4 test files, 179 tests)
+#### 4. Testing Infrastructure (4 test files, 184 tests)
 
 **Test Coverage**: ~88% overall, 100% pass rate
 
-**Test Files**:
-- **test_backtest.py** (858 lines, 67 tests): Unit tests for backtest engine
+**Test Files** (in `tests/` directory):
+- **tests/test_backtest.py** (72 tests): Unit tests for backtest engine
   - Cache expiration, retry logic, ticker/date validation
   - Batch downloads, data quality validation
+  - Rolling 12-month Sharpe ratio calculation and edge cases
   - 11 test classes covering all major functions
 
-- **test_app.py** (933 lines, 64 tests): Unit tests for web UI
+- **tests/test_app.py** (64 tests): Unit tests for web UI
   - Portfolio presets, date presets, multiple benchmarks
   - Delta indicators, rolling returns, metric formatting
   - Portfolio composition with ticker names (fetched from yfinance)
   - 14 test classes with comprehensive coverage
 
-- **test_ticker_data.py** (32 tests): Unit tests for ticker search and name fetching
+- **tests/test_ticker_data.py** (32 tests): Unit tests for ticker search and name fetching
   - Curated ticker list validation
   - Search functionality (by symbol and name)
   - Yahoo Finance API mocking (search and ticker info)
@@ -178,10 +180,14 @@ portfolio-backtester/
   - Fallback to shortName, error handling
   - Cache clearing and edge cases
 
-- **test_integration.py** (420 lines, 16 tests - Phase 3): Integration tests
+- **tests/test_integration.py** (16 tests): Integration tests
   - End-to-end workflows, edge cases, data quality
   - Statistical edge cases, multi-ticker scenarios
   - 6 test classes covering real-world usage
+
+- **tests/conftest.py**: pytest configuration
+  - Automatically adds parent directory to Python path
+  - Enables tests to import modules from project root
 
 **See**: [TESTING_GUIDE.md](docs/TESTING_GUIDE.md) for comprehensive testing rules and patterns.
 
@@ -313,7 +319,7 @@ python backtest.py --tickers AAPL MSFT --weights 0.6 0.4 --benchmark SPY
 # Plot results
 python plot_backtest.py --csv results/backtest.csv --output charts/test
 
-# Run all tests (179 tests)
+# Run all tests (184 tests)
 pytest -v
 
 # Run with coverage
@@ -403,10 +409,10 @@ def compute_metrics(prices, weights, benchmark, capital):
     return results
 
 # 3. Run tests
-pytest test_backtest.py::test_new_metric_calculation -v
+pytest tests/test_backtest.py::test_new_metric_calculation -v
 
 # 4. Commit
-git add test_backtest.py backtest.py
+git add tests/test_backtest.py backtest.py
 git commit -m "feat: add new_metric calculation"
 ```
 
@@ -430,11 +436,7 @@ git commit -m "feat: add new_metric calculation"
 
 **📄 [README.md](README.md)**: User documentation with quick start, usage examples, CLI reference, troubleshooting.
 
-**📄 [IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)**: Phases 1-4 roadmap with task breakdown and timeline.
-
-**📄 [IMPLEMENTATION_CHECKLIST.md](docs/IMPLEMENTATION_CHECKLIST.md)**: Task tracking (14/16 complete - 87.5%).
-
-**📄 [CHANGELOG.md](docs/CHANGELOG.md)**: Version history and release notes (v1.0.0 → v2.1.0).
+**📄 [CHANGELOG.md](docs/CHANGELOG.md)**: Version history and release notes with rolling Sharpe ratio feature.
 
 ---
 

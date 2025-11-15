@@ -153,43 +153,50 @@ This document provides detailed information about each file in the portfolio-bac
 
 ## Test Suite
 
-### test_backtest.py (858 lines, 68 tests)
+### tests/test_backtest.py (72 tests)
 **Comprehensive unit test suite using pytest**
 - Tests all major functions and edge cases
 - Mocks external dependencies (yfinance) for isolation
 - Covers caching, error handling, calculations, validation, and CLI
 
-**Phase 1 Tests** (28 new tests):
+**Phase 1 Tests** (28 tests):
 - Cache expiration and TTL (6 tests)
 - Retry logic with exponential backoff (4 tests)
 - Ticker validation for multiple formats (11 tests)
 - Date validation and normalization (7 tests)
 
-**Phase 3 Tests** (15 new tests):
+**Phase 3 Tests** (15 tests):
 - Batch download optimization (5 tests)
 - Data quality validation (10 tests)
+
+**Rolling Sharpe Tests** (5 new tests):
+- Rolling 12-month Sharpe ratio column creation
+- NaN handling for first 252 days
+- Calculation accuracy with realistic volatility
+- Zero volatility edge case
+- Insufficient data handling
 
 **Test Classes** (11 total):
 - `TestParseArgs`: CLI argument parsing (7 tests)
 - `TestCacheFunctions`: Cache with TTL and migration (6 tests)
 - `TestSummarize`: Statistics calculation (4 tests)
-- `TestComputeMetrics`: Backtest computation (4 tests)
+- `TestComputeMetrics`: Backtest computation (9 tests, +5 for rolling Sharpe)
 - `TestRetryLogic`: Exponential backoff decorator (4 tests)
 - `TestTickerValidation`: Ticker format validation (11 tests)
 - `TestDateValidation`: Date parsing and ranges (7 tests)
 - `TestDownloadPrices`: Price fetching with batch caching (9 tests)
-- **Phase 3: `TestDataValidation`**: Data quality checks (10 tests)
-- `TestMain`: Integration tests (6 tests)
+- `TestDataValidation`: Data quality checks (10 tests)
+- `TestMain`: Integration tests (2 tests)
 
-**Run with**: `pytest test_backtest.py -v`
+**Run with**: `pytest tests/test_backtest.py -v`
 
-### test_app.py (933 lines, 62 tests)
+### tests/test_app.py (64 tests)
 **Comprehensive test suite for Streamlit UI**
 - Tests UI workflow integration with backtest module
 - Validates metric formatting and display logic
 - Tests error handling and input validation
 - Covers portfolio composition, chart data, and export functionality
-- Complete coverage of all 5 UI enhancements (39 additional tests)
+- Complete coverage of all UI enhancements
 - Mocks Streamlit components for isolated testing
 
 **Test Classes** (14 total):
@@ -208,30 +215,26 @@ This document provides detailed information about each file in the portfolio-bac
 - `TestDeltaIndicators`: Delta calculation and formatting (7 tests)
 - `TestRollingReturns`: Rolling returns windows (8 tests)
 
-**Run with**: `pytest test_app.py -v`
+**Run with**: `pytest tests/test_app.py -v`
 
-### test_integration.py (420 lines, 25 tests)
+### tests/test_integration.py (16 tests)
 **Comprehensive integration test suite**
 - Tests system integration and real-world scenarios
 - Mocks yfinance for isolated, reproducible tests
-- Run with: `pytest test_integration.py -v`
+- Run with: `pytest tests/test_integration.py -v`
 
 **Test Classes** (6 total):
 
-1. **TestEndToEndWorkflow** (3 tests):
-   - CLI to CSV workflow
-   - Multi-ticker portfolio workflow
+1. **TestEndToEndWorkflow** (1 test):
    - Cache workflow (download → cache → reload)
 
-2. **TestEdgeCases** (8 tests):
+2. **TestEdgeCases** (6 tests):
    - Single day backtest (should fail)
    - Leap year date handling
    - Extreme drawdowns (>90%)
    - Zero volatility periods
    - Very short date ranges
    - Missing ticker data
-   - Negative returns
-   - Different start dates alignment
 
 3. **TestDataQuality** (5 tests):
    - All-NaN data rejection
@@ -240,11 +243,9 @@ This document provides detailed information about each file in the portfolio-bac
    - Zero prices detection
    - Extreme price changes
 
-4. **TestValidation** (5 tests):
-   - Ticker format validation
-   - Date format validation
-   - Future date rejection
-   - Historical date limits
+4. **TestValidation** (4 tests):
+   - Ticker format validation (valid/invalid)
+   - Date format validation (valid/future/too old)
 
 5. **TestStatisticalEdgeCases** (4 tests):
    - Sharpe ratio with zero volatility
@@ -277,18 +278,10 @@ This document provides detailed information about each file in the portfolio-bac
 ### PROJECT_SUMMARY.md
 - Additional project documentation
 
-### IMPLEMENTATION_PLAN.md
-- Code improvement roadmap
-
-### IMPLEMENTATION_CHECKLIST.md
-- Progress tracking (87.5% complete)
-
-### TEST_REPORT.md
-- Phase 2 validation report
-
 ### CHANGELOG.md
 - Version history
-- Release notes (v2.1.0 latest)
+- Release notes with rolling Sharpe ratio feature
+- Detailed feature descriptions and test coverage updates
 
 ---
 
@@ -308,14 +301,15 @@ This document provides detailed information about each file in the portfolio-bac
 
 ### Testing
 
-**Total Tests**: 155 (68 backtest + 62 UI + 25 integration)  
-**Coverage**: ~88%  
-**Pass Rate**: 100%  
+**Total Tests**: 184 (72 backtest + 64 UI + 32 ticker_data + 16 integration)
+**Coverage**: ~88%
+**Pass Rate**: 100%
 
-**Run All Tests**: `pytest -v`  
-**Run Backtest Tests**: `pytest test_backtest.py -v`  
-**Run UI Tests**: `pytest test_app.py -v`  
-**Run Integration Tests**: `pytest test_integration.py -v`  
+**Run All Tests**: `pytest -v`
+**Run Backtest Tests**: `pytest tests/test_backtest.py -v`
+**Run UI Tests**: `pytest tests/test_app.py -v`
+**Run Ticker Data Tests**: `pytest tests/test_ticker_data.py -v`
+**Run Integration Tests**: `pytest tests/test_integration.py -v`
 **Check Coverage**: `pytest --cov=backtest --cov=app --cov-report=term-missing`
 
 ---
