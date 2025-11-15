@@ -96,22 +96,26 @@ This opens an interactive web application in your browser with:
 ### Web UI Features
 
 1. **Sidebar Configuration**:
-   - Dynamic number of portfolio tickers
+   - Example portfolio presets (Default UK ETFs, 60/40, Tech Giants, Dividend Aristocrats, Global Diversified)
+   - Dynamic number of portfolio tickers (1-10)
    - Auto-normalized weights
-   - Date picker for start/end dates
+   - Multiple benchmark support (compare up to 3 benchmarks)
+   - Date range presets (1Y, 3Y, 5Y, 10Y, YTD, Max) with custom date picker
    - Capital input with validation
    - Cache toggle
 
 2. **Results Display**:
    - Side-by-side comparison of Portfolio vs Benchmark vs Relative Performance
+   - Delta indicators showing outperformance/underperformance with color-coded arrows
    - All metrics: Total Return, CAGR, Volatility, Sharpe, Sortino, Max Drawdown
+   - Expandable sections for additional benchmark comparisons
    - Portfolio composition table
 
 3. **Interactive Visualizations**:
-   - Portfolio vs Benchmark Value (hover for exact values)
-   - Cumulative Returns (hover for precise percentages)
-   - Active Return (hover for difference at any point)
-   - Drawdown Over Time (hover for exact drawdown %)
+   - 2x2 Dashboard: Portfolio vs Benchmark Value, Cumulative Returns, Active Return, Drawdown
+   - Rolling Returns Analysis (30/90/180-day periods)
+   - Multiple benchmarks displayed on all charts with distinct colors and line styles
+   - Hover tooltips for exact values at any point
    - Zoom, pan, and explore interactively
 
 4. **Export Options**:
@@ -124,13 +128,18 @@ This opens an interactive web application in your browser with:
 1. Run `streamlit run app.py`
 2. Browser opens automatically at `http://localhost:8501`
 3. Configure your backtest in the sidebar:
-   - Tickers: AAPL, MSFT
-   - Weights: 0.6, 0.4
-   - Benchmark: SPY
-   - Date Range: 2018-01-01 to Today
+   - Select "Tech Giants" from Example Portfolio dropdown (or choose Custom)
+   - Tickers auto-populate: AAPL, MSFT, GOOGL, AMZN
+   - Weights: 0.25 each (auto-populated)
+   - Benchmark: QQQ (auto-populated)
+   - Add additional benchmarks if desired (e.g., SPY, VTI)
+   - Click "5Y" preset button for 5-year backtest
    - Capital: $100,000
 4. Click "Run Backtest"
-5. View results, charts, and download data
+5. View results with delta indicators showing outperformance
+6. Explore interactive charts including rolling returns analysis
+7. Expand additional benchmark sections for detailed comparisons
+8. Download data and charts
 
 ## Command-Line Options
 
