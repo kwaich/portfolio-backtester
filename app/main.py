@@ -260,11 +260,12 @@ def main() -> None:
     
     # Run button
     run_backtest = st.sidebar.button("🚀 Run Backtest", type="primary", use_container_width=True)
-    
+
     # =========================================================================
     # Main Content Area
     # =========================================================================
-    
+
+    # Run backtest and store results in session state
     if run_backtest:
         # Validate inputs
         is_valid, error_msg = validate_backtest_inputs(tickers, benchmarks, start_date, end_date)
@@ -329,12 +330,38 @@ def main() -> None:
                     bench_result = compute_metrics(portfolio_prices, weights_array, bench_prices, capital, rebalance_freq=rebalance_freq)
                     all_benchmark_results[bench_name] = bench_result
 
+                # Store results in session state
+                st.session_state.backtest_results = {
+                    'results': results,
+                    'all_benchmark_results': all_benchmark_results,
+                    'tickers': tickers,
+                    'benchmarks': benchmarks,
+                    'weights_array': weights_array,
+                    'capital': capital,
+                    'rebalance_strategy': rebalance_strategy,
+                    'rebalance_freq': rebalance_freq
+                }
+                st.session_state.backtest_completed = True
+
                 st.success("✅ Backtest completed successfully!")
-                
+
             except Exception as e:
                 st.error(f"❌ Error computing metrics: {str(e)}")
                 st.stop()
-        
+
+    # Display results from session state (persists across reruns)
+    if st.session_state.get('backtest_completed', False):
+        # Retrieve stored results
+        stored = st.session_state.backtest_results
+        results = stored['results']
+        all_benchmark_results = stored['all_benchmark_results']
+        tickers = stored['tickers']
+        benchmarks = stored['benchmarks']
+        weights_array = stored['weights_array']
+        capital = stored['capital']
+        rebalance_strategy = stored['rebalance_strategy']
+        rebalance_freq = stored['rebalance_freq']
+
         # Display results
         st.divider()
         st.header("📊 Backtest Results")
