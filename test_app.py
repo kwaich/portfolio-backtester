@@ -240,33 +240,59 @@ class TestPortfolioComposition:
     """Test portfolio composition display logic"""
 
     def test_composition_table_data(self):
-        """Test creation of portfolio composition table"""
+        """Test creation of portfolio composition table with ticker names"""
+        from app.ticker_data import get_ticker_name
+
         tickers = ["AAPL", "MSFT", "GOOGL"]
-        weights_original = [0.5, 0.3, 0.2]
-        weights_array = np.array(weights_original)
+        weights_array = np.array([0.5, 0.3, 0.2])
 
-        # Normalize weights as UI does
-        if not np.isclose(weights_array.sum(), 1.0):
-            weights_normalized = weights_array / weights_array.sum()
-        else:
-            weights_normalized = weights_array
+        # Get ticker names as the UI does
+        ticker_names = [get_ticker_name(ticker) for ticker in tickers]
 
-        # Create composition data structure
+        # Create composition data structure (matching actual implementation)
         composition_data = {
             "Ticker": tickers,
-            "Weight": [f"{w:.1%}" for w in weights_array],
-            "Normalized Weight": [f"{w:.3%}" for w in weights_normalized]
+            "Name": ticker_names,
+            "Weight": [f"{w:.1%}" for w in weights_array]
         }
 
         # Verify structure
         assert len(composition_data["Ticker"]) == 3
+        assert len(composition_data["Name"]) == 3
         assert len(composition_data["Weight"]) == 3
-        assert len(composition_data["Normalized Weight"]) == 3
 
-        # Verify formatting
+        # Verify ticker names are present
+        assert composition_data["Name"][0] == "Apple Inc."
+        assert composition_data["Name"][1] == "Microsoft Corporation"
+        assert composition_data["Name"][2] == "Alphabet Inc. (Google) Class A"
+
+        # Verify weight formatting
         assert composition_data["Weight"][0] == "50.0%"
         assert composition_data["Weight"][1] == "30.0%"
         assert composition_data["Weight"][2] == "20.0%"
+
+    def test_composition_with_unknown_ticker(self):
+        """Test composition table handles unknown tickers gracefully"""
+        from app.ticker_data import get_ticker_name
+
+        tickers = ["AAPL", "UNKNOWN_TICKER", "SPY"]
+        weights_array = np.array([0.4, 0.3, 0.3])
+
+        # Get ticker names
+        ticker_names = [get_ticker_name(ticker) for ticker in tickers]
+
+        composition_data = {
+            "Ticker": tickers,
+            "Name": ticker_names,
+            "Weight": [f"{w:.1%}" for w in weights_array]
+        }
+
+        # Known tickers should have names
+        assert composition_data["Name"][0] == "Apple Inc."
+        assert composition_data["Name"][2] == "SPDR S&P 500 ETF Trust"
+
+        # Unknown ticker should have empty name
+        assert composition_data["Name"][1] == ""
 
 
 class TestChartData:
