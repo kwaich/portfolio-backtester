@@ -391,9 +391,16 @@ def main() -> None:
         st.divider()
         st.header("📈 Interactive Visualizations")
         st.caption("💡 Hover over the charts to see exact values")
-        
+
+        # Log scale toggle
+        log_scale = st.checkbox(
+            "Use logarithmic scale for portfolio value chart",
+            value=False,
+            help="Logarithmic scale is useful for viewing long-term exponential growth"
+        )
+
         # Create main dashboard
-        fig = create_main_dashboard(results, all_benchmark_results, benchmarks)
+        fig = create_main_dashboard(results, all_benchmark_results, benchmarks, log_scale=log_scale)
         st.plotly_chart(fig, use_container_width=True)
         
         # Rolling returns analysis

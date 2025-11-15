@@ -48,21 +48,23 @@ def calculate_drawdown(series: pd.Series) -> pd.Series:
 def create_main_dashboard(
     results: pd.DataFrame,
     all_benchmark_results: Dict[str, pd.DataFrame],
-    benchmarks: List[str]
+    benchmarks: List[str],
+    log_scale: bool = False
 ) -> go.Figure:
     """Create 2x2 dashboard with all main charts.
-    
+
     Creates a comprehensive dashboard showing:
     - Portfolio vs Benchmark Value (top-left)
     - Cumulative Returns (top-right)
     - Active Return (bottom-left)
     - Drawdown Over Time (bottom-right)
-    
+
     Args:
         results: DataFrame with portfolio_value, portfolio_return, benchmark_value, benchmark_return
         all_benchmark_results: Dict mapping benchmark names to their result DataFrames
         benchmarks: List of benchmark ticker symbols
-    
+        log_scale: If True, use logarithmic scale for value and returns charts (default: False)
+
     Returns:
         Plotly Figure object with 2x2 subplots
     """
@@ -199,8 +201,15 @@ def create_main_dashboard(
     fig.update_xaxes(title_text="Date", row=1, col=2)
     fig.update_xaxes(title_text="Date", row=2, col=1)
     fig.update_xaxes(title_text="Date", row=2, col=2)
-    
-    fig.update_yaxes(title_text="Value ($)", row=1, col=1)
+
+    # Set y-axis labels and scale
+    # Log scale for value chart (always positive)
+    if log_scale:
+        fig.update_yaxes(title_text="Value ($) - Log Scale", type="log", row=1, col=1)
+    else:
+        fig.update_yaxes(title_text="Value ($)", row=1, col=1)
+
+    # Returns chart stays linear (can be negative)
     fig.update_yaxes(title_text="Return (%)", row=1, col=2)
     fig.update_yaxes(title_text="Active Return (%)", row=2, col=1)
     fig.update_yaxes(title_text="Drawdown (%)", row=2, col=2)
