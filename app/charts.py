@@ -63,10 +63,15 @@ def create_main_dashboard(
         results: DataFrame with portfolio_value, portfolio_return, benchmark_value, benchmark_return
         all_benchmark_results: Dict mapping benchmark names to their result DataFrames
         benchmarks: List of benchmark ticker symbols
-        log_scale: If True, use logarithmic scale for value and returns charts (default: False)
+        log_scale: If True, use logarithmic scale for value chart only (default: False)
 
     Returns:
         Plotly Figure object with 2x2 subplots
+
+    Note:
+        Log scale is only applied to the Portfolio vs Benchmark Value chart (top-left)
+        since it contains only positive values. Other charts remain linear as they
+        can contain negative values (returns, active return, drawdown).
     """
     # Calculate metrics for charts
     active_return = (results['portfolio_return'] - results['benchmark_return']) * 100
