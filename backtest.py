@@ -18,6 +18,7 @@ import argparse
 import hashlib
 import logging
 import pickle
+import re
 import sys
 import time
 from functools import wraps
@@ -85,6 +86,71 @@ def retry_with_backoff(
             return None  # Should never reach here
         return wrapper
     return decorator
+
+
+def validate_ticker(ticker: str) -> tuple[bool, str]:
+    """Validate ticker symbol format.
+
+    Args:
+        ticker: Ticker symbol to validate
+
+    Returns:
+        Tuple of (is_valid, error_message). If valid, error_message is empty string.
+
+    Examples:
+        >>> validate_ticker("AAPL")
+        (True, "")
+        >>> validate_ticker("")
+        (False, "Ticker cannot be empty")
+        >>> validate_ticker("123")
+        (False, "Ticker cannot be all numbers: 123")
+    """
+    if not ticker:
+        return False, "Ticker cannot be empty"
+
+    if len(ticker) > 10:
+        return False, f"Ticker too long: {ticker} (max 10 characters)"
+
+    # Allow: letters, numbers, dots (for UK tickers like VWRA.L),
+    # hyphens, carets (for indices like ^GSPC), equals (for currencies)
+    if not re.match(r'^[A-Z0-9\.\-\^=]+$', ticker.upper()):
+        return False, f"Invalid ticker format: {ticker} (use only letters, numbers, ., -, ^, =)"
+
+    # Check for common invalid patterns
+    if ticker.isdigit():
+        return False, f"Ticker cannot be all numbers: {ticker}"
+
+    return True, ""
+
+
+def validate_tickers(tickers: List[str]) -> None:
+    """Validate list of ticker symbols, raise ValueError if any invalid.
+
+    Args:
+        tickers: List of ticker symbols to validate
+
+    Raises:
+        ValueError: If any ticker is invalid, with detailed error messages
+
+    Examples:
+        >>> validate_tickers(["AAPL", "MSFT"])
+        >>> validate_tickers(["AAPL", ""])
+        ValueError: Invalid ticker(s) detected...
+    """
+    if not tickers:
+        raise ValueError("No tickers provided")
+
+    errors = []
+    for ticker in tickers:
+        is_valid, error_msg = validate_ticker(ticker)
+        if not is_valid:
+            errors.append(f"  • {error_msg}")
+
+    if errors:
+        raise ValueError(
+            f"Invalid ticker(s) detected:\n" + "\n".join(errors) + "\n\n"
+            f"Valid ticker examples: AAPL, MSFT, VWRA.L, ^GSPC, EURUSD=X"
+        )
 
 
 def parse_args(argv: List[str]) -> argparse.Namespace:
@@ -261,7 +327,13 @@ def download_prices(
 
     Returns:
         DataFrame with adjusted close prices for all tickers
+
+    Raises:
+        ValueError: If any ticker is invalid
     """
+
+    # Validate tickers before attempting download
+    validate_tickers(tickers)
 
     # Try to load from cache first
     if use_cache:
@@ -450,6 +522,14 @@ def main(argv: List[str]) -> None:
 
     tickers = args.tickers
     weights = np.array(args.weights, dtype=float)
+
+    # Validate tickers early
+    try:
+        validate_tickers(tickers)
+        validate_tickers([args.benchmark])
+    except ValueError as e:
+        raise SystemExit(f"Ticker validation failed:\n{e}")
+
     if len(tickers) != len(weights):
         raise SystemExit("Number of weights must match number of tickers")
     if not np.isclose(weights.sum(), 1.0):

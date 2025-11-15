@@ -64,7 +64,7 @@ except ImportError as e:
 
 # Import functions from backtest module
 try:
-    from backtest import download_prices, compute_metrics, summarize
+    from backtest import download_prices, compute_metrics, summarize, validate_tickers
 except ImportError as e:
     st.error(
         "❌ **Cannot Import Backtest Module**\n\n"
@@ -338,6 +338,14 @@ if run_backtest:
 
     if not benchmarks:
         st.error("❌ Please enter at least one benchmark ticker")
+        st.stop()
+
+    # Validate ticker format
+    try:
+        validate_tickers(tickers)
+        validate_tickers(benchmarks)
+    except ValueError as e:
+        st.error(f"❌ **Ticker Validation Failed**\n\n{str(e)}")
         st.stop()
 
     if start_date >= end_date:

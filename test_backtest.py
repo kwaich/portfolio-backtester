@@ -288,6 +288,81 @@ class TestComputeMetrics:
         assert table.index[0] == pd.Timestamp("2020-01-06")
 
 
+class TestTickerValidation:
+    """Test ticker validation functionality"""
+
+    def test_valid_tickers(self):
+        """Test that valid tickers pass validation."""
+        valid_tickers = ["AAPL", "MSFT", "VWRA.L", "^GSPC", "EURUSD=X", "BRK-B"]
+
+        for ticker in valid_tickers:
+            is_valid, error = backtest.validate_ticker(ticker)
+            assert is_valid, f"{ticker} should be valid, got error: {error}"
+            assert error == ""
+
+    def test_empty_ticker(self):
+        """Test that empty ticker is rejected."""
+        is_valid, error = backtest.validate_ticker("")
+        assert not is_valid
+        assert "cannot be empty" in error.lower()
+
+    def test_too_long_ticker(self):
+        """Test that ticker longer than 10 characters is rejected."""
+        is_valid, error = backtest.validate_ticker("VERYLONGTICKER")
+        assert not is_valid
+        assert "too long" in error.lower()
+
+    def test_all_numbers_ticker(self):
+        """Test that all-numeric ticker is rejected."""
+        is_valid, error = backtest.validate_ticker("12345")
+        assert not is_valid
+        assert "all numbers" in error.lower()
+
+    def test_invalid_characters(self):
+        """Test that ticker with invalid characters is rejected."""
+        invalid_tickers = ["AAP@L", "MSF!T", "TEST#", "TIC KER"]
+
+        for ticker in invalid_tickers:
+            is_valid, error = backtest.validate_ticker(ticker)
+            assert not is_valid, f"{ticker} should be invalid"
+            assert "invalid" in error.lower() or "format" in error.lower()
+
+    def test_validate_tickers_list_valid(self):
+        """Test validation of valid ticker list."""
+        # Should not raise
+        backtest.validate_tickers(["AAPL", "MSFT", "GOOGL"])
+
+    def test_validate_tickers_empty_list(self):
+        """Test that empty list raises error."""
+        with pytest.raises(ValueError, match="No tickers provided"):
+            backtest.validate_tickers([])
+
+    def test_validate_tickers_with_invalid(self):
+        """Test that list with invalid ticker raises error."""
+        with pytest.raises(ValueError, match="Invalid ticker"):
+            backtest.validate_tickers(["AAPL", "", "MSFT"])
+
+    def test_validate_tickers_multiple_errors(self):
+        """Test that multiple invalid tickers show all errors."""
+        with pytest.raises(ValueError) as exc_info:
+            backtest.validate_tickers(["", "123", "VERYLONGTICKER"])
+
+        error_msg = str(exc_info.value)
+        assert "cannot be empty" in error_msg
+        assert "all numbers" in error_msg
+        assert "too long" in error_msg
+
+    def test_case_insensitive_validation(self):
+        """Test that validation is case-insensitive."""
+        # Lowercase should work
+        is_valid, _ = backtest.validate_ticker("aapl")
+        assert is_valid
+
+        # Mixed case should work
+        is_valid, _ = backtest.validate_ticker("VwRa.L")
+        assert is_valid
+
+
 class TestRetryLogic:
     """Test retry logic with exponential backoff"""
 
