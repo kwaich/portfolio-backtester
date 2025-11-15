@@ -172,6 +172,265 @@ pytest test_backtest.py::TestSummarize -v
 pytest test_app.py::TestMetricLabels -v
 ```
 
+## Test-Driven Development Rules
+
+### Core Principles
+
+**CRITICAL**: Always write tests for new functionality. Testing is not optional.
+
+**Current Coverage Status (as of 2025-11-15):**
+- Backtest engine: 95% coverage ✅
+- App.py (original): 90% coverage ✅
+- App.py (new features): 0% coverage ⚠️
+- **Overall: 66.8% coverage**
+
+**Target**: Maintain 85%+ coverage for all new code
+
+### When to Write Tests
+
+#### ALWAYS Write Tests For:
+1. **New functions**: Any new function in backtest.py or app.py
+2. **New features**: UI components, workflows, calculations
+3. **Bug fixes**: Add regression test before fixing the bug
+4. **Refactoring**: Ensure tests pass before and after
+5. **Edge cases**: Error handling, empty data, boundary conditions
+
+#### Test Writing Workflow:
+```
+For New Features:
+1. Write failing test first (TDD approach preferred)
+2. Implement minimal code to pass test
+3. Refactor while keeping tests green
+4. Add additional edge case tests
+
+For Bug Fixes:
+1. Write test that reproduces the bug
+2. Verify test fails
+3. Fix the bug
+4. Verify test passes
+5. Add related edge case tests
+```
+
+### What to Test
+
+#### Backtest Engine (test_backtest.py):
+- ✅ Function inputs/outputs (all pure functions)
+- ✅ Edge cases (empty data, NaN values, date misalignments)
+- ✅ Error conditions (invalid tickers, network failures)
+- ✅ Calculations (metrics, returns, statistics)
+- ✅ CLI argument parsing
+- ✅ Caching behavior
+- ✅ Integration (main() workflow)
+
+#### Web UI (test_app.py):
+- ✅ Integration with backtest module
+- ✅ Metric formatting (currency, percentage, ratio)
+- ✅ Error handling (invalid inputs, failed backtests)
+- ✅ Data transformations (drawdown, active return)
+- ✅ Export functionality (CSV, charts)
+- ⚠️ **MISSING**: Portfolio preset behavior
+- ⚠️ **MISSING**: Date preset calculations
+- ⚠️ **MISSING**: Multiple benchmark logic
+- ⚠️ **MISSING**: Delta indicator logic
+- ⚠️ **MISSING**: Rolling returns calculations
+
+### Test Structure Patterns
+
+#### Good Test Structure (AAA Pattern):
+```python
+def test_feature_name(self):
+    """Clear description of what is being tested"""
+    # ARRANGE: Set up test data
+    dates = pd.date_range("2020-01-01", periods=252, freq="D")
+    prices = pd.DataFrame({"AAPL": [100, 110, 105]}, index=dates[:3])
+
+    # ACT: Execute the function being tested
+    result = backtest.compute_metrics(prices, weights, benchmark, capital)
+
+    # ASSERT: Verify expected behavior
+    assert result is not None
+    assert 'portfolio_value' in result.columns
+    assert len(result) == 3
+```
+
+#### Test Class Organization:
+```python
+class TestFeatureName:
+    """Test suite for specific feature or function"""
+
+    def test_basic_case(self):
+        """Test normal/happy path"""
+        pass
+
+    def test_edge_case_empty_data(self):
+        """Test with empty input"""
+        pass
+
+    def test_edge_case_single_value(self):
+        """Test with minimal input"""
+        pass
+
+    def test_error_handling(self):
+        """Test expected errors are raised"""
+        with pytest.raises(ValueError):
+            # code that should raise ValueError
+            pass
+```
+
+### Mocking Patterns
+
+#### Mock External Dependencies:
+```python
+# Mock yfinance downloads
+@patch('backtest.yf.download')
+def test_download_prices(mock_download):
+    mock_download.return_value = pd.DataFrame({...})
+    result = backtest.download_prices(['AAPL'], '2020-01-01', '2020-12-31')
+    assert not result.empty
+```
+
+#### Mock Streamlit for UI Tests:
+```python
+# Mock streamlit before importing app
+sys.modules['streamlit'] = MagicMock()
+import backtest  # Then import modules that use backtest
+```
+
+### Coverage Expectations
+
+#### Minimum Coverage Requirements:
+- **New functions**: 90%+ coverage required
+- **New features**: 80%+ coverage required
+- **Bug fixes**: Must include regression test
+- **Overall codebase**: Maintain 85%+ coverage
+
+#### How to Check Coverage:
+```bash
+# Check coverage for specific module
+pytest test_backtest.py --cov=backtest --cov-report=term-missing
+
+# Generate HTML coverage report
+pytest --cov=backtest --cov=app --cov-report=html
+open htmlcov/index.html
+```
+
+#### Coverage Report Interpretation:
+```
+backtest.py      95%   (371/391 lines)  ✅ Excellent
+app.py           66%   (412/783 lines)  ⚠️  Needs improvement
+```
+
+### Common Testing Mistakes to Avoid
+
+#### DON'T:
+❌ Skip writing tests for "simple" code
+❌ Test implementation details instead of behavior
+❌ Write tests that depend on external services (mock them)
+❌ Write tests that depend on specific dates (use fixed dates)
+❌ Commit code without running tests
+❌ Ignore failing tests ("I'll fix it later")
+❌ Write tests that test the same thing multiple times
+❌ Use real file I/O (use temp files or mocks)
+
+#### DO:
+✅ Write descriptive test names: `test_portfolio_value_increases_with_positive_returns`
+✅ Use fixtures for repeated setup
+✅ Mock external dependencies (yfinance, file I/O, network calls)
+✅ Test edge cases (empty data, NaN, None, negative values)
+✅ Use pytest.raises() for expected errors
+✅ Keep tests fast (< 2 seconds total runtime)
+✅ Make tests independent (no shared state)
+✅ Use parametrize for testing multiple inputs
+
+### Example: Adding Tests for New Feature
+
+**Scenario**: Added "Example Portfolio Presets" feature (not yet tested)
+
+**Required Tests**:
+```python
+class TestPortfolioPresets:
+    """Test portfolio preset functionality"""
+
+    def test_preset_portfolios_exist(self):
+        """Verify all preset portfolios are defined"""
+        expected_presets = [
+            "Custom (Manual Entry)",
+            "Default UK ETFs",
+            "60/40 US Stocks/Bonds",
+            "Tech Giants",
+            "Dividend Aristocrats",
+            "Global Diversified"
+        ]
+        # Test preset data structure exists
+
+    def test_tech_giants_preset_values(self):
+        """Verify Tech Giants preset has correct values"""
+        # Expected: 4 tickers, equal weights, QQQ benchmark
+        assert len(tickers) == 4
+        assert tickers == ["AAPL", "MSFT", "GOOGL", "AMZN"]
+        assert all(w == 0.25 for w in weights)
+        assert benchmark == "QQQ"
+
+    def test_preset_selection_populates_inputs(self):
+        """Verify selecting preset updates session state"""
+        # Mock session state
+        # Select "Tech Giants"
+        # Assert tickers/weights/benchmark are populated
+
+    def test_custom_preset_allows_manual_entry(self):
+        """Verify Custom preset doesn't override inputs"""
+        # Select "Custom"
+        # Assert inputs remain editable
+```
+
+### Test Metrics and Goals
+
+**Current Status (2025-11-15)**:
+- Total tests: 47 (24 backtest + 23 UI)
+- Pass rate: 100%
+- Test-to-code ratio: 0.63:1
+- Coverage: 66.8%
+
+**Goals**:
+- Total tests: 70+ tests
+- Pass rate: 100% (always)
+- Test-to-code ratio: >0.80:1
+- Coverage: 85%+
+
+**To Achieve Goals**:
+- Add ~25-30 tests for new UI features
+- Focus on: Presets (10 tests), Multiple benchmarks (10 tests), Rolling returns (5 tests)
+
+### Running Tests in Development
+
+```bash
+# Before committing: Always run all tests
+source .venv/bin/activate
+pytest -v
+
+# Watch mode (re-run on file changes)
+pytest-watch
+
+# Run specific test while developing
+pytest test_app.py::TestPortfolioPresets::test_tech_giants_preset_values -v
+
+# Check coverage after adding tests
+pytest --cov=app --cov-report=term-missing
+
+# Ensure all tests pass before pushing
+pytest -v && git push
+```
+
+### Test Documentation Requirements
+
+Every test class should have:
+- Docstring explaining what is being tested
+- Individual test docstrings for complex tests
+- Clear assertion messages for debugging
+- Organized by feature/function
+
+**Summary**: Testing is mandatory for all new code. Aim for 85%+ coverage. Use mocks for external dependencies. Follow AAA pattern. Run tests before every commit.
+
 ## Code Conventions
 
 ### Python Style
