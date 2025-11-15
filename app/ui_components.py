@@ -215,6 +215,15 @@ def render_searchable_ticker_input(
     input_key = f"{key}_input" if key else None
     search_key = f"{key}_search" if key else None
     query_key = f"{key}_query" if key else None
+    pending_key = f"{key}_pending" if key else None
+
+    # Check for pending ticker selection (from previous run)
+    if key and pending_key and pending_key in st.session_state:
+        pending_ticker = st.session_state[pending_key]
+        del st.session_state[pending_key]
+        # Set the value BEFORE creating the widget
+        if input_key:
+            st.session_state[input_key] = pending_ticker
 
     # Initialize the text input's session state if needed
     if key and input_key and input_key not in st.session_state:
@@ -263,9 +272,9 @@ def render_searchable_ticker_input(
                     display_text = f"{ticker} - {name}"
 
                     if st.button(display_text, key=button_key, use_container_width=True):
-                        # Update the text input's session state directly
-                        if key and input_key:
-                            st.session_state[input_key] = ticker
+                        # Store ticker in pending state for next run
+                        if key and pending_key:
+                            st.session_state[pending_key] = ticker
                             st.session_state[f"{key}_show_search"] = False
                         st.rerun()
             else:
