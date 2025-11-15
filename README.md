@@ -9,11 +9,12 @@ A lightweight, flexible Python utility for backtesting ETF portfolio strategies 
 - **Smart Data Caching**: Automatic caching with configurable TTL (time-to-live) for fresh data
 - **Resilient API Calls**: Automatic retry logic with exponential backoff for network reliability
 - **Input Validation**: Comprehensive validation for tickers, dates, and parameters before execution
+- **Searchable Ticker Selection**: Built-in search for 50+ popular ETFs and stocks with optional Yahoo Finance integration
 - **Flexible Visualization**: Generate publication-ready charts or interactive plots
 - **Easy CLI**: Simple command-line interface with sensible defaults
 - **Data Quality Validation**: Automatic detection of data issues (missing values, invalid prices, extreme changes)
 - **Optimized Performance**: Batch downloads with per-ticker caching for faster multi-ticker operations
-- **Well-Tested**: Comprehensive test coverage with 155 tests including integration tests (100% pass rate)
+- **Well-Tested**: Comprehensive test coverage with 155+ tests including integration tests (100% pass rate)
 
 ## Quick Start
 
@@ -102,6 +103,8 @@ This opens an interactive web application in your browser with:
 1. **Sidebar Configuration**:
    - Example portfolio presets (Default UK ETFs, 60/40, Tech Giants, Dividend Aristocrats, Global Diversified)
    - Dynamic number of portfolio tickers (1-10)
+   - **Searchable Ticker Inputs**: Search and select from 50+ popular ETFs and stocks, or enter any ticker manually
+   - **Yahoo Finance Integration**: Optional live search to find any ticker symbol by name or symbol
    - Auto-normalized weights
    - Multiple benchmark support (compare up to 3 benchmarks)
    - Date range presets (1Y, 3Y, 5Y, 10Y, YTD, Max) with custom date picker
@@ -144,6 +147,28 @@ This opens an interactive web application in your browser with:
 6. Explore interactive charts including rolling returns analysis
 7. Expand additional benchmark sections for detailed comparisons
 8. Download data and charts
+
+### Searchable Ticker Feature
+
+The web UI includes a powerful ticker search feature:
+
+1. **Direct Entry**: Simply type any ticker symbol (e.g., AAPL, MSFT, VWRA.L) in the text field
+2. **Search Button**: Click the 🔍 Search button to:
+   - Search from 50+ curated popular ETFs and stocks
+   - Optionally search Yahoo Finance for any ticker (if API is available)
+   - Browse results by company/fund name or ticker symbol
+3. **Click to Select**: Click any result to instantly populate the ticker field
+
+**Curated Tickers Include**:
+- Global ETFs: VWRA.L, VT, ACWI
+- US ETFs: SPY, VOO, VTI, QQQ
+- International ETFs: VXUS, VEA, VWO
+- European ETFs: VEUR.L, VGK
+- Fixed Income: VDCP.L, VHYD.L, AGG, BND
+- Sector ETFs: XLK, XLF, XLE
+- Popular Stocks: AAPL, MSFT, GOOGL, AMZN, TSLA, and more
+
+**Note**: Yahoo Finance search may be rate-limited or blocked. The app will automatically fall back to the curated list.
 
 ## Command-Line Options
 

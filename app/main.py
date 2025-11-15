@@ -58,7 +58,7 @@ try:
     )
     from .ui_components import (
         render_metrics_column, render_relative_metrics,
-        render_portfolio_composition
+        render_portfolio_composition, render_searchable_ticker_input
     )
     from .charts import create_main_dashboard, create_rolling_returns_chart
 except ImportError as e:
@@ -129,44 +129,41 @@ def main() -> None:
     preset_weights = st.session_state.get('preset_weights', [])
     
     for i in range(num_tickers):
-        col1, col2 = st.sidebar.columns([2, 1])
-        
-        with col1:
-            # Determine default ticker
-            if i < len(preset_tickers):
-                default_ticker = preset_tickers[i]
-            elif i == 0:
-                default_ticker = DEFAULT_TICKER_1
-            elif i == 1:
-                default_ticker = DEFAULT_TICKER_2
-            else:
-                default_ticker = ""
-            
-            ticker = col1.text_input(
-                f"Ticker {i+1}",
-                value=default_ticker,
-                key=f"ticker_{i}",
-                help="Enter ticker symbol (e.g., VDCP.L, AAPL)"
-            )
-            tickers.append(ticker)
-        
-        with col2:
-            # Determine default weight
-            if i < len(preset_weights):
-                default_weight = preset_weights[i]
-            else:
-                default_weight = 1.0 / num_tickers
-            
-            weight = col2.number_input(
-                f"Weight {i+1}",
-                min_value=0.0,
-                max_value=1.0,
-                value=default_weight,
-                step=0.05,
-                key=f"weight_{i}",
-                help="Portfolio weight (will be normalized)"
-            )
-            weights.append(weight)
+        # Determine default ticker
+        if i < len(preset_tickers):
+            default_ticker = preset_tickers[i]
+        elif i == 0:
+            default_ticker = DEFAULT_TICKER_1
+        elif i == 1:
+            default_ticker = DEFAULT_TICKER_2
+        else:
+            default_ticker = ""
+
+        # Use searchable ticker input
+        ticker = render_searchable_ticker_input(
+            f"Ticker {i+1}",
+            default_value=default_ticker,
+            key=f"ticker_{i}",
+            help_text="Enter ticker or search Yahoo Finance"
+        )
+        tickers.append(ticker)
+
+        # Weight input
+        if i < len(preset_weights):
+            default_weight = preset_weights[i]
+        else:
+            default_weight = 1.0 / num_tickers
+
+        weight = st.sidebar.number_input(
+            f"Weight {i+1}",
+            min_value=0.0,
+            max_value=1.0,
+            value=default_weight,
+            step=0.05,
+            key=f"weight_{i}",
+            help="Portfolio weight (will be normalized)"
+        )
+        weights.append(weight)
     
     # Benchmark
     st.sidebar.subheader("Benchmark")
@@ -189,12 +186,13 @@ def main() -> None:
             default_bench = "SPY"
         else:
             default_bench = ""
-        
-        bench_ticker = st.sidebar.text_input(
+
+        # Use searchable ticker input for benchmarks
+        bench_ticker = render_searchable_ticker_input(
             f"Benchmark {i+1}",
-            value=default_bench,
+            default_value=default_bench,
             key=f"benchmark_{i}",
-            help="Ticker to compare against (e.g., VWRA.L, SPY)"
+            help_text="Ticker to compare against or search Yahoo Finance"
         )
         if bench_ticker:
             benchmarks.append(bench_ticker)
