@@ -9,10 +9,11 @@ from __future__ import annotations
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 from pathlib import Path
 import io
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # Import functions from backtest module
 from backtest import download_prices, compute_metrics, summarize
@@ -271,45 +272,12 @@ if run_backtest:
 
     # Charts
     st.divider()
-    st.header("📈 Visualizations")
+    st.header("📈 Interactive Visualizations")
+    st.caption("💡 Hover over the charts to see exact values")
 
-    # Create 2x2 grid of charts
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
-    fig.patch.set_facecolor('white')
-
-    # Chart 1: Portfolio vs Benchmark Value
-    ax1.plot(results.index, results['portfolio_value'], label='Portfolio', linewidth=2, color='#1f77b4')
-    ax1.plot(results.index, results['benchmark_value'], label='Benchmark', linewidth=2, color='#9467bd', linestyle='--')
-    ax1.set_title('Portfolio vs Benchmark Value', fontsize=14, fontweight='bold', pad=10)
-    ax1.set_xlabel('Date', fontsize=11)
-    ax1.set_ylabel('Value ($)', fontsize=11)
-    ax1.legend(loc='best', fontsize=10)
-    ax1.grid(True, alpha=0.3)
-    ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'${x:,.0f}'))
-
-    # Chart 2: Cumulative Returns
-    ax2.plot(results.index, results['portfolio_return'] * 100, label='Portfolio', linewidth=2, color='#1f77b4')
-    ax2.plot(results.index, results['benchmark_return'] * 100, label='Benchmark', linewidth=2, color='#9467bd', linestyle='--')
-    ax2.set_title('Cumulative Returns', fontsize=14, fontweight='bold', pad=10)
-    ax2.set_xlabel('Date', fontsize=11)
-    ax2.set_ylabel('Return (%)', fontsize=11)
-    ax2.legend(loc='best', fontsize=10)
-    ax2.grid(True, alpha=0.3)
-    ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1f}%'))
-
-    # Chart 3: Active Return (Portfolio - Benchmark)
+    # Calculate metrics for charts
     active_return = (results['portfolio_return'] - results['benchmark_return']) * 100
-    colors = ['#2ca02c' if x >= 0 else '#d62728' for x in active_return]
-    ax3.fill_between(results.index, 0, active_return, alpha=0.3, color='#1f77b4')
-    ax3.plot(results.index, active_return, linewidth=2, color='#1f77b4')
-    ax3.axhline(y=0, color='black', linestyle='-', linewidth=1, alpha=0.5)
-    ax3.set_title('Active Return (Portfolio - Benchmark)', fontsize=14, fontweight='bold', pad=10)
-    ax3.set_xlabel('Date', fontsize=11)
-    ax3.set_ylabel('Active Return (%)', fontsize=11)
-    ax3.grid(True, alpha=0.3)
-    ax3.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1f}%'))
 
-    # Chart 4: Drawdown
     # Calculate drawdown for portfolio
     portfolio_cummax = results['portfolio_value'].expanding().max()
     portfolio_drawdown = ((results['portfolio_value'] - portfolio_cummax) / portfolio_cummax) * 100
@@ -318,32 +286,134 @@ if run_backtest:
     benchmark_cummax = results['benchmark_value'].expanding().max()
     benchmark_drawdown = ((results['benchmark_value'] - benchmark_cummax) / benchmark_cummax) * 100
 
-    ax4.fill_between(results.index, 0, portfolio_drawdown, alpha=0.3, color='#1f77b4', label='Portfolio')
-    ax4.fill_between(results.index, 0, benchmark_drawdown, alpha=0.3, color='#9467bd', label='Benchmark')
-    ax4.plot(results.index, portfolio_drawdown, linewidth=1.5, color='#1f77b4')
-    ax4.plot(results.index, benchmark_drawdown, linewidth=1.5, color='#9467bd', linestyle='--')
-    ax4.axhline(y=0, color='black', linestyle='-', linewidth=1, alpha=0.5)
-    ax4.set_title('Drawdown Over Time', fontsize=14, fontweight='bold', pad=10)
-    ax4.set_xlabel('Date', fontsize=11)
-    ax4.set_ylabel('Drawdown (%)', fontsize=11)
-    ax4.legend(loc='best', fontsize=10)
-    ax4.grid(True, alpha=0.3)
-    ax4.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1f}%'))
+    # Create 2x2 grid of charts using Plotly subplots
+    fig = make_subplots(
+        rows=2, cols=2,
+        subplot_titles=('Portfolio vs Benchmark Value', 'Cumulative Returns',
+                       'Active Return (Portfolio - Benchmark)', 'Drawdown Over Time'),
+        vertical_spacing=0.12,
+        horizontal_spacing=0.10
+    )
 
-    # Annotate max drawdowns
-    max_dd_portfolio = portfolio_drawdown.min()
-    max_dd_portfolio_date = portfolio_drawdown.idxmin()
-    max_dd_benchmark = benchmark_drawdown.min()
+    # Chart 1: Portfolio vs Benchmark Value (top-left)
+    fig.add_trace(
+        go.Scatter(
+            x=results.index,
+            y=results['portfolio_value'],
+            name='Portfolio',
+            line=dict(color='#1f77b4', width=2),
+            hovertemplate='<b>Portfolio</b><br>Date: %{x}<br>Value: $%{y:,.2f}<extra></extra>'
+        ),
+        row=1, col=1
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=results.index,
+            y=results['benchmark_value'],
+            name='Benchmark',
+            line=dict(color='#9467bd', width=2, dash='dash'),
+            hovertemplate='<b>Benchmark</b><br>Date: %{x}<br>Value: $%{y:,.2f}<extra></extra>'
+        ),
+        row=1, col=1
+    )
 
-    ax4.annotate(f'Max DD: {max_dd_portfolio:.2f}%',
-                xy=(max_dd_portfolio_date, max_dd_portfolio),
-                xytext=(10, -20), textcoords='offset points',
-                fontsize=9, color='#1f77b4',
-                bbox=dict(boxstyle='round,pad=0.5', fc='white', alpha=0.8),
-                arrowprops=dict(arrowstyle='->', color='#1f77b4'))
+    # Chart 2: Cumulative Returns (top-right)
+    fig.add_trace(
+        go.Scatter(
+            x=results.index,
+            y=results['portfolio_return'] * 100,
+            name='Portfolio Return',
+            line=dict(color='#1f77b4', width=2),
+            hovertemplate='<b>Portfolio</b><br>Date: %{x}<br>Return: %{y:.2f}%<extra></extra>',
+            showlegend=False
+        ),
+        row=1, col=2
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=results.index,
+            y=results['benchmark_return'] * 100,
+            name='Benchmark Return',
+            line=dict(color='#9467bd', width=2, dash='dash'),
+            hovertemplate='<b>Benchmark</b><br>Date: %{x}<br>Return: %{y:.2f}%<extra></extra>',
+            showlegend=False
+        ),
+        row=1, col=2
+    )
 
-    plt.tight_layout()
-    st.pyplot(fig)
+    # Chart 3: Active Return (bottom-left)
+    # Color code based on positive/negative
+    colors = ['rgba(44, 160, 44, 0.3)' if x >= 0 else 'rgba(214, 39, 40, 0.3)' for x in active_return]
+
+    fig.add_trace(
+        go.Scatter(
+            x=results.index,
+            y=active_return,
+            name='Active Return',
+            fill='tozeroy',
+            line=dict(color='#1f77b4', width=2),
+            hovertemplate='<b>Active Return</b><br>Date: %{x}<br>Difference: %{y:.2f}%<extra></extra>',
+            showlegend=False
+        ),
+        row=2, col=1
+    )
+    fig.add_hline(y=0, line_dash="solid", line_color="black", opacity=0.5, row=2, col=1)
+
+    # Chart 4: Drawdown (bottom-right)
+    fig.add_trace(
+        go.Scatter(
+            x=results.index,
+            y=portfolio_drawdown,
+            name='Portfolio DD',
+            fill='tozeroy',
+            line=dict(color='#1f77b4', width=1.5),
+            hovertemplate='<b>Portfolio</b><br>Date: %{x}<br>Drawdown: %{y:.2f}%<extra></extra>',
+            showlegend=False
+        ),
+        row=2, col=2
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=results.index,
+            y=benchmark_drawdown,
+            name='Benchmark DD',
+            fill='tozeroy',
+            line=dict(color='#9467bd', width=1.5, dash='dash'),
+            hovertemplate='<b>Benchmark</b><br>Date: %{x}<br>Drawdown: %{y:.2f}%<extra></extra>',
+            showlegend=False
+        ),
+        row=2, col=2
+    )
+    fig.add_hline(y=0, line_dash="solid", line_color="black", opacity=0.5, row=2, col=2)
+
+    # Update axes labels
+    fig.update_xaxes(title_text="Date", row=1, col=1)
+    fig.update_xaxes(title_text="Date", row=1, col=2)
+    fig.update_xaxes(title_text="Date", row=2, col=1)
+    fig.update_xaxes(title_text="Date", row=2, col=2)
+
+    fig.update_yaxes(title_text="Value ($)", row=1, col=1)
+    fig.update_yaxes(title_text="Return (%)", row=1, col=2)
+    fig.update_yaxes(title_text="Active Return (%)", row=2, col=1)
+    fig.update_yaxes(title_text="Drawdown (%)", row=2, col=2)
+
+    # Update layout
+    fig.update_layout(
+        height=800,
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        hovermode='x unified',
+        template='plotly_white'
+    )
+
+    # Display interactive chart
+    st.plotly_chart(fig, use_container_width=True)
 
     # Download options
     st.divider()
@@ -366,16 +436,14 @@ if run_backtest:
         )
 
     with col2:
-        # Chart download
-        chart_buffer = io.BytesIO()
-        fig.savefig(chart_buffer, format='png', dpi=150, bbox_inches='tight')
-        chart_data = chart_buffer.getvalue()
+        # Chart download as interactive HTML
+        chart_html = fig.to_html(include_plotlyjs='cdn')
 
         st.download_button(
-            label="📥 Download Charts (PNG)",
-            data=chart_data,
-            file_name=f"backtest_charts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
-            mime="image/png",
+            label="📥 Download Interactive Charts (HTML)",
+            data=chart_html,
+            file_name=f"backtest_charts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
+            mime="text/html",
             use_container_width=True
         )
 
@@ -408,10 +476,10 @@ else:
         st.markdown("""
         #### 📊 Features:
         - **Comprehensive metrics**: CAGR, Sharpe, Sortino, Drawdown
-        - **Interactive charts**: Portfolio value, returns, active return
+        - **Interactive charts**: Hover to see exact values at any point
         - **Data caching**: Faster subsequent runs
         - **CSV export**: Download results for further analysis
-        - **Chart export**: Save visualizations as PNG
+        - **Chart export**: Save interactive visualizations as HTML
         - **Real-time data**: Fetches latest prices from Yahoo Finance
         """)
 
