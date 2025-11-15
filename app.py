@@ -187,8 +187,8 @@ if run_backtest:
         try:
             results = compute_metrics(
                 portfolio_prices,
-                benchmark_prices,
                 weights_array,
+                benchmark_prices,
                 capital
             )
 
