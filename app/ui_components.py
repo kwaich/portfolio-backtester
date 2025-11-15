@@ -257,8 +257,9 @@ def render_searchable_ticker_input(
                 st.caption(f"Found {len(results)} result(s):")
 
                 # Display results as clickable buttons
-                for ticker, name in results:
-                    button_key = f"{key}_result_{ticker}" if key else None
+                for idx, (ticker, name) in enumerate(results):
+                    # Use index to ensure unique keys even if ticker appears multiple times
+                    button_key = f"{key}_result_{idx}_{ticker}" if key else None
                     display_text = f"{ticker} - {name}"
 
                     if st.button(display_text, key=button_key, use_container_width=True):
