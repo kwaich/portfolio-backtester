@@ -6,17 +6,100 @@ This app provides an interactive interface for running backtests and visualizing
 
 from __future__ import annotations
 
-import streamlit as st
-import pandas as pd
-import numpy as np
+# Standard library imports (should always work)
 from datetime import datetime, timedelta
 from pathlib import Path
 import io
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+
+# Check and import third-party dependencies
+try:
+    import streamlit as st
+except ImportError as e:
+    print(
+        "ERROR: Streamlit is not installed.\n"
+        "Please install it with: pip install streamlit>=1.28.0\n"
+        f"Details: {e}"
+    )
+    raise SystemExit(1)
+
+try:
+    import pandas as pd
+except ImportError as e:
+    st.error(
+        "❌ **Missing Dependency: pandas**\n\n"
+        "pandas is required for data processing.\n\n"
+        "**Install with:**\n"
+        "```bash\n"
+        "pip install pandas>=2.0.0\n"
+        "```"
+    )
+    st.stop()
+
+try:
+    import numpy as np
+except ImportError as e:
+    st.error(
+        "❌ **Missing Dependency: numpy**\n\n"
+        "numpy is required for numerical operations.\n\n"
+        "**Install with:**\n"
+        "```bash\n"
+        "pip install numpy>=1.24.0\n"
+        "```"
+    )
+    st.stop()
+
+try:
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+except ImportError as e:
+    st.error(
+        "❌ **Missing Dependency: plotly**\n\n"
+        "plotly is required for interactive charts.\n\n"
+        "**Install with:**\n"
+        "```bash\n"
+        "pip install plotly>=5.14.0\n"
+        "```"
+    )
+    st.stop()
 
 # Import functions from backtest module
-from backtest import download_prices, compute_metrics, summarize
+try:
+    from backtest import download_prices, compute_metrics, summarize, validate_tickers
+except ImportError as e:
+    st.error(
+        "❌ **Cannot Import Backtest Module**\n\n"
+        f"Error: `{str(e)}`\n\n"
+        "**Please ensure:**\n"
+        "1. `backtest.py` is in the same directory as `app.py`\n"
+        "2. All dependencies are installed:\n"
+        "   ```bash\n"
+        "   pip install -r requirements.txt\n"
+        "   ```\n"
+        "3. Python version is 3.8 or higher\n\n"
+        "**Directory structure should be:**\n"
+        "```\n"
+        "backtester/\n"
+        "├── app.py\n"
+        "├── backtest.py\n"
+        "└── requirements.txt\n"
+        "```"
+    )
+    st.stop()
+except Exception as e:
+    st.error(
+        "❌ **Error Loading Backtest Module**\n\n"
+        f"Unexpected error: `{str(e)}`\n\n"
+        "**Possible causes:**\n"
+        "- Syntax error in `backtest.py`\n"
+        "- Missing dependencies in `backtest.py`\n"
+        "- Incompatible Python version\n\n"
+        "**Try:**\n"
+        "```bash\n"
+        "python -c \"import backtest\"\n"
+        "```\n"
+        "to see detailed error messages."
+    )
+    st.stop()
 
 # Page configuration
 st.set_page_config(
@@ -255,6 +338,14 @@ if run_backtest:
 
     if not benchmarks:
         st.error("❌ Please enter at least one benchmark ticker")
+        st.stop()
+
+    # Validate ticker format
+    try:
+        validate_tickers(tickers)
+        validate_tickers(benchmarks)
+    except ValueError as e:
+        st.error(f"❌ **Ticker Validation Failed**\n\n{str(e)}")
         st.stop()
 
     if start_date >= end_date:

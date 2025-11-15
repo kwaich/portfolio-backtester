@@ -18,9 +18,12 @@ import argparse
 import hashlib
 import logging
 import pickle
+import re
 import sys
+import time
+from functools import wraps
 from pathlib import Path
-from typing import List
+from typing import Any, Callable, List
 
 import numpy as np
 import pandas as pd
@@ -39,6 +42,165 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
+
+# Constants
+TRADING_DAYS_PER_YEAR = 252
+DEFAULT_CACHE_TTL_HOURS = 24
+CACHE_VERSION = "1.0"
+
+
+def retry_with_backoff(
+    max_retries: int = 3,
+    base_delay: float = 2.0,
+    max_delay: float = 60.0,
+    exceptions: tuple = (Exception,)
+) -> Callable:
+    """Decorator to retry function with exponential backoff.
+
+    Args:
+        max_retries: Maximum number of retry attempts (default: 3)
+        base_delay: Initial delay in seconds (default: 2.0)
+        max_delay: Maximum delay in seconds (default: 60.0)
+        exceptions: Tuple of exception types to catch (default: all Exception)
+
+    Returns:
+        Decorated function with retry logic
+    """
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs) -> Any:
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as e:
+                    if attempt == max_retries - 1:
+                        # Last attempt failed, raise the exception
+                        raise
+
+                    delay = min(base_delay * (2 ** attempt), max_delay)
+                    logger.warning(
+                        f"{func.__name__} failed (attempt {attempt + 1}/{max_retries}): {e}. "
+                        f"Retrying in {delay:.1f}s..."
+                    )
+                    time.sleep(delay)
+            return None  # Should never reach here
+        return wrapper
+    return decorator
+
+
+def validate_ticker(ticker: str) -> tuple[bool, str]:
+    """Validate ticker symbol format.
+
+    Args:
+        ticker: Ticker symbol to validate
+
+    Returns:
+        Tuple of (is_valid, error_message). If valid, error_message is empty string.
+
+    Examples:
+        >>> validate_ticker("AAPL")
+        (True, "")
+        >>> validate_ticker("")
+        (False, "Ticker cannot be empty")
+        >>> validate_ticker("123")
+        (False, "Ticker cannot be all numbers: 123")
+    """
+    if not ticker:
+        return False, "Ticker cannot be empty"
+
+    if len(ticker) > 10:
+        return False, f"Ticker too long: {ticker} (max 10 characters)"
+
+    # Allow: letters, numbers, dots (for UK tickers like VWRA.L),
+    # hyphens, carets (for indices like ^GSPC), equals (for currencies)
+    if not re.match(r'^[A-Z0-9\.\-\^=]+$', ticker.upper()):
+        return False, f"Invalid ticker format: {ticker} (use only letters, numbers, ., -, ^, =)"
+
+    # Check for common invalid patterns
+    if ticker.isdigit():
+        return False, f"Ticker cannot be all numbers: {ticker}"
+
+    return True, ""
+
+
+def validate_tickers(tickers: List[str]) -> None:
+    """Validate list of ticker symbols, raise ValueError if any invalid.
+
+    Args:
+        tickers: List of ticker symbols to validate
+
+    Raises:
+        ValueError: If any ticker is invalid, with detailed error messages
+
+    Examples:
+        >>> validate_tickers(["AAPL", "MSFT"])
+        >>> validate_tickers(["AAPL", ""])
+        ValueError: Invalid ticker(s) detected...
+    """
+    if not tickers:
+        raise ValueError("No tickers provided")
+
+    errors = []
+    for ticker in tickers:
+        is_valid, error_msg = validate_ticker(ticker)
+        if not is_valid:
+            errors.append(f"  • {error_msg}")
+
+    if errors:
+        raise ValueError(
+            f"Invalid ticker(s) detected:\n" + "\n".join(errors) + "\n\n"
+            f"Valid ticker examples: AAPL, MSFT, VWRA.L, ^GSPC, EURUSD=X"
+        )
+
+
+def validate_date_string(date_str: str) -> str:
+    """Validate and normalize date string to YYYY-MM-DD format.
+
+    Args:
+        date_str: Date string in various formats (YYYY-MM-DD, YYYY/MM/DD, etc.)
+
+    Returns:
+        Normalized date string in YYYY-MM-DD format
+
+    Raises:
+        argparse.ArgumentTypeError: If date format is invalid or date is invalid
+
+    Examples:
+        >>> validate_date_string("2020-01-01")
+        '2020-01-01'
+        >>> validate_date_string("2020/01/01")
+        '2020-01-01'
+        >>> validate_date_string("invalid")
+        ArgumentTypeError: Invalid date format...
+    """
+    try:
+        # Try parsing with pandas (accepts many formats)
+        dt = pd.Timestamp(date_str)
+
+        # Check if date is not too far in the past
+        if dt.year < 1970:
+            raise argparse.ArgumentTypeError(
+                f"Date too far in the past: {date_str} (minimum: 1970-01-01)"
+            )
+
+        # Check if date is not in the future
+        if dt > pd.Timestamp.today():
+            raise argparse.ArgumentTypeError(
+                f"Date is in the future: {date_str}"
+            )
+
+        # Return normalized format
+        return dt.strftime("%Y-%m-%d")
+
+    except argparse.ArgumentTypeError:
+        # Re-raise our custom errors
+        raise
+    except (ValueError, TypeError) as e:
+        raise argparse.ArgumentTypeError(
+            f"Invalid date format: '{date_str}'\n"
+            f"Expected format: YYYY-MM-DD (e.g., 2020-01-01)\n"
+            f"Error: {str(e)}"
+        )
 
 
 def parse_args(argv: List[str]) -> argparse.Namespace:
@@ -63,11 +225,13 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--start",
+        type=validate_date_string,
         default="2018-01-01",
         help="Backtest start date (YYYY-MM-DD)",
     )
     parser.add_argument(
         "--end",
+        type=validate_date_string,
         default=pd.Timestamp.today().strftime("%Y-%m-%d"),
         help="Backtest end date (YYYY-MM-DD)",
     )
@@ -87,6 +251,12 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
         action="store_true",
         help="Disable price data caching (always download fresh data)",
     )
+    parser.add_argument(
+        "--cache-ttl",
+        type=int,
+        default=DEFAULT_CACHE_TTL_HOURS,
+        help=f"Cache time-to-live in hours (default: {DEFAULT_CACHE_TTL_HOURS})",
+    )
     return parser.parse_args(argv)
 
 
@@ -104,43 +274,84 @@ def get_cache_path(tickers: List[str], start: str, end: str) -> Path:
     return cache_dir / f"{cache_key}.pkl"
 
 
-def load_cached_prices(cache_path: Path) -> pd.DataFrame | None:
-    """Load cached price data if it exists and is valid."""
+def load_cached_prices(cache_path: Path, max_age_hours: int = DEFAULT_CACHE_TTL_HOURS) -> pd.DataFrame | None:
+    """Load cached price data if it exists and is not stale.
+
+    Args:
+        cache_path: Path to cache file
+        max_age_hours: Maximum age of cache in hours (default: 24)
+
+    Returns:
+        DataFrame if cache is valid and fresh, None otherwise
+    """
     if not cache_path.exists():
         return None
+
     try:
         with open(cache_path, "rb") as f:
-            data = pickle.load(f)
-        logger.info(f"Loaded cached data from {cache_path}")
-        return data
+            cache_data = pickle.load(f)
+
+        # Handle old cache format (migration from plain DataFrame)
+        if isinstance(cache_data, pd.DataFrame):
+            logger.warning(f"Old cache format detected at {cache_path}, will re-download")
+            cache_path.unlink()  # Delete old format cache
+            return None
+
+        # Check cache age
+        cache_age_hours = (time.time() - cache_data["timestamp"]) / 3600
+        if cache_age_hours > max_age_hours:
+            logger.info(f"Cache expired (age: {cache_age_hours:.1f}h, max: {max_age_hours}h)")
+            cache_path.unlink()  # Delete stale cache
+            return None
+
+        logger.info(f"Loaded cached data (age: {cache_age_hours:.1f}h from {cache_path})")
+        return cache_data["data"]
+
     except Exception as e:
         logger.warning(f"Failed to load cache: {e}")
+        # Try to clean up corrupted cache file
+        try:
+            cache_path.unlink()
+        except:
+            pass
         return None
 
 
 def save_cached_prices(cache_path: Path, prices: pd.DataFrame) -> None:
-    """Save price data to cache."""
+    """Save price data to cache with metadata.
+
+    Args:
+        cache_path: Path where cache file will be saved
+        prices: DataFrame containing price data to cache
+    """
     try:
+        cache_data = {
+            "data": prices,
+            "timestamp": time.time(),
+            "version": CACHE_VERSION
+        }
         with open(cache_path, "wb") as f:
-            pickle.dump(prices, f)
+            pickle.dump(cache_data, f, protocol=pickle.HIGHEST_PROTOCOL)
         logger.info(f"Saved data to cache: {cache_path}")
     except Exception as e:
         logger.warning(f"Failed to save cache: {e}")
 
 
-def download_prices(tickers: List[str], start: str, end: str, use_cache: bool = True) -> pd.DataFrame:
-    """Fetch adjusted closes for the requested tickers."""
+@retry_with_backoff(max_retries=3, base_delay=2.0)
+def _download_from_yfinance(tickers: List[str], start: str, end: str) -> Any:
+    """Internal function to download from yfinance with retry logic.
 
-    # Try to load from cache first
-    if use_cache:
-        cache_path = get_cache_path(tickers, start, end)
-        cached_data = load_cached_prices(cache_path)
-        if cached_data is not None:
-            return cached_data
+    Args:
+        tickers: List of ticker symbols
+        start: Start date
+        end: End date
 
+    Returns:
+        Raw data from yfinance (format varies based on number of tickers)
+    """
     logger.info(f"Downloading data for {len(tickers)} ticker(s) from {start} to {end}")
 
-    data = yf.download(
+    return yf.download(
         tickers=tickers,
         start=start,
         end=end,
@@ -148,6 +359,43 @@ def download_prices(tickers: List[str], start: str, end: str, use_cache: bool = 
         auto_adjust=True,
         progress=False,
     )
+
+
+def download_prices(
+    tickers: List[str],
+    start: str,
+    end: str,
+    use_cache: bool = True,
+    cache_ttl_hours: int = DEFAULT_CACHE_TTL_HOURS
+) -> pd.DataFrame:
+    """Fetch adjusted closes for the requested tickers.
+
+    Args:
+        tickers: List of ticker symbols to download
+        start: Start date in YYYY-MM-DD format
+        end: End date in YYYY-MM-DD format
+        use_cache: Whether to use cached data (default: True)
+        cache_ttl_hours: Cache time-to-live in hours (default: 24)
+
+    Returns:
+        DataFrame with adjusted close prices for all tickers
+
+    Raises:
+        ValueError: If any ticker is invalid
+    """
+
+    # Validate tickers before attempting download
+    validate_tickers(tickers)
+
+    # Try to load from cache first
+    if use_cache:
+        cache_path = get_cache_path(tickers, start, end)
+        cached_data = load_cached_prices(cache_path, max_age_hours=cache_ttl_hours)
+        if cached_data is not None:
+            return cached_data
+
+    # Download with retry logic
+    data = _download_from_yfinance(tickers, start, end)
 
     # Check if data is empty before processing
     if data.empty:
@@ -296,7 +544,7 @@ def summarize(series: pd.Series, capital: float) -> dict[str, float]:
     daily_returns = series.pct_change().dropna()
 
     # Volatility (annualized standard deviation)
-    volatility = daily_returns.std() * np.sqrt(252)
+    volatility = daily_returns.std() * np.sqrt(TRADING_DAYS_PER_YEAR)
 
     # Sharpe ratio (assuming 0% risk-free rate for simplicity)
     sharpe_ratio = (cagr / volatility) if volatility > 0 else 0.0
@@ -307,7 +555,7 @@ def summarize(series: pd.Series, capital: float) -> dict[str, float]:
 
     # Sortino ratio (downside deviation only)
     downside_returns = daily_returns[daily_returns < 0]
-    downside_std = downside_returns.std() * np.sqrt(252) if len(downside_returns) > 0 else 0.0
+    downside_std = downside_returns.std() * np.sqrt(TRADING_DAYS_PER_YEAR) if len(downside_returns) > 0 else 0.0
     sortino_ratio = (cagr / downside_std) if downside_std > 0 else 0.0
 
     return {
@@ -326,6 +574,30 @@ def main(argv: List[str]) -> None:
 
     tickers = args.tickers
     weights = np.array(args.weights, dtype=float)
+
+    # Validate tickers early
+    try:
+        validate_tickers(tickers)
+        validate_tickers([args.benchmark])
+    except ValueError as e:
+        raise SystemExit(f"Ticker validation failed:\n{e}")
+
+    # Validate date range
+    start_dt = pd.Timestamp(args.start)
+    end_dt = pd.Timestamp(args.end)
+
+    if start_dt >= end_dt:
+        raise SystemExit(
+            f"Invalid date range: start ({args.start}) must be before end ({args.end})"
+        )
+
+    days_in_range = (end_dt - start_dt).days
+    if days_in_range < 30:
+        logger.warning(
+            f"Short backtest period: {days_in_range} days. "
+            f"Results may be unreliable for periods < 30 days."
+        )
+
     if len(tickers) != len(weights):
         raise SystemExit("Number of weights must match number of tickers")
     if not np.isclose(weights.sum(), 1.0):
@@ -334,7 +606,13 @@ def main(argv: List[str]) -> None:
 
     universe = list(dict.fromkeys(tickers + [args.benchmark]))
     use_cache = not args.no_cache
-    prices = download_prices(universe, args.start, args.end, use_cache=use_cache)
+    prices = download_prices(
+        universe,
+        args.start,
+        args.end,
+        use_cache=use_cache,
+        cache_ttl_hours=args.cache_ttl
+    )
 
     portfolio_prices = prices[tickers]
     benchmark_prices = prices[args.benchmark]
