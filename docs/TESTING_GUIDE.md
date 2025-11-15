@@ -309,7 +309,7 @@ pytest --cov=backtest --cov=app --cov-report=html
 open htmlcov/index.html
 
 # Check coverage for specific module
-pytest test_backtest.py --cov=backtest --cov-report=term-missing
+pytest tests/test_backtest.py --cov=backtest --cov-report=term-missing
 
 # Check coverage with missing line numbers
 pytest --cov=backtest --cov-report=term-missing:skip-covered
@@ -490,15 +490,15 @@ pytest -v
 pytest --cov=backtest --cov=app --cov-report=term-missing
 
 # Run specific test file
-pytest test_backtest.py -v
-pytest test_app.py -v
-pytest test_integration.py -v
+pytest tests/test_backtest.py -v
+pytest tests/test_app.py -v
+pytest tests/test_integration.py -v
 
 # Run specific test class
-pytest test_backtest.py::TestTickerValidation -v
+pytest tests/test_backtest.py::TestTickerValidation -v
 
 # Run specific test function
-pytest test_app.py::TestPortfolioPresets::test_tech_giants_preset_values -v
+pytest tests/test_app.py::TestPortfolioPresets::test_tech_giants_preset_values -v
 
 # Run with verbose output and show all print statements
 pytest -vv -s
@@ -595,10 +595,10 @@ pytest -v
 pytest --cov=backtest --cov=app --cov-report=term-missing
 
 # Run specific file
-pytest test_backtest.py -v
+pytest tests/test_backtest.py -v
 
 # Run specific test
-pytest test_backtest.py::TestTickerValidation::test_valid_formats -v
+pytest tests/test_backtest.py::TestTickerValidation::test_valid_formats -v
 
 # Run and stop at first failure
 pytest -x
