@@ -16,47 +16,124 @@ This is a lightweight Python-based ETF backtesting utility that allows users to:
 
 ```
 portfolio-backtester/
-├── app.py               # Streamlit web UI (NEW)
-├── backtest.py          # Main backtesting engine
-├── plot_backtest.py     # Visualization helper
-├── test_backtest.py     # Unit tests for backtest.py
-├── test_app.py          # Unit tests for app.py (NEW)
-├── requirements.txt     # Python dependencies (NEW)
-├── README.md            # Main documentation (NEW)
-├── PROJECT_SUMMARY.md   # Additional documentation
-├── CLAUDE.md            # This file - AI assistant guide
-├── .gitignore           # Git ignore patterns
-├── .venv/               # Python virtual environment (gitignored)
-├── .cache/              # Price data cache (gitignored, NEW)
-├── results/             # CSV outputs (gitignored)
-└── charts/              # PNG outputs (gitignored)
+├── app.py                  # Streamlit web UI (backward compat wrapper)
+├── app/                    # Modular web UI package (REFACTORED Phase 2)
+│   ├── __init__.py         # Package initialization (16 lines)
+│   ├── config.py           # Configuration constants (121 lines, 32 constants)
+│   ├── presets.py          # Portfolio and date presets (110 lines)
+│   ├── validation.py       # Input validation & session state (162 lines)
+│   ├── ui_components.py    # Reusable UI rendering (184 lines)
+│   ├── charts.py           # Plotly chart generation (306 lines)
+│   └── main.py             # Main orchestration (459 lines)
+├── backtest.py             # Core backtesting engine (669 lines, ENHANCED Phase 1)
+├── plot_backtest.py        # Visualization helper (365 lines, ENHANCED Phase 2)
+├── test_backtest.py        # Unit tests for backtest.py (635 lines, 51 tests)
+├── test_app.py             # Unit tests for app.py UI (933 lines, 62 tests)
+├── requirements.txt        # Python dependencies
+├── README.md               # Main user documentation
+├── PROJECT_SUMMARY.md      # Additional documentation
+├── CLAUDE.md               # This file - AI assistant guide
+├── IMPLEMENTATION_PLAN.md  # Code improvement roadmap
+├── IMPLEMENTATION_CHECKLIST.md # Progress tracking
+├── TEST_REPORT.md          # Comprehensive validation report
+├── .gitignore              # Git ignore patterns
+├── .venv/                  # Python virtual environment (gitignored)
+├── .cache/                 # Price data cache (gitignored)
+├── results/                # CSV outputs (gitignored)
+└── charts/                 # PNG outputs (gitignored)
 ```
 
 ### File Purposes
 
-**app.py** (~700 lines, ENHANCED)
-- Streamlit web UI for interactive backtesting
-- Provides user-friendly interface without CLI knowledge
-- Imports and reuses functions from backtest.py module
-- Key features:
-  - **Example Portfolio Presets**: 6 pre-configured portfolios (Default UK ETFs, 60/40, Tech Giants, Dividend Aristocrats, Global Diversified)
-  - **Date Range Presets**: Quick buttons for 1Y, 3Y, 5Y, 10Y, YTD, Max
-  - **Multiple Benchmarks**: Compare against up to 3 benchmarks simultaneously
-  - **Delta Indicators**: Color-coded arrows showing outperformance/underperformance
-  - **Rolling Returns Chart**: Interactive 30/90/180-day rolling returns analysis
-  - Dynamic form inputs for tickers and weights
-  - Real-time backtest execution with progress indicators
-  - Side-by-side results comparison (Portfolio vs Benchmark vs Relative)
-  - Interactive Plotly charts with hover tooltips (2x2 dashboard + rolling returns)
-  - Expandable sections for additional benchmark comparisons
-  - CSV and HTML chart download capabilities
-  - Weight auto-normalization
-  - Cache toggle option
-  - Session state management for smooth UX
-- Run with: `streamlit run app.py`
-- Opens browser at `http://localhost:8501`
-- Uses st.sidebar for inputs, main area for results
-- Integrates Plotly interactive charts with Streamlit's display functions
+**app.py** (43 lines, REFACTORED Phase 2)
+- **Backward compatibility wrapper** for refactored modular architecture
+- Imports and runs `app.main.main()` from new package structure
+- Maintains old entry point: `streamlit run app.py` still works
+- Provides helpful error messages if imports fail
+- Allows seamless transition to modular architecture without breaking existing workflows
+
+**app/ package** (1,358 lines total, CREATED Phase 2)
+- **Professional modular architecture** replacing monolithic app.py
+- Clean separation of concerns with focused, testable modules
+- Zero code duplication (eliminated 134 duplicate lines)
+- All magic numbers extracted to constants (32 constants)
+- Consistent logging and error handling throughout
+
+**app/__init__.py** (16 lines)
+- Package initialization
+- Version information (v1.0.0)
+- Exports main entry point for direct imports
+
+**app/config.py** (121 lines, 32 constants)
+- Centralized configuration management
+- Page settings (title, icon, layout)
+- UI limits (MAX_TICKERS=10, MAX_BENCHMARKS=3, DEFAULT_CAPITAL=100k)
+- Chart colors (PORTFOLIO_COLOR, BENCHMARK_COLORS, etc.)
+- Chart configuration (ROLLING_WINDOWS=[30,90,180], BENCHMARK_DASH_STYLES)
+- Metric labels (METRIC_LABELS dictionary for display names)
+- Default values (DEFAULT_NUM_TICKERS, DEFAULT_START_DATE, etc.)
+
+**app/presets.py** (110 lines)
+- Portfolio presets: 6 pre-configured portfolios
+  - Custom (Manual Entry)
+  - Default UK ETFs: VDCP.L + VHYD.L vs VWRA.L
+  - 60/40 US Stocks/Bonds: VOO + BND vs SPY
+  - Tech Giants: AAPL + MSFT + GOOGL + AMZN vs QQQ
+  - Dividend Aristocrats: JNJ + PG + KO + PEP vs SPY
+  - Global Diversified: VTI + VXUS + BND vs VT
+- Date presets: 6 quick-select date ranges (1Y, 3Y, 5Y, 10Y, YTD, Max)
+- Functions: `get_portfolio_presets()`, `get_date_presets()`
+
+**app/validation.py** (162 lines)
+- **Centralized session state management** (single source of truth)
+- `get_session_defaults()`: Returns dictionary of all default session state values
+- `initialize_session_state()`: Initializes all session state variables at startup
+- `validate_backtest_inputs()`: Validates tickers, benchmarks, dates before execution
+- `normalize_weights()`: Auto-normalizes portfolio weights to sum to 1.0
+- Input validation for all user inputs (tickers, dates, capital)
+
+**app/ui_components.py** (184 lines)
+- **Reusable UI rendering functions** (DRY principle)
+- `format_metric_value()`: Format values based on metric type (currency, percentage, ratio)
+- `render_metric()`: Render single metric with proper formatting
+- `render_metrics_column()`: Render all metrics for portfolio/benchmark in column layout
+- `render_delta_metric()`: Render delta indicator with color-coded arrow (↑/↓)
+- `create_portfolio_table()`: Generate portfolio composition table
+- Eliminates metric rendering duplication across the codebase
+
+**app/charts.py** (306 lines)
+- **Plotly chart generation functions** (interactive visualizations)
+- `calculate_drawdown()`: Calculate drawdown from value series
+- `calculate_active_return()`: Calculate portfolio - benchmark returns
+- `calculate_rolling_returns()`: Calculate rolling returns for specified window
+- `create_main_dashboard()`: Generate 2x2 dashboard with all main charts
+  - Portfolio vs Benchmark Value (currency-formatted, multiple benchmarks)
+  - Cumulative Returns (percentage-formatted, multiple benchmarks)
+  - Active Return with colored zones (green=outperformance, red=underperformance)
+  - Drawdown Over Time with max drawdown annotations
+- `create_rolling_returns_chart()`: Generate rolling returns analysis (30/90/180-day)
+- Consistent color scheme and formatting across all charts
+
+**app/main.py** (459 lines)
+- **Main application orchestration** (replaces original app.py logic)
+- `main()`: Entry point called by app.py wrapper or directly
+- Streamlit page configuration and layout setup
+- Session state initialization via validation.py
+- Sidebar input collection (tickers, weights, benchmarks, dates, capital)
+- Portfolio preset handling with auto-population
+- Date preset buttons for quick date selection
+- Multiple benchmark support (1-3 benchmarks)
+- Backtest execution workflow:
+  1. Validate all inputs
+  2. Download prices with caching
+  3. Compute metrics for portfolio and all benchmarks
+  4. Display results with delta indicators
+  5. Generate and display interactive charts
+  6. Provide download options (CSV, HTML)
+- Expandable sections for additional benchmark comparisons
+- Portfolio composition table display
+- Error handling with user-friendly messages
+- Run with: `streamlit run app.py` (via wrapper) or `streamlit run app/main.py` (direct)
 
 **backtest.py** (~450 lines, ENHANCED Phase 1)
 - Core backtesting logic with CLI interface
@@ -81,8 +158,9 @@ portfolio-backtester/
   - `summarize()`: Generates comprehensive statistics (Sharpe, Sortino, drawdown, etc.)
   - `main()`: Orchestrates the backtest workflow with early validation
 
-**plot_backtest.py** (~354 lines, ENHANCED)
+**plot_backtest.py** (365 lines, ENHANCED Phase 2)
 - Comprehensive visualization utility for backtest results
+- **Consistent logging** (Phase 2.5): Uses logging module instead of print()
 - Reads CSV output from backtest.py
 - Generates four professional plots:
   1. Portfolio vs benchmark value (currency-formatted axes)
@@ -93,6 +171,8 @@ portfolio-backtester/
 - Professional color scheme (blue/purple palette with green/red zones)
 - Customizable: --style, --dpi, --dashboard options
 - Supports both interactive display and PNG export
+- Logging configuration: INFO level with timestamps
+- 5 logger.info() calls for key operations (data loading, chart generation, file saving)
 
 **test_backtest.py** (~550 lines, EXPANDED Phase 1)
 - Comprehensive unit test suite using pytest
@@ -938,15 +1018,30 @@ rm -rf .cache/
 
 ---
 
-**Last Updated**: 2025-11-15 (Latest: **Phase 1 Complete** - Reliability, validation, and retry logic)
-**Repository State**: Production-ready with Phase 1 enhancements deployed
-**Current Branch**: claude/code-review-01APrVtdG2gV3nj4sJeyWWXj
+**Last Updated**: 2025-11-15 (Latest: **Phase 2 Complete** - Modular architecture, code quality, and organization)
+**Repository State**: Production-ready with Phase 1 & 2 enhancements deployed
+**Current Branch**: claude/review-implementation-plan-01CNKXvBZAn7UQMEcwXn5eGw
 **Test Coverage**: ~88% overall (113 tests, 100% passing)
-**Key Files**: app.py (~700 lines), backtest.py (~450 lines), test_backtest.py (~550 lines), test_app.py (~933 lines), README.md, requirements.txt, CLAUDE.md, PROJECT_SUMMARY.md, IMPLEMENTATION_PLAN.md, IMPLEMENTATION_CHECKLIST.md, PR_PHASE1.md
+**Key Files**: app/ package (7 modules, 1,358 lines), app.py (43 line wrapper), backtest.py (669 lines), plot_backtest.py (365 lines), test_backtest.py (635 lines), test_app.py (933 lines), README.md, requirements.txt, CLAUDE.md, PROJECT_SUMMARY.md, IMPLEMENTATION_PLAN.md, IMPLEMENTATION_CHECKLIST.md, TEST_REPORT.md
+
+**Phase 2 Enhancements (Completed)**:
+- **Modular Architecture**: Refactored monolithic app.py (874 lines) into 7 focused modules (1,358 organized lines)
+  - app/config.py: 32 configuration constants
+  - app/presets.py: Portfolio and date presets
+  - app/validation.py: Centralized session state and input validation
+  - app/ui_components.py: Reusable UI rendering functions
+  - app/charts.py: Plotly chart generation
+  - app/main.py: Application orchestration
+  - app/__init__.py: Package initialization
+  - app.py: 43-line backward compatibility wrapper
+- **Code Quality**: Eliminated 134 lines of duplicate code (DRY principle applied)
+- **Configuration Management**: Extracted all magic numbers to named constants
+- **Consistent Logging**: Added logging to plot_backtest.py (5 logger.info calls)
+- **100% Backward Compatibility**: Wrapper pattern maintains old entry point
 
 **Phase 1 Enhancements (Completed)**:
-- Cache Expiration System with configurable TTL (default 24h)
-- Automatic Retry Logic with exponential backoff (3 attempts: 2s→4s→8s)
-- Comprehensive Ticker Validation (supports AAPL, VWRA.L, ^GSPC, EURUSD=X, BRK-B)
-- Flexible Date Validation with multiple format support and normalization
-- Import Error Handling with user-friendly messages and installation guidance
+- **Cache Expiration System**: Configurable TTL (default 24h), automatic stale cache deletion
+- **Automatic Retry Logic**: Exponential backoff (3 attempts: 2s→4s→8s)
+- **Comprehensive Ticker Validation**: Supports AAPL, VWRA.L, ^GSPC, EURUSD=X, BRK-B
+- **Flexible Date Validation**: Multiple format support and normalization
+- **Import Error Handling**: User-friendly messages and installation guidance

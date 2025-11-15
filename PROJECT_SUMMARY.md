@@ -21,8 +21,21 @@ The system includes `backtest.py` (core engine), `app.py` (Streamlit web UI), an
 
 ## Scripts
 
-- `app.py` — Streamlit web UI for interactive backtesting (~700 lines). Provides a
-  user-friendly browser-based interface without requiring command-line knowledge.
+- `app.py` — **Backward compatibility wrapper** (43 lines) for the refactored modular
+  Streamlit web UI. Imports and runs the main application from the `app/` package.
+  **100% backward compatible** — old entry point still works.
+
+- `app/` package — **Modular web UI architecture** (1,358 lines, Phase 2 refactoring).
+  Professional package structure replacing monolithic app.py with clean separation of concerns.
+
+  **Modules:**
+  - `config.py` (121 lines): 32 configuration constants (colors, limits, labels)
+  - `presets.py` (110 lines): Portfolio and date range presets
+  - `validation.py` (162 lines): Input validation and centralized session state
+  - `ui_components.py` (184 lines): Reusable UI rendering functions (DRY principle)
+  - `charts.py` (306 lines): Plotly chart generation functions
+  - `main.py` (459 lines): Application orchestration and workflow
+  - `__init__.py` (16 lines): Package initialization
 
   **Key Features:**
   - **Example Portfolio Presets**: 6 pre-configured portfolios (Default UK ETFs, 60/40,
@@ -35,7 +48,13 @@ The system includes `backtest.py` (core engine), `app.py` (Streamlit web UI), an
   - **Comprehensive Metrics**: All performance metrics with professional formatting
   - **Export Options**: Download CSV data and interactive HTML charts
   - **Data Caching**: Toggle cache for faster subsequent runs
-  - **Session State**: Smooth UX with persistent selections
+  - **Session State**: Centralized management with single source of truth
+
+  **Phase 2 Improvements:**
+  - **Zero Code Duplication**: Eliminated 134 duplicate lines (DRY principle)
+  - **All Magic Numbers Extracted**: 32 named constants for maintainability
+  - **Modular Architecture**: Easy to test, extend, and maintain
+  - **Professional Structure**: Industry-standard package organization
 
   **UI Sections:**
   - Sidebar: Portfolio configuration, benchmark selection, date range, capital
@@ -44,7 +63,8 @@ The system includes `backtest.py` (core engine), `app.py` (Streamlit web UI), an
 
   **Usage:**
   ```bash
-  streamlit run app.py
+  streamlit run app.py              # Via backward compat wrapper (recommended)
+  streamlit run app/main.py         # Direct entry point (alternative)
   # Opens browser at http://localhost:8501
   # Select "Tech Giants" preset, click "5Y", run backtest
   # View results with interactive charts and delta indicators
@@ -89,15 +109,20 @@ The system includes `backtest.py` (core engine), `app.py` (Streamlit web UI), an
       --output results/backtest_series.csv
   ```
 
-- `plot_backtest.py` — Enhanced visualization utility that reads the CSV (must include
-  a `date` column plus the columns emitted by `backtest.py`) and creates comprehensive
-  performance charts.
+- `plot_backtest.py` — Enhanced visualization utility (365 lines, Phase 2 logging)
+  that reads the CSV (must include a `date` column plus the columns emitted by `backtest.py`)
+  and creates comprehensive performance charts.
 
-  **New Features:**
+  **Features:**
   - Creates 4 individual plots: value, returns, active return, and drawdown
   - Dashboard mode (`--dashboard`) for single comprehensive view
   - Professional color scheme with colored zones for outperformance/underperformance
   - Currency and percentage formatting on axes
+
+  **Phase 2 Improvements:**
+  - **Consistent Logging**: Uses logging module instead of print() for better observability
+  - 5 logger.info() calls for key operations (data loading, chart generation, saving)
+  - INFO level with timestamps matching backtest.py format
   - Max drawdown annotations on drawdown chart
   - Customizable DPI and matplotlib style
 
