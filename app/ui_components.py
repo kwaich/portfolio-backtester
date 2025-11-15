@@ -216,12 +216,9 @@ def render_searchable_ticker_input(
     search_key = f"{key}_search" if key else None
     query_key = f"{key}_query" if key else None
 
-    # Initialize session state for this ticker input
-    if key and f"{key}_value" not in st.session_state:
-        st.session_state[f"{key}_value"] = default_value
-
-    # Get current value from session state or default
-    current_value = st.session_state.get(f"{key}_value", default_value) if key else default_value
+    # Initialize the text input's session state if needed
+    if key and input_key and input_key not in st.session_state:
+        st.session_state[input_key] = default_value
 
     # Text input for ticker
     col1, col2 = st.columns([3, 1])
@@ -229,7 +226,6 @@ def render_searchable_ticker_input(
     with col1:
         ticker_input = st.text_input(
             label,
-            value=current_value,
             key=input_key,
             help=help_text or "Enter ticker symbol or click Search to find tickers",
             placeholder="e.g., AAPL, MSFT, VWRA.L"
@@ -266,11 +262,10 @@ def render_searchable_ticker_input(
                     display_text = f"{ticker} - {name}"
 
                     if st.button(display_text, key=button_key, use_container_width=True):
-                        # Update session state with selected ticker
-                        if key:
-                            st.session_state[f"{key}_value"] = ticker
+                        # Update the text input's session state directly
+                        if key and input_key:
+                            st.session_state[input_key] = ticker
                             st.session_state[f"{key}_show_search"] = False
-                        ticker_input = ticker
                         st.rerun()
             else:
                 st.warning(f"No results found for '{search_query}'. Try a different search term.")
@@ -282,9 +277,5 @@ def render_searchable_ticker_input(
             if key:
                 st.session_state[f"{key}_show_search"] = False
             st.rerun()
-
-    # Update session state value
-    if key and ticker_input != st.session_state.get(f"{key}_value"):
-        st.session_state[f"{key}_value"] = ticker_input
 
     return ticker_input.strip().upper() if ticker_input else ""
