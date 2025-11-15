@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Rolling 12-Month Sharpe Ratio Chart** - New visualization for risk-adjusted performance tracking
+  - Calculates rolling 12-month (252 trading days) Sharpe ratio for portfolio and benchmarks
+  - Shows how risk-adjusted performance evolves over time
+  - Available in both Web UI (Streamlit) and CLI (plot_backtest.py)
+  - Chart includes reference lines (Sharpe = 1, 2) for interpretation
+  - Automatically handles insufficient data (NaN for first 252 days)
+  - Two new columns added to backtest output: `portfolio_rolling_sharpe_12m`, `benchmark_rolling_sharpe_12m`
+
 - **Portfolio Composition Enhancement** - Ticker names now displayed in Portfolio Composition table
   - Table shows: Ticker symbol, Full company/fund name (from Yahoo Finance), Weight percentage
   - Ticker names fetched dynamically from Yahoo Finance API for accuracy
@@ -23,12 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Falls back to `shortName` if `longName` unavailable
   - Returns empty string on error or if ticker not found
 
-- **Test Coverage** - Updated from 155 to 179 tests (100% pass rate)
+- **Test Coverage** - Updated from 155 to 184 tests (100% pass rate)
+  - Added 5 new tests for rolling 12-month Sharpe ratio calculation
   - Added 2 new tests for yfinance ticker name integration
   - Updated portfolio composition tests with yfinance mocking
   - All ticker_data tests passing (32 tests, +2 new)
   - All app UI tests passing (64 tests)
-  - All backtest engine tests passing (67 tests)
+  - All backtest engine tests passing (72 tests, +5 for rolling Sharpe)
   - All integration tests passing (16 tests)
 
 ### Fixed

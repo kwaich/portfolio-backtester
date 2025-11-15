@@ -121,6 +121,7 @@ This opens an interactive web application in your browser with:
 3. **Interactive Visualizations**:
    - 2x2 Dashboard: Portfolio vs Benchmark Value, Cumulative Returns, Active Return, Drawdown
    - Rolling Returns Analysis (30/90/180-day periods)
+   - Rolling 12-Month Sharpe Ratio: Track risk-adjusted performance over time
    - Multiple benchmarks displayed on all charts with distinct colors and line styles
    - Hover tooltips for exact values at any point
    - Zoom, pan, and explore interactively

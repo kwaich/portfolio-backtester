@@ -21,7 +21,7 @@ This is a lightweight Python-based ETF backtesting utility that allows users to:
 
 **Current Status**:
 - **Version**: v2.2.0-dev (Unreleased - 2025-11-15)
-- **Test Coverage**: ~88% (179 tests, 100% passing)
+- **Test Coverage**: ~88% (184 tests, 100% passing)
 - **Progress**: 87.5% complete (14/16 tasks)
 - **Branch**: claude/make-ticker-searchable-01Nb4CzjMJBJ9y2PugkUtCW7
 
@@ -117,6 +117,7 @@ portfolio-backtester/
 - Multiple benchmarks (up to 3 simultaneously)
 - Delta indicators (color-coded outperformance)
 - Rolling returns (30/90/180-day windows)
+- Rolling 12-month Sharpe ratio chart (252-day window for risk-adjusted performance tracking)
 - Rebalancing strategies (buy-and-hold, daily, weekly, monthly, quarterly, yearly)
 - Logarithmic scale toggle for portfolio value charts
 - CSV & HTML export
@@ -144,6 +145,7 @@ portfolio-backtester/
 2. Cumulative Returns (percentage-formatted)
 3. Active Return with colored zones (outperformance/underperformance)
 4. Drawdown Over Time with max drawdown annotations
+5. Rolling 12-Month Sharpe Ratio with reference lines (Sharpe = 1, 2)
 
 **Modes**:
 - Dashboard mode: single 2x2 grid
@@ -154,14 +156,15 @@ portfolio-backtester/
 - **Phase 2**: Logging instead of print statements
 - **Phase 3**: Data quality validation (min 2 rows, NaN checks)
 
-#### 4. Testing Infrastructure (4 test files, 179 tests)
+#### 4. Testing Infrastructure (4 test files, 184 tests)
 
 **Test Coverage**: ~88% overall, 100% pass rate
 
 **Test Files**:
-- **test_backtest.py** (858 lines, 67 tests): Unit tests for backtest engine
+- **test_backtest.py** (72 tests): Unit tests for backtest engine
   - Cache expiration, retry logic, ticker/date validation
   - Batch downloads, data quality validation
+  - Rolling 12-month Sharpe ratio calculation and edge cases
   - 11 test classes covering all major functions
 
 - **test_app.py** (933 lines, 64 tests): Unit tests for web UI
@@ -313,7 +316,7 @@ python backtest.py --tickers AAPL MSFT --weights 0.6 0.4 --benchmark SPY
 # Plot results
 python plot_backtest.py --csv results/backtest.csv --output charts/test
 
-# Run all tests (179 tests)
+# Run all tests (184 tests)
 pytest -v
 
 # Run with coverage

@@ -316,5 +316,83 @@ def create_rolling_returns_chart(
             x=1
         )
     )
-    
+
+    return fig
+
+
+def create_rolling_sharpe_chart(
+    results: pd.DataFrame,
+    all_benchmark_results: Dict[str, pd.DataFrame],
+    benchmarks: List[str]
+) -> go.Figure:
+    """Create rolling 12-month Sharpe ratio chart.
+
+    Shows how risk-adjusted performance evolves over time using a
+    12-month (252 trading day) rolling window.
+
+    Args:
+        results: DataFrame with portfolio_rolling_sharpe_12m
+        all_benchmark_results: Dict mapping benchmark names to their result DataFrames
+        benchmarks: List of benchmark ticker symbols
+
+    Returns:
+        Plotly Figure object showing rolling Sharpe ratios
+    """
+    fig = go.Figure()
+
+    # Add portfolio rolling Sharpe
+    fig.add_trace(
+        go.Scatter(
+            x=results.index,
+            y=results['portfolio_rolling_sharpe_12m'],
+            name='Portfolio',
+            line=dict(color=PORTFOLIO_COLOR, width=2),
+            hovertemplate='<b>Portfolio</b><br>Date: %{x}<br>12M Sharpe: %{y:.2f}<extra></extra>'
+        )
+    )
+
+    # Add all benchmarks rolling Sharpe
+    for idx, bench_name in enumerate(benchmarks):
+        bench_result = all_benchmark_results[bench_name]
+
+        fig.add_trace(
+            go.Scatter(
+                x=bench_result.index,
+                y=bench_result['benchmark_rolling_sharpe_12m'],
+                name=bench_name,
+                line=dict(
+                    color=BENCHMARK_COLORS[idx % len(BENCHMARK_COLORS)],
+                    width=2,
+                    dash=BENCHMARK_DASH_STYLES[idx % len(BENCHMARK_DASH_STYLES)]
+                ),
+                hovertemplate=f'<b>{bench_name}</b><br>Date: %{{x}}<br>12M Sharpe: %{{y:.2f}}<extra></extra>'
+            )
+        )
+
+    # Add zero line for reference
+    fig.add_hline(y=0, line_dash="solid", line_color="black", opacity=0.3)
+
+    # Add reference lines for "good" Sharpe ratios
+    fig.add_hline(y=1, line_dash="dash", line_color="green", opacity=0.2,
+                  annotation_text="Sharpe = 1", annotation_position="right")
+    fig.add_hline(y=2, line_dash="dash", line_color="darkgreen", opacity=0.2,
+                  annotation_text="Sharpe = 2", annotation_position="right")
+
+    # Update layout
+    fig.update_layout(
+        title="Rolling 12-Month Sharpe Ratio",
+        xaxis_title="Date",
+        yaxis_title="Rolling 12-Month Sharpe Ratio",
+        height=CHART_HEIGHT,
+        hovermode='x unified',
+        template='plotly_white',
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
+    )
+
     return fig
