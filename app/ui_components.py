@@ -12,7 +12,7 @@ import streamlit as st
 import pandas as pd
 
 from .config import METRIC_LABELS
-from .ticker_data import get_all_tickers, format_ticker_option, search_tickers_with_yahoo
+from .ticker_data import get_all_tickers, format_ticker_option, search_tickers_with_yahoo, get_ticker_name
 
 
 def format_metric_value(key: str, value: float) -> str:
@@ -161,7 +161,7 @@ def render_relative_metrics(
 
 
 def render_portfolio_composition(tickers: list, weights: list) -> None:
-    """Render portfolio composition table.
+    """Render portfolio composition table with ticker names.
 
     Args:
         tickers: List of ticker symbols
@@ -172,12 +172,16 @@ def render_portfolio_composition(tickers: list, weights: list) -> None:
         ...     ["AAPL", "MSFT"],
         ...     [0.6, 0.4]
         ... )
-        # Displays table with tickers and weights
+        # Displays table with tickers, names, and weights
     """
     st.subheader("Portfolio Composition")
 
+    # Get ticker names from ticker_data module
+    ticker_names = [get_ticker_name(ticker) for ticker in tickers]
+
     composition_data = {
         "Ticker": tickers,
+        "Name": ticker_names,
         "Weight": [f"{w:.1%}" for w in weights]
     }
 
