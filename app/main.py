@@ -102,10 +102,7 @@ def main() -> None:
         help="Select a pre-configured portfolio or choose Custom to enter manually"
     )
     
-    # Handle portfolio preset selection
-    if 'selected_portfolio' not in st.session_state:
-        st.session_state.selected_portfolio = selected_portfolio
-    
+    # Handle portfolio preset selection (session state already initialized)
     if selected_portfolio != st.session_state.selected_portfolio:
         st.session_state.selected_portfolio = selected_portfolio
         if selected_portfolio != "Custom (Manual Entry)":
@@ -211,14 +208,8 @@ def main() -> None:
     
     date_presets = get_date_presets()
     preset_cols = st.sidebar.columns(6)
-    
-    # Initialize date session state
-    if 'start_date' not in st.session_state:
-        st.session_state.start_date = datetime(2018, 1, 1)
-    if 'end_date' not in st.session_state:
-        st.session_state.end_date = datetime.today()
-    
-    # Preset buttons
+
+    # Date preset buttons (session state already initialized)
     for idx, (label, date_value) in enumerate(date_presets.items()):
         if preset_cols[idx].button(label, use_container_width=True, help=f"Set range to {label}"):
             st.session_state.start_date = date_value
