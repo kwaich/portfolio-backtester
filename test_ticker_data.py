@@ -145,14 +145,59 @@ class TestTickerSearch:
         formatted = format_ticker_option("UNKNOWN")
         assert formatted == "UNKNOWN"
 
-    def test_get_ticker_name_known_ticker(self):
-        """Test get_ticker_name with known ticker."""
+    @patch('app.ticker_data.yf.Ticker')
+    def test_get_ticker_name_known_ticker(self, mock_ticker):
+        """Test get_ticker_name fetches from yfinance."""
+        # Clear cache first
+        get_ticker_name.cache_clear()
+
+        # Mock yfinance Ticker
+        mock_instance = Mock()
+        mock_instance.info = {'longName': 'SPDR S&P 500 ETF Trust'}
+        mock_ticker.return_value = mock_instance
+
         name = get_ticker_name("SPY")
         assert name == "SPDR S&P 500 ETF Trust"
+        mock_ticker.assert_called_once_with("SPY")
 
-    def test_get_ticker_name_unknown_ticker(self):
-        """Test get_ticker_name with unknown ticker."""
+    @patch('app.ticker_data.yf.Ticker')
+    def test_get_ticker_name_unknown_ticker(self, mock_ticker):
+        """Test get_ticker_name with unknown ticker returns empty string."""
+        # Clear cache first
+        get_ticker_name.cache_clear()
+
+        # Mock yfinance Ticker with no info
+        mock_instance = Mock()
+        mock_instance.info = None
+        mock_ticker.return_value = mock_instance
+
         name = get_ticker_name("UNKNOWN")
+        assert name == ""
+
+    @patch('app.ticker_data.yf.Ticker')
+    def test_get_ticker_name_uses_shortname_fallback(self, mock_ticker):
+        """Test get_ticker_name falls back to shortName if longName missing."""
+        # Clear cache first
+        get_ticker_name.cache_clear()
+
+        # Mock yfinance Ticker with only shortName
+        mock_instance = Mock()
+        mock_instance.info = {'shortName': 'Apple'}
+        mock_ticker.return_value = mock_instance
+
+        name = get_ticker_name("AAPL")
+        assert name == "Apple"
+
+    @patch('app.ticker_data.yf.Ticker')
+    def test_get_ticker_name_error_handling(self, mock_ticker):
+        """Test get_ticker_name handles errors gracefully."""
+        # Clear cache first
+        get_ticker_name.cache_clear()
+
+        # Mock yfinance Ticker that raises exception
+        mock_ticker.side_effect = Exception("API Error")
+
+        name = get_ticker_name("BAD")
         assert name == ""
 
 

@@ -11,6 +11,7 @@ import logging
 from typing import List, Optional
 import requests
 from functools import lru_cache
+import yfinance as yf
 
 # Popular ETFs organized by category
 POPULAR_ETFS = {
@@ -197,24 +198,52 @@ def format_ticker_option(ticker: str) -> str:
         return ticker
 
 
+@lru_cache(maxsize=500)
 def get_ticker_name(ticker: str) -> str:
-    """Get the full name for a ticker symbol.
+    """Get the full name for a ticker symbol from Yahoo Finance.
+
+    Fetches the ticker name dynamically from Yahoo Finance API.
+    Results are cached to avoid repeated API calls.
 
     Args:
-        ticker: Ticker symbol
+        ticker: Ticker symbol (e.g., "AAPL", "VWRA.L", "SPY")
 
     Returns:
-        Full name of the ticker, or empty string if not found
+        Full name of the ticker, or empty string if not found or error occurs
 
     Examples:
         >>> get_ticker_name("SPY")
         'SPDR S&P 500 ETF Trust'
+        >>> get_ticker_name("AAPL")
+        'Apple Inc.'
         >>> get_ticker_name("UNKNOWN")
         ''
     """
-    all_tickers = get_all_tickers()
-    ticker_dict = dict(all_tickers)
-    return ticker_dict.get(ticker, "")
+    if not ticker or not ticker.strip():
+        return ""
+
+    try:
+        yf_ticker = yf.Ticker(ticker)
+        info = yf_ticker.info
+
+        # info might be None or empty dict
+        if not info:
+            logging.warning(f"No info available for ticker: {ticker}")
+            return ""
+
+        # Try to get longName first, then shortName as fallback
+        name = info.get('longName') or info.get('shortName') or ""
+
+        if name:
+            logging.info(f"Fetched ticker name for {ticker}: {name}")
+        else:
+            logging.warning(f"No name fields available for ticker: {ticker}")
+
+        return name
+
+    except Exception as e:
+        logging.warning(f"Error fetching ticker name for {ticker}: {e}")
+        return ""
 
 
 @lru_cache(maxsize=100)

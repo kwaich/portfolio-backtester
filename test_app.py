@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 from datetime import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
 import pandas as pd
@@ -239,9 +239,26 @@ class TestErrorHandling:
 class TestPortfolioComposition:
     """Test portfolio composition display logic"""
 
-    def test_composition_table_data(self):
-        """Test creation of portfolio composition table with ticker names"""
+    @patch('app.ticker_data.yf.Ticker')
+    def test_composition_table_data(self, mock_yf_ticker):
+        """Test creation of portfolio composition table with ticker names from yfinance"""
         from app.ticker_data import get_ticker_name
+
+        # Clear cache
+        get_ticker_name.cache_clear()
+
+        # Mock yfinance responses for different tickers
+        def mock_ticker_side_effect(symbol):
+            mock_instance = Mock()
+            names = {
+                "AAPL": {'longName': 'Apple Inc.'},
+                "MSFT": {'longName': 'Microsoft Corporation'},
+                "GOOGL": {'longName': 'Alphabet Inc. (Google) Class A'}
+            }
+            mock_instance.info = names.get(symbol, {})
+            return mock_instance
+
+        mock_yf_ticker.side_effect = mock_ticker_side_effect
 
         tickers = ["AAPL", "MSFT", "GOOGL"]
         weights_array = np.array([0.5, 0.3, 0.2])
@@ -261,7 +278,7 @@ class TestPortfolioComposition:
         assert len(composition_data["Name"]) == 3
         assert len(composition_data["Weight"]) == 3
 
-        # Verify ticker names are present
+        # Verify ticker names are fetched from yfinance
         assert composition_data["Name"][0] == "Apple Inc."
         assert composition_data["Name"][1] == "Microsoft Corporation"
         assert composition_data["Name"][2] == "Alphabet Inc. (Google) Class A"
@@ -271,9 +288,26 @@ class TestPortfolioComposition:
         assert composition_data["Weight"][1] == "30.0%"
         assert composition_data["Weight"][2] == "20.0%"
 
-    def test_composition_with_unknown_ticker(self):
+    @patch('app.ticker_data.yf.Ticker')
+    def test_composition_with_unknown_ticker(self, mock_yf_ticker):
         """Test composition table handles unknown tickers gracefully"""
         from app.ticker_data import get_ticker_name
+
+        # Clear cache
+        get_ticker_name.cache_clear()
+
+        # Mock yfinance responses
+        def mock_ticker_side_effect(symbol):
+            mock_instance = Mock()
+            names = {
+                "AAPL": {'longName': 'Apple Inc.'},
+                "SPY": {'longName': 'SPDR S&P 500 ETF Trust'},
+                "UNKNOWN_TICKER": None  # No info for unknown ticker
+            }
+            mock_instance.info = names.get(symbol, None)
+            return mock_instance
+
+        mock_yf_ticker.side_effect = mock_ticker_side_effect
 
         tickers = ["AAPL", "UNKNOWN_TICKER", "SPY"]
         weights_array = np.array([0.4, 0.3, 0.3])
