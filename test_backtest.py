@@ -36,6 +36,14 @@ class TestParseArgs:
         args = backtest.parse_args(["--no-cache"])
         assert args.no_cache is True
 
+    def test_cache_ttl_argument(self):
+        args = backtest.parse_args(["--cache-ttl", "48"])
+        assert args.cache_ttl == 48
+
+    def test_cache_ttl_default(self):
+        args = backtest.parse_args([])
+        assert args.cache_ttl == backtest.DEFAULT_CACHE_TTL_HOURS
+
     def test_output_path(self):
         args = backtest.parse_args(["--output", "test.csv"])
         assert args.output == Path("test.csv")
@@ -84,6 +92,88 @@ class TestCacheFunctions:
 
             assert loaded_data is not None
             pd.testing.assert_frame_equal(loaded_data, test_data)
+
+    def test_cache_expiration(self):
+        """Test that stale cache is rejected and deleted."""
+        import time
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_path = Path(tmpdir) / "test_cache.pkl"
+            test_data = pd.DataFrame(
+                {"AAPL": [100, 101, 102]},
+                index=pd.date_range("2020-01-01", periods=3),
+            )
+
+            # Save cache
+            backtest.save_cached_prices(cache_path, test_data)
+
+            # Modify timestamp to simulate old cache (25 hours old)
+            import pickle
+            with open(cache_path, "rb") as f:
+                cache_data = pickle.load(f)
+            cache_data["timestamp"] = time.time() - (25 * 3600)  # 25 hours ago
+            with open(cache_path, "wb") as f:
+                pickle.dump(cache_data, f)
+
+            # Try to load with default TTL (24 hours)
+            loaded_data = backtest.load_cached_prices(cache_path, max_age_hours=24)
+
+            # Should return None and delete the file
+            assert loaded_data is None
+            assert not cache_path.exists()
+
+    def test_cache_within_ttl(self):
+        """Test that fresh cache is loaded successfully."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_path = Path(tmpdir) / "test_cache.pkl"
+            test_data = pd.DataFrame(
+                {"AAPL": [100, 101, 102]},
+                index=pd.date_range("2020-01-01", periods=3),
+            )
+
+            # Save cache
+            backtest.save_cached_prices(cache_path, test_data)
+
+            # Load with long TTL (should succeed)
+            loaded_data = backtest.load_cached_prices(cache_path, max_age_hours=48)
+
+            assert loaded_data is not None
+            pd.testing.assert_frame_equal(loaded_data, test_data)
+
+    def test_old_cache_format_migration(self):
+        """Test migration from old cache format (plain DataFrame)."""
+        import pickle
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_path = Path(tmpdir) / "old_cache.pkl"
+            test_data = pd.DataFrame(
+                {"AAPL": [100, 101, 102]},
+                index=pd.date_range("2020-01-01", periods=3),
+            )
+
+            # Save old format (plain DataFrame)
+            with open(cache_path, "wb") as f:
+                pickle.dump(test_data, f)
+
+            # Try to load (should detect old format and return None)
+            loaded_data = backtest.load_cached_prices(cache_path)
+
+            assert loaded_data is None
+            assert not cache_path.exists()  # Old cache should be deleted
+
+    def test_corrupted_cache_handling(self):
+        """Test that corrupted cache is handled gracefully."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_path = Path(tmpdir) / "corrupted.pkl"
+
+            # Write corrupted data
+            with open(cache_path, "wb") as f:
+                f.write(b"corrupted data")
+
+            # Should return None and clean up
+            result = backtest.load_cached_prices(cache_path)
+            assert result is None
+            assert not cache_path.exists()
 
 
 class TestSummarize:

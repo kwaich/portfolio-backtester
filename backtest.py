@@ -19,6 +19,7 @@ import hashlib
 import logging
 import pickle
 import sys
+import time
 from pathlib import Path
 from typing import List
 
@@ -39,6 +40,11 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
+
+# Constants
+TRADING_DAYS_PER_YEAR = 252
+DEFAULT_CACHE_TTL_HOURS = 24
+CACHE_VERSION = "1.0"
 
 
 def parse_args(argv: List[str]) -> argparse.Namespace:
@@ -87,6 +93,12 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
         action="store_true",
         help="Disable price data caching (always download fresh data)",
     )
+    parser.add_argument(
+        "--cache-ttl",
+        type=int,
+        default=DEFAULT_CACHE_TTL_HOURS,
+        help=f"Cache time-to-live in hours (default: {DEFAULT_CACHE_TTL_HOURS})",
+    )
     return parser.parse_args(argv)
 
 
@@ -104,37 +116,93 @@ def get_cache_path(tickers: List[str], start: str, end: str) -> Path:
     return cache_dir / f"{cache_key}.pkl"
 
 
-def load_cached_prices(cache_path: Path) -> pd.DataFrame | None:
-    """Load cached price data if it exists and is valid."""
+def load_cached_prices(cache_path: Path, max_age_hours: int = DEFAULT_CACHE_TTL_HOURS) -> pd.DataFrame | None:
+    """Load cached price data if it exists and is not stale.
+
+    Args:
+        cache_path: Path to cache file
+        max_age_hours: Maximum age of cache in hours (default: 24)
+
+    Returns:
+        DataFrame if cache is valid and fresh, None otherwise
+    """
     if not cache_path.exists():
         return None
+
     try:
         with open(cache_path, "rb") as f:
-            data = pickle.load(f)
-        logger.info(f"Loaded cached data from {cache_path}")
-        return data
+            cache_data = pickle.load(f)
+
+        # Handle old cache format (migration from plain DataFrame)
+        if isinstance(cache_data, pd.DataFrame):
+            logger.warning(f"Old cache format detected at {cache_path}, will re-download")
+            cache_path.unlink()  # Delete old format cache
+            return None
+
+        # Check cache age
+        cache_age_hours = (time.time() - cache_data["timestamp"]) / 3600
+        if cache_age_hours > max_age_hours:
+            logger.info(f"Cache expired (age: {cache_age_hours:.1f}h, max: {max_age_hours}h)")
+            cache_path.unlink()  # Delete stale cache
+            return None
+
+        logger.info(f"Loaded cached data (age: {cache_age_hours:.1f}h from {cache_path})")
+        return cache_data["data"]
+
     except Exception as e:
         logger.warning(f"Failed to load cache: {e}")
+        # Try to clean up corrupted cache file
+        try:
+            cache_path.unlink()
+        except:
+            pass
         return None
 
 
 def save_cached_prices(cache_path: Path, prices: pd.DataFrame) -> None:
-    """Save price data to cache."""
+    """Save price data to cache with metadata.
+
+    Args:
+        cache_path: Path where cache file will be saved
+        prices: DataFrame containing price data to cache
+    """
     try:
+        cache_data = {
+            "data": prices,
+            "timestamp": time.time(),
+            "version": CACHE_VERSION
+        }
         with open(cache_path, "wb") as f:
-            pickle.dump(prices, f)
+            pickle.dump(cache_data, f, protocol=pickle.HIGHEST_PROTOCOL)
         logger.info(f"Saved data to cache: {cache_path}")
     except Exception as e:
         logger.warning(f"Failed to save cache: {e}")
 
 
-def download_prices(tickers: List[str], start: str, end: str, use_cache: bool = True) -> pd.DataFrame:
-    """Fetch adjusted closes for the requested tickers."""
+def download_prices(
+    tickers: List[str],
+    start: str,
+    end: str,
+    use_cache: bool = True,
+    cache_ttl_hours: int = DEFAULT_CACHE_TTL_HOURS
+) -> pd.DataFrame:
+    """Fetch adjusted closes for the requested tickers.
+
+    Args:
+        tickers: List of ticker symbols to download
+        start: Start date in YYYY-MM-DD format
+        end: End date in YYYY-MM-DD format
+        use_cache: Whether to use cached data (default: True)
+        cache_ttl_hours: Cache time-to-live in hours (default: 24)
+
+    Returns:
+        DataFrame with adjusted close prices for all tickers
+    """
 
     # Try to load from cache first
     if use_cache:
         cache_path = get_cache_path(tickers, start, end)
-        cached_data = load_cached_prices(cache_path)
+        cached_data = load_cached_prices(cache_path, max_age_hours=cache_ttl_hours)
         if cached_data is not None:
             return cached_data
 
@@ -296,7 +364,7 @@ def summarize(series: pd.Series, capital: float) -> dict[str, float]:
     daily_returns = series.pct_change().dropna()
 
     # Volatility (annualized standard deviation)
-    volatility = daily_returns.std() * np.sqrt(252)
+    volatility = daily_returns.std() * np.sqrt(TRADING_DAYS_PER_YEAR)
 
     # Sharpe ratio (assuming 0% risk-free rate for simplicity)
     sharpe_ratio = (cagr / volatility) if volatility > 0 else 0.0
@@ -307,7 +375,7 @@ def summarize(series: pd.Series, capital: float) -> dict[str, float]:
 
     # Sortino ratio (downside deviation only)
     downside_returns = daily_returns[daily_returns < 0]
-    downside_std = downside_returns.std() * np.sqrt(252) if len(downside_returns) > 0 else 0.0
+    downside_std = downside_returns.std() * np.sqrt(TRADING_DAYS_PER_YEAR) if len(downside_returns) > 0 else 0.0
     sortino_ratio = (cagr / downside_std) if downside_std > 0 else 0.0
 
     return {
@@ -334,7 +402,13 @@ def main(argv: List[str]) -> None:
 
     universe = list(dict.fromkeys(tickers + [args.benchmark]))
     use_cache = not args.no_cache
-    prices = download_prices(universe, args.start, args.end, use_cache=use_cache)
+    prices = download_prices(
+        universe,
+        args.start,
+        args.end,
+        use_cache=use_cache,
+        cache_ttl_hours=args.cache_ttl
+    )
 
     portfolio_prices = prices[tickers]
     benchmark_prices = prices[args.benchmark]
