@@ -75,6 +75,61 @@ This creates a single `my_backtest_dashboard.png` with a 2x2 grid of all metrics
 python plot_backtest.py --csv results/my_backtest.csv
 ```
 
+## Web UI (Interactive Dashboard)
+
+For a more user-friendly experience, launch the Streamlit web interface:
+
+```bash
+streamlit run app.py
+```
+
+This opens an interactive web application in your browser with:
+
+- **Interactive Forms**: Configure tickers, weights, benchmarks, and date ranges
+- **Real-time Results**: View comprehensive metrics and charts instantly
+- **Visual Dashboard**: 2x2 grid of professional charts with formatted axes
+- **Download Options**: Export both CSV data and PNG charts
+- **Data Caching**: Toggle cache for faster subsequent runs
+- **No Command-Line Required**: Perfect for non-technical users
+
+### Web UI Features
+
+1. **Sidebar Configuration**:
+   - Dynamic number of portfolio tickers
+   - Auto-normalized weights
+   - Date picker for start/end dates
+   - Capital input with validation
+   - Cache toggle
+
+2. **Results Display**:
+   - Side-by-side comparison of Portfolio vs Benchmark vs Relative Performance
+   - All metrics: Total Return, CAGR, Volatility, Sharpe, Sortino, Max Drawdown
+   - Portfolio composition table
+
+3. **Visualizations**:
+   - Portfolio vs Benchmark Value (currency-formatted axes)
+   - Cumulative Returns (percentage-formatted)
+   - Active Return (green/red zones)
+   - Drawdown Over Time (with annotations)
+
+4. **Export Options**:
+   - Download results as CSV
+   - Download charts as high-resolution PNG
+   - View raw data in expandable table
+
+### Usage Example
+
+1. Run `streamlit run app.py`
+2. Browser opens automatically at `http://localhost:8501`
+3. Configure your backtest in the sidebar:
+   - Tickers: AAPL, MSFT
+   - Weights: 0.6, 0.4
+   - Benchmark: SPY
+   - Date Range: 2018-01-01 to Today
+   - Capital: $100,000
+4. Click "Run Backtest"
+5. View results, charts, and download data
+
 ## Command-Line Options
 
 ### backtest.py
@@ -162,18 +217,19 @@ Price data is automatically cached in `.cache/` to speed up repeated backtests:
 
 ```
 backtester/
-├── backtest.py           # Main backtesting engine
-├── plot_backtest.py      # Visualization utility
-├── test_backtest.py      # Unit tests
-├── requirements.txt      # Python dependencies
+├── app.py               # Streamlit web UI
+├── backtest.py          # Main backtesting engine
+├── plot_backtest.py     # Visualization utility
+├── test_backtest.py     # Unit tests
+├── requirements.txt     # Python dependencies
 ├── README.md            # This file
 ├── PROJECT_SUMMARY.md   # Additional documentation
-├── CLAUDE.md           # AI assistant guide
-├── .gitignore          # Git ignore rules
-├── .venv/              # Virtual environment (gitignored)
-├── .cache/             # Price data cache (gitignored)
-├── results/            # CSV outputs (gitignored)
-└── charts/             # PNG outputs (gitignored)
+├── CLAUDE.md            # AI assistant guide
+├── .gitignore           # Git ignore rules
+├── .venv/               # Virtual environment (gitignored)
+├── .cache/              # Price data cache (gitignored)
+├── results/             # CSV outputs (gitignored)
+└── charts/              # PNG outputs (gitignored)
 ```
 
 ## Development
@@ -207,6 +263,7 @@ The codebase follows these conventions:
 - yfinance >= 0.2.0
 - matplotlib >= 3.7.0
 - pytest >= 7.0.0 (for testing)
+- streamlit >= 1.28.0 (for web UI)
 
 ## Data Source
 
@@ -230,7 +287,6 @@ Potential improvements (see [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) for details
 - Configuration file support (YAML/JSON)
 - Multiple time period analysis
 - Currency conversion for multi-currency portfolios
-- Interactive dashboard (Streamlit/Dash)
 - Additional data sources beyond Yahoo Finance
 
 ## Contributing

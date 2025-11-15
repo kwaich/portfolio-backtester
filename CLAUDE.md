@@ -16,12 +16,13 @@ This is a lightweight Python-based ETF backtesting utility that allows users to:
 
 ```
 backtester/
-├── backtest.py           # Main backtesting engine
-├── plot_backtest.py      # Visualization helper
-├── test_backtest.py      # Unit tests (NEW)
-├── requirements.txt      # Python dependencies (NEW)
+├── app.py               # Streamlit web UI (NEW)
+├── backtest.py          # Main backtesting engine
+├── plot_backtest.py     # Visualization helper
+├── test_backtest.py     # Unit tests (NEW)
+├── requirements.txt     # Python dependencies (NEW)
 ├── README.md            # Main documentation (NEW)
-├── PROJECT_SUMMARY.md    # Additional documentation
+├── PROJECT_SUMMARY.md   # Additional documentation
 ├── CLAUDE.md            # This file - AI assistant guide
 ├── .gitignore           # Git ignore patterns
 ├── .venv/               # Python virtual environment (gitignored)
@@ -31,6 +32,23 @@ backtester/
 ```
 
 ### File Purposes
+
+**app.py** (~458 lines, NEW)
+- Streamlit web UI for interactive backtesting
+- Provides user-friendly interface without CLI knowledge
+- Imports and reuses functions from backtest.py module
+- Key features:
+  - Dynamic form inputs for tickers and weights
+  - Real-time backtest execution with progress indicators
+  - Side-by-side results comparison (Portfolio vs Benchmark vs Relative)
+  - Interactive 2x2 chart dashboard with formatted axes
+  - CSV and PNG download capabilities
+  - Weight auto-normalization
+  - Cache toggle option
+- Run with: `streamlit run app.py`
+- Opens browser at `http://localhost:8501`
+- Uses st.sidebar for inputs, main area for results
+- Integrates matplotlib charts with Streamlit's display functions
 
 **backtest.py** (~377 lines)
 - Core backtesting logic with CLI interface
@@ -93,7 +111,7 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
 # Or install individually
-python -m pip install numpy pandas yfinance matplotlib pytest
+python -m pip install numpy pandas yfinance matplotlib pytest streamlit
 
 # Upgrade pip if needed
 ./.venv/bin/python -m pip install --upgrade pip
@@ -105,6 +123,7 @@ python -m pip install numpy pandas yfinance matplotlib pytest
 - **yfinance** (>=0.2.0): Yahoo Finance API wrapper for price data
 - **matplotlib** (>=3.7.0): Plotting and visualization
 - **pytest** (>=7.0.0): Testing framework
+- **streamlit** (>=1.28.0): Web UI framework for interactive dashboard
 
 ### Testing
 ```bash
@@ -289,6 +308,21 @@ Recent commits show incremental development:
 3. Ensure both interactive and PNG output work
 4. Keep DPI at 150 for consistent quality
 
+### Modifying the Web UI
+1. Edit app.py to modify Streamlit interface
+2. Import necessary functions from backtest.py (don't duplicate logic)
+3. Use st.sidebar for input controls, main area for results
+4. Test with `streamlit run app.py` during development
+5. Maintain consistency with CLI functionality
+6. Key Streamlit patterns used:
+   - `st.spinner()` for progress indicators
+   - `st.metric()` for displaying statistics
+   - `st.pyplot()` for matplotlib charts
+   - `st.download_button()` for file exports
+   - `st.columns()` for side-by-side layouts
+7. Ensure error handling with `st.error()` and `st.warning()`
+8. Validate inputs before running backtest
+
 ## Testing & Validation
 
 ### Manual Testing Workflow
@@ -310,6 +344,11 @@ python plot_backtest.py --csv results/test_run.csv \
 
 # Verify PNGs were created
 ls -lh charts/
+
+# Test web UI
+streamlit run app.py
+# Opens browser at http://localhost:8501
+# Configure backtest in sidebar and click "Run Backtest"
 ```
 
 ### What to Verify
@@ -417,6 +456,7 @@ ls -lh charts/
 ## Quick Reference
 
 ### File Locations
+- **Web UI**: app.py (Streamlit interface)
 - **Main logic**: backtest.py:199-270 (`compute_metrics`)
 - **CLI parsing**: backtest.py:44-90 (`parse_args`)
 - **Caching**: backtest.py:93-128 (cache helper functions)
@@ -429,6 +469,7 @@ ls -lh charts/
 - **AI docs**: CLAUDE.md (this file)
 
 ### Key Dependencies
+- **streamlit**: Web UI framework, interactive dashboard
 - **yfinance**: `yf.download()` at backtest.py:143-150
 - **pandas**: DataFrames, Series, datetime handling
 - **numpy**: Arrays, numerical operations, statistics
@@ -462,10 +503,13 @@ ls -lh charts/
 # Install dependencies
 pip install -r requirements.txt
 
-# Run backtest
+# Run web UI (interactive dashboard)
+streamlit run app.py
+
+# Run backtest (CLI)
 python backtest.py --tickers A B --weights 0.6 0.4 --benchmark SPY
 
-# Plot results
+# Plot results (CLI)
 python plot_backtest.py --csv results/backtest.csv --output charts/test
 
 # Run tests
@@ -477,7 +521,7 @@ rm -rf .cache/
 
 ---
 
-**Last Updated**: 2025-11-15 (Major update: caching, metrics, tests, docs)
+**Last Updated**: 2025-11-15 (Major update: web UI, caching, metrics, tests, docs)
 **Repository State**: Multiple commits, comprehensive improvements
-**Current Branch**: claude/claude-md-mhzru0wxtf2fhp26-01BiHcWsAHGCMM49CgJT4PL2
-**Key Files**: backtest.py (377 lines), test_backtest.py (370 lines), README.md, requirements.txt
+**Current Branch**: claude/create-ui-framework-01D656RsUmycaEV3SNmffGrx
+**Key Files**: app.py (458 lines), backtest.py (377 lines), test_backtest.py (370 lines), README.md, requirements.txt
