@@ -1,6 +1,13 @@
 # CLAUDE.md - AI Assistant Development Guide
 
-This document provides comprehensive guidance for AI assistants working on the portfolio-backtester repository.
+**Purpose**: Concise guidance for AI assistants working on the portfolio-backtester repository.
+
+**Detailed Documentation**:
+- **[FILE_REFERENCE.md](FILE_REFERENCE.md)**: Comprehensive file-by-file documentation
+- **[TESTING_GUIDE.md](TESTING_GUIDE.md)**: Test-driven development rules and patterns
+- **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)**: Development workflows and best practices
+
+---
 
 ## Project Overview
 
@@ -12,1112 +19,427 @@ This is a lightweight Python-based ETF backtesting utility that allows users to:
 
 **Primary Use Case**: Testing portfolio allocations (default: VDCP.L/VHYD.L vs VWRA.L benchmark)
 
-## Repository Structure
+**Current Status**:
+- **Version**: v2.1.0 (Phase 3 Complete - 2025-11-15)
+- **Test Coverage**: ~88% (155 tests, 100% passing)
+- **Progress**: 87.5% complete (14/16 tasks)
+- **Branch**: claude/read-imple-01QaXd8PwRSeMGMtHvEeqFGf
+
+---
+
+## Repository Structure (High-Level)
 
 ```
 portfolio-backtester/
-├── app.py                  # Streamlit web UI (backward compat wrapper)
-├── app/                    # Modular web UI package (REFACTORED Phase 2)
-│   ├── __init__.py         # Package initialization (16 lines)
-│   ├── config.py           # Configuration constants (121 lines, 32 constants)
-│   ├── presets.py          # Portfolio and date presets (110 lines)
-│   ├── validation.py       # Input validation & session state (162 lines)
-│   ├── ui_components.py    # Reusable UI rendering (184 lines)
-│   ├── charts.py           # Plotly chart generation (306 lines)
-│   └── main.py             # Main orchestration (459 lines)
-├── backtest.py             # Core backtesting engine (830 lines, ENHANCED Phase 1+3)
-├── plot_backtest.py        # Visualization helper (395 lines, ENHANCED Phase 2+3)
-├── test_backtest.py        # Unit tests for backtest.py (858 lines, 68 tests)
-├── test_app.py             # Unit tests for app.py UI (933 lines, 62 tests)
-├── test_integration.py     # Integration tests (420 lines, 25 tests, NEW Phase 3)
-├── requirements.txt        # Python dependencies
-├── README.md               # Main user documentation
-├── PROJECT_SUMMARY.md      # Additional documentation
-├── CLAUDE.md               # This file - AI assistant guide
-├── IMPLEMENTATION_PLAN.md  # Code improvement roadmap
-├── IMPLEMENTATION_CHECKLIST.md # Progress tracking
-├── TEST_REPORT.md          # Comprehensive validation report
-├── PHASE3_SUMMARY.md       # Phase 3 completion summary
-├── .gitignore              # Git ignore patterns
-├── .venv/                  # Python virtual environment (gitignored)
-├── .cache/                 # Price data cache (gitignored)
-├── results/                # CSV outputs (gitignored)
-└── charts/                 # PNG outputs (gitignored)
+├── app.py                    # Streamlit web UI (backward compatibility wrapper - 43 lines)
+├── app/                      # Modular web UI package (Phase 2 - 7 modules, 1,358 lines)
+│   ├── __init__.py           # Package initialization
+│   ├── config.py             # Configuration constants (32 constants)
+│   ├── presets.py            # Portfolio and date presets
+│   ├── validation.py         # Input validation & session state
+│   ├── ui_components.py      # Reusable UI rendering
+│   ├── charts.py             # Plotly chart generation
+│   └── main.py               # Application orchestration
+├── backtest.py               # Core backtesting engine (830 lines - Phases 1 & 3)
+├── plot_backtest.py          # Visualization utility (395 lines - Phases 2 & 3)
+├── test_backtest.py          # Unit tests for backtest.py (858 lines, 68 tests)
+├── test_app.py               # Unit tests for app.py UI (933 lines, 62 tests)
+├── test_integration.py       # Integration tests (420 lines, 25 tests - Phase 3)
+├── requirements.txt          # Python dependencies
+├── README.md                 # Main user documentation
+├── CLAUDE.md                 # This file - AI assistant guide
+├── FILE_REFERENCE.md         # Detailed file documentation
+├── TESTING_GUIDE.md          # TDD rules and test patterns
+├── DEVELOPER_GUIDE.md        # Development workflows
+├── IMPLEMENTATION_PLAN.md    # Code improvement roadmap
+├── IMPLEMENTATION_CHECKLIST.md # Progress tracking (87.5% complete)
+├── CHANGELOG.md              # Version history (v2.1.0)
+├── PHASE3_SUMMARY.md         # Phase 3 completion summary
+└── TEST_REPORT.md            # Phase 2 validation report
 ```
 
-### File Purposes
+**Gitignored Directories** (do not commit):
+- `.venv/` - Python virtual environment
+- `.cache/` - Price data cache
+- `results/` - CSV outputs
+- `charts/` - PNG outputs
 
-**app.py** (43 lines, REFACTORED Phase 2)
-- **Backward compatibility wrapper** for refactored modular architecture
-- Imports and runs `app.main.main()` from new package structure
-- Maintains old entry point: `streamlit run app.py` still works
-- Provides helpful error messages if imports fail
-- Allows seamless transition to modular architecture without breaking existing workflows
+---
 
-**app/ package** (1,358 lines total, CREATED Phase 2)
-- **Professional modular architecture** replacing monolithic app.py
-- Clean separation of concerns with focused, testable modules
+## Overall Architecture
+
+### Key Subsystems
+
+#### 1. Core Backtesting Engine (backtest.py - 830 lines)
+
+**Purpose**: Download prices, compute metrics, calculate statistics
+
+**Key Functions**:
+- `parse_args()`: CLI argument parsing with validation
+- `download_prices()`: Fetch prices with batch caching & retry logic (Phase 1 & 3)
+- `validate_price_data()`: Data quality validation (Phase 3)
+- `compute_metrics()`: Calculate portfolio vs benchmark metrics with minimum data checks
+- `summarize()`: Generate comprehensive statistics (Sharpe, Sortino, drawdown, etc.)
+- `main()`: Orchestrate the backtest workflow
+
+**Phase Enhancements**:
+- **Phase 1**: Cache expiration (TTL), retry logic (exponential backoff), ticker/date validation
+- **Phase 3**: Batch download optimization (per-ticker caching), data quality validation
+
+**Key Patterns**:
+- Weight normalization (always sum to 1.0)
+- Date alignment (common start date across all series)
+- Forward-fill for missing data
+- MD5-based caching (tickers + date range)
+
+#### 2. Web UI (app/ package - 7 modules, 1,358 lines)
+
+**Purpose**: Interactive Streamlit dashboard with presets, multiple benchmarks, and charts
+
+**Architecture** (Phase 2 - Modular):
+- **config.py**: Centralized configuration (32 constants)
+- **presets.py**: Portfolio & date presets (6 portfolios + 6 date ranges)
+- **validation.py**: Session state management & input validation
+- **ui_components.py**: Reusable UI rendering (DRY principle)
+- **charts.py**: Plotly chart generation (interactive visualizations)
+- **main.py**: Application orchestration & workflow
+- **app.py**: 43-line backward compatibility wrapper
+
+**Features**:
+- Portfolio presets (6 pre-configured portfolios)
+- Date range presets (1Y, 3Y, 5Y, 10Y, YTD, Max)
+- Multiple benchmarks (up to 3 simultaneously)
+- Delta indicators (color-coded outperformance)
+- Rolling returns (30/90/180-day windows)
+- CSV & HTML export
+
+**Phase 2 Improvements**:
 - Zero code duplication (eliminated 134 duplicate lines)
-- All magic numbers extracted to constants (32 constants)
-- Consistent logging and error handling throughout
+- All magic numbers extracted to constants
+- Consistent logging throughout
+- 100% backward compatibility
 
-**app/__init__.py** (16 lines)
-- Package initialization
-- Version information (v1.0.0)
-- Exports main entry point for direct imports
+#### 3. Visualization (plot_backtest.py - 395 lines)
 
-**app/config.py** (121 lines, 32 constants)
-- Centralized configuration management
-- Page settings (title, icon, layout)
-- UI limits (MAX_TICKERS=10, MAX_BENCHMARKS=3, DEFAULT_CAPITAL=100k)
-- Chart colors (PORTFOLIO_COLOR, BENCHMARK_COLORS, etc.)
-- Chart configuration (ROLLING_WINDOWS=[30,90,180], BENCHMARK_DASH_STYLES)
-- Metric labels (METRIC_LABELS dictionary for display names)
-- Default values (DEFAULT_NUM_TICKERS, DEFAULT_START_DATE, etc.)
+**Purpose**: Generate professional charts from backtest CSV output
 
-**app/presets.py** (110 lines)
-- Portfolio presets: 6 pre-configured portfolios
-  - Custom (Manual Entry)
-  - Default UK ETFs: VDCP.L + VHYD.L vs VWRA.L
-  - 60/40 US Stocks/Bonds: VOO + BND vs SPY
-  - Tech Giants: AAPL + MSFT + GOOGL + AMZN vs QQQ
-  - Dividend Aristocrats: JNJ + PG + KO + PEP vs SPY
-  - Global Diversified: VTI + VXUS + BND vs VT
-- Date presets: 6 quick-select date ranges (1Y, 3Y, 5Y, 10Y, YTD, Max)
-- Functions: `get_portfolio_presets()`, `get_date_presets()`
+**Charts Generated**:
+1. Portfolio vs Benchmark Value (currency-formatted)
+2. Cumulative Returns (percentage-formatted)
+3. Active Return with colored zones (outperformance/underperformance)
+4. Drawdown Over Time with max drawdown annotations
 
-**app/validation.py** (162 lines)
-- **Centralized session state management** (single source of truth)
-- `get_session_defaults()`: Returns dictionary of all default session state values
-- `initialize_session_state()`: Initializes all session state variables at startup
-- `validate_backtest_inputs()`: Validates tickers, benchmarks, dates before execution
-- `normalize_weights()`: Auto-normalizes portfolio weights to sum to 1.0
-- Input validation for all user inputs (tickers, dates, capital)
+**Modes**:
+- Dashboard mode: single 2x2 grid
+- Interactive display or PNG export (150 DPI)
+- Consistent style: seaborn-v0_8
 
-**app/ui_components.py** (184 lines)
-- **Reusable UI rendering functions** (DRY principle)
-- `format_metric_value()`: Format values based on metric type (currency, percentage, ratio)
-- `render_metric()`: Render single metric with proper formatting
-- `render_metrics_column()`: Render all metrics for portfolio/benchmark in column layout
-- `render_delta_metric()`: Render delta indicator with color-coded arrow (↑/↓)
-- `create_portfolio_table()`: Generate portfolio composition table
-- Eliminates metric rendering duplication across the codebase
+**Phase Enhancements**:
+- **Phase 2**: Logging instead of print statements
+- **Phase 3**: Data quality validation (min 2 rows, NaN checks)
 
-**app/charts.py** (306 lines)
-- **Plotly chart generation functions** (interactive visualizations)
-- `calculate_drawdown()`: Calculate drawdown from value series
-- `calculate_active_return()`: Calculate portfolio - benchmark returns
-- `calculate_rolling_returns()`: Calculate rolling returns for specified window
-- `create_main_dashboard()`: Generate 2x2 dashboard with all main charts
-  - Portfolio vs Benchmark Value (currency-formatted, multiple benchmarks)
-  - Cumulative Returns (percentage-formatted, multiple benchmarks)
-  - Active Return with colored zones (green=outperformance, red=underperformance)
-  - Drawdown Over Time with max drawdown annotations
-- `create_rolling_returns_chart()`: Generate rolling returns analysis (30/90/180-day)
-- Consistent color scheme and formatting across all charts
+#### 4. Testing Infrastructure (3 test files, 155 tests)
 
-**app/main.py** (459 lines)
-- **Main application orchestration** (replaces original app.py logic)
-- `main()`: Entry point called by app.py wrapper or directly
-- Streamlit page configuration and layout setup
-- Session state initialization via validation.py
-- Sidebar input collection (tickers, weights, benchmarks, dates, capital)
-- Portfolio preset handling with auto-population
-- Date preset buttons for quick date selection
-- Multiple benchmark support (1-3 benchmarks)
-- Backtest execution workflow:
-  1. Validate all inputs
-  2. Download prices with caching
-  3. Compute metrics for portfolio and all benchmarks
-  4. Display results with delta indicators
-  5. Generate and display interactive charts
-  6. Provide download options (CSV, HTML)
-- Expandable sections for additional benchmark comparisons
-- Portfolio composition table display
-- Error handling with user-friendly messages
-- Run with: `streamlit run app.py` (via wrapper) or `streamlit run app/main.py` (direct)
+**Test Coverage**: ~88% overall, 100% pass rate
 
-**backtest.py** (830 lines, ENHANCED Phase 1+3)
-- Core backtesting logic with CLI interface
-- Downloads price data via yfinance with intelligent caching (TTL-based)
-- Automatic retry logic with exponential backoff for API resilience
-- Comprehensive input and data quality validation
-- Computes comprehensive portfolio metrics
-- Uses logging for better observability
-- Exports time-series data to CSV
-- **Phase 1 Enhancements**: Cache expiration, retry logic, input validation
-- **Phase 3 Enhancements**: Batch downloads, data quality validation, minimum data checks
-- Key functions:
-  - `parse_args()`: CLI argument parsing (includes --no-cache, --cache-ttl)
-  - `get_cache_key()`, `get_cache_path()`: Cache management with MD5 hashing
-  - `load_cached_prices()`: Cache I/O with TTL checking and auto-migration
-  - `save_cached_prices()`: Cache I/O with metadata (timestamp, version)
-  - `retry_with_backoff()`: Decorator for exponential backoff retry (2s→4s→8s)
-  - `validate_ticker()`: Individual ticker validation (returns tuple[bool, str])
-  - `validate_tickers()`: Batch ticker validation with aggregated errors
-  - `validate_date_string()`: Flexible date parsing and normalization
-  - **NEW Phase 3: `validate_price_data()`**: Data quality validation (NaN%, zero/negative prices, extreme changes)
-  - **NEW Phase 3: `_process_yfinance_data()`**: Helper to process and validate yfinance data
-  - `download_prices()`: Fetches prices with optimized batch caching (per-ticker cache checks)
-  - `compute_metrics()`: Calculates metrics with minimum data validation (≥2 days required)
-  - `summarize()`: Generates comprehensive statistics (Sharpe, Sortino, drawdown, etc.)
-  - `main()`: Orchestrates the backtest workflow with early validation
+**Test Files**:
+- **test_backtest.py** (858 lines, 68 tests): Unit tests for backtest engine
+  - Cache expiration, retry logic, ticker/date validation
+  - Batch downloads, data quality validation
+  - 11 test classes covering all major functions
 
-**plot_backtest.py** (395 lines, ENHANCED Phase 2+3)
-- Comprehensive visualization utility for backtest results
-- **Consistent logging** (Phase 2.5): Uses logging module instead of print()
-- **Data validation** (Phase 3): Minimum data checks, quality validation
-- Reads CSV output from backtest.py
-- Generates four professional plots:
-  1. Portfolio vs benchmark value (currency-formatted axes)
-  2. Cumulative returns comparison (percentage-formatted)
-  3. Active return with colored zones (outperformance/underperformance)
-  4. Drawdown over time with max drawdown annotations
-- Dashboard mode: single 2x2 grid with all metrics
-- Professional color scheme (blue/purple palette with green/red zones)
-- Customizable: --style, --dpi, --dashboard options
-- Supports both interactive display and PNG export
-- **Phase 3 Validation**:
-  - Minimum 2 rows required for plotting
-  - Warning for < 30 data points
-  - All-NaN column detection
-  - Excessive missing data warnings (>50%)
-- Logging configuration: INFO level with timestamps
-- 5 logger.info() calls for key operations (data loading, chart generation, file saving)
+- **test_app.py** (933 lines, 62 tests): Unit tests for web UI
+  - Portfolio presets, date presets, multiple benchmarks
+  - Delta indicators, rolling returns, metric formatting
+  - 14 test classes with comprehensive coverage
 
-**test_backtest.py** (858 lines, EXPANDED Phase 1+3)
-- Comprehensive unit test suite using pytest
-- **68 tests total** (was 24 tests, +183% increase)
-- Tests all major functions and edge cases
-- Mocks external dependencies (yfinance) for isolation
-- Covers caching, error handling, calculations, validation, and CLI
-- **Phase 1 Tests (28 new tests)**:
-  - Cache expiration and TTL (6 tests)
-  - Retry logic with exponential backoff (4 tests)
-  - Ticker validation for multiple formats (11 tests)
-  - Date validation and normalization (7 tests)
-- **Phase 3 Tests (15 new tests)**:
-  - Batch download optimization (5 tests)
-  - Data quality validation (10 tests)
-- Run with: `pytest test_backtest.py -v`
-- Test classes (11 total):
-  - `TestParseArgs`: CLI argument parsing (7 tests)
-  - `TestCacheFunctions`: Cache with TTL and migration (6 tests)
-  - `TestSummarize`: Statistics calculation (4 tests)
-  - `TestComputeMetrics`: Backtest computation (4 tests)
-  - `TestRetryLogic`: Exponential backoff decorator (4 tests)
-  - `TestTickerValidation`: Ticker format validation (11 tests)
-  - `TestDateValidation`: Date parsing and ranges (7 tests)
-  - `TestDownloadPrices`: Price fetching with batch caching (9 tests)
-  - **NEW Phase 3: `TestDataValidation`**: Data quality checks (10 tests) 🆕
-  - `TestMain`: Integration tests (6 tests)
+- **test_integration.py** (420 lines, 25 tests - Phase 3): Integration tests
+  - End-to-end workflows, edge cases, data quality
+  - Statistical edge cases, multi-ticker scenarios
+  - 6 test classes covering real-world usage
 
-**test_app.py** (~933 lines, COMPREHENSIVE)
-- Comprehensive test suite for Streamlit UI (62 tests - 170% increase!)
-- Tests UI workflow integration with backtest module
-- Validates metric formatting and display logic
-- Tests error handling and input validation
-- Covers portfolio composition, chart data, and export functionality
-- **NEW**: Complete coverage of all 5 UI enhancements (39 additional tests)
-- Mocks Streamlit components for isolated testing
-- Run with: `pytest test_app.py -v`
-- Test classes (14 total):
-  - `TestMetricLabels`: Metric display formatting
-  - `TestBacktestIntegration`: UI workflow with backtest.py
-  - `TestMetricFormatting`: Currency, percentage, ratio formatting
-  - `TestErrorHandling`: Invalid input scenarios
-  - `TestPortfolioComposition`: Table generation
-  - `TestChartData`: Drawdown and active return calculations
-  - `TestDownloadFunctionality`: CSV and PNG export
-  - `TestCacheToggle`: Cache enable/disable behavior
-  - `TestInputValidation`: Form input validation
-  - `TestPortfolioPresets`: Portfolio preset validation (8 tests) 🆕
-  - `TestDateRangePresets`: Date preset calculations (7 tests) 🆕
-  - `TestMultipleBenchmarks`: Multi-benchmark logic (9 tests) 🆕
-  - `TestDeltaIndicators`: Delta calculation and formatting (7 tests) 🆕
-  - `TestRollingReturns`: Rolling returns windows (8 tests) 🆕
+**See**: [TESTING_GUIDE.md](TESTING_GUIDE.md) for comprehensive testing rules and patterns.
 
-**test_integration.py** (420 lines, NEW Phase 3)
-- Comprehensive integration test suite
-- **25 tests total** covering end-to-end workflows and edge cases
-- Tests system integration and real-world scenarios
-- Mocks yfinance for isolated, reproducible tests
-- Run with: `pytest test_integration.py -v`
-- Test classes (6 total):
-  - `TestEndToEndWorkflow`: Complete workflows (3 tests)
-    - CLI to CSV workflow
-    - Multi-ticker portfolio workflow
-    - Cache workflow (download → cache → reload)
-  - `TestEdgeCases`: Boundary conditions (8 tests)
-    - Single day backtest (should fail)
-    - Leap year date handling
-    - Extreme drawdowns (>90%)
-    - Zero volatility periods
-    - Very short date ranges
-    - Missing ticker data
-    - Negative returns
-    - Different start dates alignment
-  - `TestDataQuality`: Data validation (5 tests)
-    - All-NaN data rejection
-    - Excessive missing data
-    - Negative prices detection
-    - Zero prices detection
-    - Extreme price changes
-  - `TestValidation`: Input validation (5 tests)
-    - Ticker format validation
-    - Date format validation
-    - Future date rejection
-    - Historical date limits
-  - `TestStatisticalEdgeCases`: Statistical calculations (4 tests)
-    - Sharpe ratio with zero volatility
-    - Sortino ratio with no downside
-    - CAGR calculation precision
-    - Max drawdown recovery
+---
 
-**requirements.txt** (NEW)
-- Pin all Python dependencies with minimum versions
-- Easy setup: `pip install -r requirements.txt`
-- Includes pytest for testing
+## Key Rules and Conventions
 
-**README.md** (NEW)
-- Comprehensive user documentation
-- Quick start guide and examples
-- Command-line reference
-- Troubleshooting section
-- Development guidelines
+### Testing Rules (CRITICAL)
 
-## Development Environment Setup
+**MANDATORY**: Always write tests for new functionality. Testing is not optional.
 
-### Initial Setup
+**Coverage Requirements**:
+- New functions: 90%+ coverage required
+- New features: 80%+ coverage required
+- Bug fixes: Must include regression test
+- Overall codebase: Maintain 85%+ coverage (currently ~88%)
+
+**Test Before Commit**:
 ```bash
-# Create virtual environment
-python3 -m venv .venv
-
-# Activate virtual environment
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install all dependencies (RECOMMENDED)
-pip install -r requirements.txt
-
-# Or install individually
-python -m pip install numpy pandas yfinance matplotlib pytest streamlit
-
-# Upgrade pip if needed
-./.venv/bin/python -m pip install --upgrade pip
-```
-
-### Dependencies
-- **numpy** (>=1.24.0): Numerical computations (weights, calculations)
-- **pandas** (>=2.0.0): Time-series data handling and manipulation
-- **yfinance** (>=0.2.0): Yahoo Finance API wrapper for price data
-- **matplotlib** (>=3.7.0): Plotting and visualization (for plot_backtest.py)
-- **pytest** (>=7.0.0): Testing framework
-- **streamlit** (>=1.28.0): Web UI framework for interactive dashboard
-- **plotly** (>=5.14.0): Interactive charts with hover tooltips in web UI
-
-### Testing
-```bash
-# Run all tests (backtest + UI)
+# ALWAYS run tests before committing
 pytest -v
-
-# Run only backtest tests
-pytest test_backtest.py -v
-
-# Run only UI tests
-pytest test_app.py -v
-
-# Run with coverage
-pytest test_backtest.py --cov=backtest --cov-report=html
-
-# Run specific test class
-pytest test_backtest.py::TestSummarize -v
-pytest test_app.py::TestMetricLabels -v
+# If tests fail, fix them before committing
 ```
 
-## Test-Driven Development Rules
-
-### Core Principles
-
-**CRITICAL**: Always write tests for new functionality. Testing is not optional.
-
-**Current Coverage Status (as of Phase 1 Completion):**
-- Backtest engine: 95% coverage ✅ (51 tests, +28 Phase 1 tests)
-- App.py (original): 90% coverage ✅
-- App.py (new features): 70% coverage ✅ (39 new tests added)
-- **Overall: ~88% coverage** 🎯
-- **Total: 113 tests (51 backtest + 62 UI), 100% pass rate** ✅
-
-**Target**: Maintain 85%+ coverage for all new code ✅ **ACHIEVED**
-
-**Phase 1 Additions (28 new tests)**:
-- Cache expiration system (6 tests)
-- Retry logic with exponential backoff (4 tests)
-- Ticker validation for multiple formats (11 tests)
-- Date validation and normalization (7 tests)
-
-### When to Write Tests
-
-#### ALWAYS Write Tests For:
-1. **New functions**: Any new function in backtest.py or app.py
-2. **New features**: UI components, workflows, calculations
-3. **Bug fixes**: Add regression test before fixing the bug
-4. **Refactoring**: Ensure tests pass before and after
-5. **Edge cases**: Error handling, empty data, boundary conditions
-
-#### Test Writing Workflow:
-```
-For New Features:
-1. Write failing test first (TDD approach preferred)
-2. Implement minimal code to pass test
-3. Refactor while keeping tests green
-4. Add additional edge case tests
-
-For Bug Fixes:
-1. Write test that reproduces the bug
-2. Verify test fails
-3. Fix the bug
-4. Verify test passes
-5. Add related edge case tests
-```
-
-### What to Test
-
-#### Backtest Engine (test_backtest.py):
-- ✅ Function inputs/outputs (all pure functions)
-- ✅ Edge cases (empty data, NaN values, date misalignments)
-- ✅ Error conditions (invalid tickers, network failures)
-- ✅ Calculations (metrics, returns, statistics)
-- ✅ CLI argument parsing
-- ✅ Caching behavior
-- ✅ Integration (main() workflow)
-
-#### Web UI (test_app.py):
-- ✅ Integration with backtest module
-- ✅ Metric formatting (currency, percentage, ratio)
-- ✅ Error handling (invalid inputs, failed backtests)
-- ✅ Data transformations (drawdown, active return)
-- ✅ Export functionality (CSV, charts)
-- ✅ Portfolio preset behavior (8 tests)
-- ✅ Date preset calculations (7 tests)
-- ✅ Multiple benchmark logic (9 tests)
-- ✅ Delta indicator logic (7 tests)
-- ✅ Rolling returns calculations (8 tests)
-
-### Test Structure Patterns
-
-#### Good Test Structure (AAA Pattern):
-```python
-def test_feature_name(self):
-    """Clear description of what is being tested"""
-    # ARRANGE: Set up test data
-    dates = pd.date_range("2020-01-01", periods=252, freq="D")
-    prices = pd.DataFrame({"AAPL": [100, 110, 105]}, index=dates[:3])
-
-    # ACT: Execute the function being tested
-    result = backtest.compute_metrics(prices, weights, benchmark, capital)
-
-    # ASSERT: Verify expected behavior
-    assert result is not None
-    assert 'portfolio_value' in result.columns
-    assert len(result) == 3
-```
-
-#### Test Class Organization:
-```python
-class TestFeatureName:
-    """Test suite for specific feature or function"""
-
-    def test_basic_case(self):
-        """Test normal/happy path"""
-        pass
-
-    def test_edge_case_empty_data(self):
-        """Test with empty input"""
-        pass
-
-    def test_edge_case_single_value(self):
-        """Test with minimal input"""
-        pass
-
-    def test_error_handling(self):
-        """Test expected errors are raised"""
-        with pytest.raises(ValueError):
-            # code that should raise ValueError
-            pass
-```
-
-### Mocking Patterns
-
-#### Mock External Dependencies:
-```python
-# Mock yfinance downloads
-@patch('backtest.yf.download')
-def test_download_prices(mock_download):
-    mock_download.return_value = pd.DataFrame({...})
-    result = backtest.download_prices(['AAPL'], '2020-01-01', '2020-12-31')
-    assert not result.empty
-```
-
-#### Mock Streamlit for UI Tests:
-```python
-# Mock streamlit before importing app
-sys.modules['streamlit'] = MagicMock()
-import backtest  # Then import modules that use backtest
-```
-
-### Coverage Expectations
-
-#### Minimum Coverage Requirements:
-- **New functions**: 90%+ coverage required
-- **New features**: 80%+ coverage required
-- **Bug fixes**: Must include regression test
-- **Overall codebase**: Maintain 85%+ coverage
-
-#### How to Check Coverage:
-```bash
-# Check coverage for specific module
-pytest test_backtest.py --cov=backtest --cov-report=term-missing
-
-# Generate HTML coverage report
-pytest --cov=backtest --cov=app --cov-report=html
-open htmlcov/index.html
-```
-
-#### Coverage Report Interpretation:
-```
-backtest.py      95%   (371/391 lines)   ✅ Excellent
-app.py           82%   (639/783 lines)   ✅ Good
-Overall          86.1% (1011/1174 lines) ✅ Target achieved
-```
-
-### Common Testing Mistakes to Avoid
-
-#### DON'T:
-❌ Skip writing tests for "simple" code
-❌ Test implementation details instead of behavior
-❌ Write tests that depend on external services (mock them)
-❌ Write tests that depend on specific dates (use fixed dates)
-❌ Commit code without running tests
-❌ Ignore failing tests ("I'll fix it later")
-❌ Write tests that test the same thing multiple times
-❌ Use real file I/O (use temp files or mocks)
-
-#### DO:
-✅ Write descriptive test names: `test_portfolio_value_increases_with_positive_returns`
-✅ Use fixtures for repeated setup
-✅ Mock external dependencies (yfinance, file I/O, network calls)
-✅ Test edge cases (empty data, NaN, None, negative values)
-✅ Use pytest.raises() for expected errors
-✅ Keep tests fast (< 2 seconds total runtime)
-✅ Make tests independent (no shared state)
-✅ Use parametrize for testing multiple inputs
-
-### Example: Adding Tests for New Feature
-
-**Scenario**: Added "Example Portfolio Presets" feature (not yet tested)
-
-**Required Tests**:
-```python
-class TestPortfolioPresets:
-    """Test portfolio preset functionality"""
-
-    def test_preset_portfolios_exist(self):
-        """Verify all preset portfolios are defined"""
-        expected_presets = [
-            "Custom (Manual Entry)",
-            "Default UK ETFs",
-            "60/40 US Stocks/Bonds",
-            "Tech Giants",
-            "Dividend Aristocrats",
-            "Global Diversified"
-        ]
-        # Test preset data structure exists
-
-    def test_tech_giants_preset_values(self):
-        """Verify Tech Giants preset has correct values"""
-        # Expected: 4 tickers, equal weights, QQQ benchmark
-        assert len(tickers) == 4
-        assert tickers == ["AAPL", "MSFT", "GOOGL", "AMZN"]
-        assert all(w == 0.25 for w in weights)
-        assert benchmark == "QQQ"
-
-    def test_preset_selection_populates_inputs(self):
-        """Verify selecting preset updates session state"""
-        # Mock session state
-        # Select "Tech Giants"
-        # Assert tickers/weights/benchmark are populated
-
-    def test_custom_preset_allows_manual_entry(self):
-        """Verify Custom preset doesn't override inputs"""
-        # Select "Custom"
-        # Assert inputs remain editable
-```
-
-### Test Metrics and Goals
-
-**Current Status (Phase 3 Complete)**:
-- Total tests: 155 (68 backtest + 62 UI + 25 integration) ✅
-- Pass rate: 100% (155/155) ✅
-- Test-to-code ratio: ~0.90:1 ✅
-- Coverage: ~88% ✅
-
-**Goals**: ✅ **ALL EXCEEDED**
-- Total tests: 70+ tests → **155 tests** ✅ (+121% over goal)
-- Pass rate: 100% (always) → **100%** ✅
-- Test-to-code ratio: >0.80:1 → **~0.90:1** ✅ **EXCEEDED**
-- Coverage: 85%+ → **~88%** ✅
-
-**Achievement Details**:
-
-**Phase 1: Reliability & Validation** (+28 tests):
-- Cache Expiration System: 6 tests ✅
-- Retry Logic with Exponential Backoff: 4 tests ✅
-- Ticker Validation (multiple formats): 11 tests ✅
-- Date Validation & Normalization: 7 tests ✅
-
-**Phase 2: UI Enhancements** (+39 tests):
-- Portfolio Presets: 8 tests ✅
-- Date Range Presets: 7 tests ✅
-- Multiple Benchmarks: 9 tests ✅
-- Delta Indicators: 7 tests ✅
-- Rolling Returns: 8 tests ✅
-
-**Phase 3: Performance & Data Quality** (+40 tests):
-- Batch Download Optimization: 5 tests ✅
-- Data Quality Validation: 10 tests ✅
-- Integration Tests: 25 tests ✅
-
-### Running Tests in Development
-
-```bash
-# Before committing: Always run all tests
-source .venv/bin/activate
-pytest -v
-
-# Watch mode (re-run on file changes)
-pytest-watch
-
-# Run specific test while developing
-pytest test_app.py::TestPortfolioPresets::test_tech_giants_preset_values -v
-
-# Check coverage after adding tests
-pytest --cov=app --cov-report=term-missing
-
-# Ensure all tests pass before pushing
-pytest -v && git push
-```
-
-### Test Documentation Requirements
-
-Every test class should have:
-- Docstring explaining what is being tested
-- Individual test docstrings for complex tests
-- Clear assertion messages for debugging
-- Organized by feature/function
-
-**Summary**: Testing is mandatory for all new code. Aim for 85%+ coverage. Use mocks for external dependencies. Follow AAA pattern. Run tests before every commit.
-
-## Code Conventions
-
-### Python Style
-- Uses modern Python features: `from __future__ import annotations`
-- Type hints for function signatures
-- Docstrings for module-level and function-level documentation
-- PEP 8 compliant code style
-- Line length: Generally <100 characters for readability
-
-### Error Handling Patterns
-- **Dependency checks**: Guards for missing imports with clear error messages
-- **Data validation**: Raises `ValueError` for invalid inputs/data with detailed context
-- **System exits**: Uses `SystemExit` for CLI-level errors
-- **Empty data checks**: Validates data availability before processing
-- **Contextual errors**: All error messages include:
-  - Relevant ticker names and date ranges
-  - Specific problem description
-  - Actionable suggestions for resolution
-  - Available vs. missing data breakdown
-
-### Logging
-- Uses Python's `logging` module (not print statements)
-- INFO level for key operations (downloads, cache hits, computation steps)
-- WARNING level for cache failures (non-critical)
-- Formatted timestamps for all log messages
-- Clean separation of user output (print) vs. diagnostic logging
-
-### Key Patterns Used
-
-**DataFrame Operations**:
-```python
-# Forward-fill for missing data
-aligned = prices.loc[start_date:].ffill().dropna()
-
-# Calculate returns
-portfolio_return = portfolio_value / capital - 1
-```
-
-**Weight Normalization**:
-```python
-if not np.isclose(weights.sum(), 1.0):
-    weights = weights / weights.sum()
-```
-
-**Date Alignment**:
-```python
-# Find common start date across all series
-start_date = max(first_valid_points)
-combined_start = max(aligned.index[0], bench_start)
-```
-
-**Data Caching**:
-```python
-# Cache keyed by tickers and date range
-cache_key = get_cache_key(tickers, start, end)  # MD5 hash
-cache_path = Path(".cache") / f"{cache_key}.pkl"
-
-# Load from cache if available
-cached_data = load_cached_prices(cache_path)
-if cached_data is not None:
-    return cached_data
-
-# Save to cache after download
-save_cached_prices(cache_path, prices)
-```
-
-## New Features (Added 2025-11-15)
-
-### Data Caching System
-- **Location**: `.cache/` directory (gitignored)
-- **Cache keys**: MD5 hash of sorted tickers + date range
-- **Format**: Pickled pandas DataFrames
-- **Behavior**:
-  - Automatic cache on first download
-  - Reused on subsequent identical requests
-  - Bypass with `--no-cache` flag
-- **Benefits**: 5-10x faster for repeated backtests
-- **Functions**: `get_cache_key()`, `get_cache_path()`, `load_cached_prices()`, `save_cached_prices()`
-
-### Enhanced Performance Metrics
-Added to `summarize()` function (backtest.py:272-307):
-
-1. **Volatility**: Annualized standard deviation (252 trading days)
-   ```python
-   volatility = daily_returns.std() * np.sqrt(252)
-   ```
-
-2. **Sharpe Ratio**: Risk-adjusted return (assumes 0% risk-free rate)
-   ```python
-   sharpe_ratio = (cagr / volatility) if volatility > 0 else 0.0
-   ```
-
-3. **Sortino Ratio**: Return vs. downside deviation only
-   ```python
-   downside_returns = daily_returns[daily_returns < 0]
-   downside_std = downside_returns.std() * np.sqrt(252)
-   sortino_ratio = (cagr / downside_std) if downside_std > 0 else 0.0
-   ```
-
-4. **Maximum Drawdown**: Largest peak-to-trough decline
-   ```python
-   cumulative = series / series.expanding().max()
-   drawdown = (cumulative - 1).min()
-   ```
-
-### Improved Output Format
-- Professional formatting with section headers
-- Aligned numerical columns for readability
-- Shows portfolio composition with weights
-- Separate sections for portfolio, benchmark, and relative performance
-- All metrics displayed with consistent precision
-
-### Unit Test Suite
-- **Coverage**: All major functions tested
-- **Mocking**: External dependencies (yfinance) mocked for reliability
-- **Test classes**:
-  - `TestParseArgs`: CLI argument parsing
-  - `TestCacheFunctions`: Cache key generation and I/O
-  - `TestSummarize`: Statistics calculation
-  - `TestComputeMetrics`: Backtest computation
-  - `TestDownloadPrices`: Price fetching with caching
-  - `TestMain`: Integration tests
-- **Run**: `pytest test_backtest.py -v`
-
-### Streamlit Web UI Enhancements (Added 2025-11-15)
-
-#### 1. Example Portfolio Presets
-- **Location**: app.py sidebar (lines 59-67)
-- **Portfolios Available**:
-  - Custom (Manual Entry)
-  - Default UK ETFs: VDCP.L + VHYD.L vs VWRA.L
-  - 60/40 US Stocks/Bonds: VOO + BND vs SPY
-  - Tech Giants: AAPL + MSFT + GOOGL + AMZN vs QQQ
-  - Dividend Aristocrats: JNJ + PG + KO + PEP vs SPY
-  - Global Diversified: VTI + VXUS + BND vs VT
-- **Behavior**: Auto-populates tickers, weights, and benchmark when selected
-- **Implementation**: Session state management for smooth preset switching
-
-#### 2. Date Range Presets
-- **Location**: app.py sidebar (lines 107-131)
-- **Presets**: 1Y, 3Y, 5Y, 10Y, YTD, Max (2010-01-01)
-- **UI**: 6 quick-select buttons arranged horizontally
-- **Behavior**: One-click sets start_date, keeps end_date as today
-- **Flexibility**: Still allows custom date picker for precise control
-- **Implementation**: Session state for date persistence between reruns
-
-#### 3. Delta Indicators
-- **Location**: app.py results section (lines 390-407)
-- **Metrics with Deltas**:
-  - Excess Return (normal coloring: green ↑ good, red ↓ bad)
-  - Excess CAGR (normal coloring)
-  - Volatility Diff (inverse coloring: red ↑ bad, green ↓ good)
-  - Sharpe Difference (normal coloring)
-  - Sortino Difference (normal coloring)
-- **Visual**: Color-coded arrows with percentage/ratio values
-- **Purpose**: Instant visual feedback on outperformance/underperformance
-
-#### 4. Rolling Returns Chart
-- **Location**: app.py visualization section (lines 514-573)
-- **Windows**: 30-day, 90-day, 180-day rolling returns
-- **Display**: Interactive Plotly chart below main 2x2 dashboard
-- **Data**: Shows both portfolio and all benchmarks
-- **Format**: Percentage returns with hover tooltips
-- **Purpose**: Visualize performance consistency and volatility over time
-- **Implementation**: `pct_change(window)` on value series
-
-#### 5. Multiple Benchmarks Support
-- **Location**: app.py sidebar and results (lines 152-181, 282-321, 409-456)
-- **Capacity**: Up to 3 benchmarks simultaneously
-- **UI Components**:
-  - Number of Benchmarks input (1-3)
-  - Individual text inputs for each benchmark ticker
-  - Auto-populated defaults (VWRA.L, SPY, "")
-- **Results Display**:
-  - Primary benchmark shown in main 3-column layout
-  - Additional benchmarks in expandable sections
-  - Full metrics comparison for each benchmark
-- **Chart Integration**:
-  - All benchmarks on Portfolio Value chart (distinct colors/dashes)
-  - All benchmarks on Cumulative Returns chart
-  - All benchmarks on Drawdown chart
-  - All benchmarks on Rolling Returns chart
-- **Color Scheme**: Purple (#9467bd), Pink (#e377c2), Yellow-Green (#bcbd22)
-- **Line Styles**: dash, dot, dashdot for visual differentiation
-
-## Git Workflow
-
-### Branch Naming Convention
-- Feature branches: `claude/<description>-<session-id>`
-- Current branch: `claude/create-ui-framework-01D656RsUmycaEV3SNmffGrx`
-
-### Commit History
-Recent commits show incremental development:
-- `3bb5a88`: "Update README with new UI features documentation"
-- `daa49cd`: "Implement top 5 UI improvements for Streamlit backtester"
-- `77ff143`: "Update documentation for interactive charts"
-- `a5d909c`: "Add interactive hover tooltips to charts using Plotly"
-- `0b507c5`: "Fix all failing tests in test suite"
-
-### Commit Message Style
-- Use imperative mood ("Add feature" not "Added feature")
+**See**: [TESTING_GUIDE.md](TESTING_GUIDE.md) for detailed testing guidelines.
+
+### Code Style
+
+**Python Conventions**:
+- Modern Python: `from __future__ import annotations`
+- Type hints for all function signatures
+- Docstrings for modules and functions
+- PEP 8 compliant
+- Line length: <100 characters
+
+**Error Handling**:
+- Contextual error messages (include ticker names, dates, suggestions)
+- `ValueError` for invalid inputs/data
+- `SystemExit` for CLI-level errors
+- Dependency guards with installation guidance
+
+**Logging**:
+- Use `logging` module (NOT print statements for diagnostics)
+- INFO level for key operations (downloads, cache hits, computations)
+- WARNING level for non-critical issues (cache failures, limited data)
+- Clean separation: `logging` for diagnostics, `print()` for user results
+
+### Git Workflow
+
+**Branch Naming**: `claude/<description>-<session-id>`
+
+**Commit Messages**:
+- Use imperative mood: "Add feature" not "Added feature"
+- Prefixes: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `perf:`
 - Be descriptive but concise
-- Focus on the "why" when the "what" isn't obvious
 
-### Git Operations
-- Always develop on designated Claude branches
-- Push with: `git push -u origin <branch-name>`
-- Never force push without explicit permission
-
-## Common Development Tasks
-
-### Adding New Metrics
-1. Modify `compute_metrics()` in backtest.py:118-166
-2. Add new calculated column to the returned DataFrame
-3. Update `summarize()` if summary stat needed
-4. Consider adding plot to plot_backtest.py
-
-### Supporting New Data Sources
-1. Modify `download_prices()` in backtest.py:77-115
-2. Ensure compatibility with existing DataFrame structure
-3. Handle new data format edge cases
-4. Update documentation in PROJECT_SUMMARY.md
-
-### Adding CLI Arguments
-1. Update `parse_args()` in backtest.py:33-74
-2. Add argument with clear help text and sensible defaults
-3. Use argument in `main()` function
-4. Test with various input combinations
-
-### Improving Visualizations
-1. Modify plot_backtest.py
-2. Maintain seaborn-v0_8 style consistency
-3. Ensure both interactive and PNG output work
-4. Keep DPI at 150 for consistent quality
-
-### Modifying the Web UI
-1. Edit app.py to modify Streamlit interface
-2. Import necessary functions from backtest.py (don't duplicate logic)
-3. Use st.sidebar for input controls, main area for results
-4. Test with `streamlit run app.py` during development
-5. Maintain consistency with CLI functionality
-6. Key Streamlit patterns used:
-   - `st.spinner()` for progress indicators
-   - `st.metric()` for displaying statistics
-   - `st.pyplot()` for matplotlib charts
-   - `st.download_button()` for file exports
-   - `st.columns()` for side-by-side layouts
-7. Ensure error handling with `st.error()` and `st.warning()`
-8. Validate inputs before running backtest
-
-## Testing & Validation
-
-### Manual Testing Workflow
+**Git Operations**:
 ```bash
-# Activate environment
-source .venv/bin/activate
+# Always push with -u on first push
+git push -u origin claude/<description>-<session-id>
 
-# Test basic backtest
-python backtest.py --start 2018-01-01 --end 2024-12-31 \
-    --capital 100000 --weights 0.5 0.5 --benchmark VWRA.L \
-    --output results/test_run.csv
-
-# Verify CSV was created
-ls -lh results/test_run.csv
-
-# Test plotting
-python plot_backtest.py --csv results/test_run.csv \
-    --output charts/test_run
-
-# Verify PNGs were created
-ls -lh charts/
-
-# Test web UI
-streamlit run app.py
-# Opens browser at http://localhost:8501
-# Configure backtest in sidebar and click "Run Backtest"
+# Never force push without permission
+# Always run tests before committing
+pytest -v && git commit
 ```
-
-### What to Verify
-- **Data downloads**: All tickers successfully fetch data
-- **Caching**: Verify .cache/ directory created and used on subsequent runs
-- **Calculations**: All metrics (CAGR, Sharpe, Sortino, drawdown) are reasonable
-- **Alignment**: Portfolio and benchmark have matching date ranges
-- **Output**: CSV and PNG files are created correctly
-- **Logging**: Check log messages appear with timestamps
-- **Edge cases**: Empty data, single ticker, mismatched weights
-- **Tests**: Run `pytest test_backtest.py -v` to verify all tests pass
-
-### Known Edge Cases
-1. **Missing data**: Tickers with limited history may cause alignment issues
-2. **Date ranges**: Very short periods may produce unreliable CAGR
-3. **Weight mismatch**: Length of weights must match length of tickers
-4. **Network dependency**: Requires internet access for yfinance
-
-## Important Notes for AI Assistants
-
-### Critical Constraints
-1. **Requirements file**: Use `requirements.txt` for dependency management
-2. **Network required**: yfinance needs internet access (except when using cached data)
-3. **Data quality**: Yahoo Finance data may have gaps or errors
-4. **Gitignored folders**: .venv/, .cache/, results/, charts/ are not committed
-5. **Cache directory**: .cache/ created automatically on first run
-6. **Testing**: Always run tests before committing significant changes
 
 ### When Making Changes
 
-**DO**:
-- Preserve existing error handling patterns (detailed, contextual errors)
-- Maintain backward compatibility with existing CSV format
-- Keep imports at module level with guards for missing deps
-- Use logging module for diagnostic output, print() for user results
-- Use descriptive variable names matching existing style
-- Write unit tests for new functionality
-- Test with multiple ticker combinations
-- Validate weight normalization works correctly
-- Update requirements.txt if adding dependencies
-- Update README.md for user-facing changes
-- Update CLAUDE.md for AI-relevant implementation details
+#### DO ✅
 
-**DON'T**:
-- Remove or modify the CSV output columns without careful consideration
-- Change default tickers without good reason (user expectation)
-- Add new dependencies without updating requirements.txt, README.md, and CLAUDE.md
-- Break the existing CLI interface (add flags, don't change existing behavior)
-- Modify plotting style without maintaining consistency
-- Commit .venv/, .cache/, results/, or charts/ directories
-- Use print() for diagnostic/debug output (use logging instead)
-- Skip writing tests for significant new features
+- ✅ Write tests for all new functionality (TDD preferred)
+- ✅ Preserve existing error handling patterns
+- ✅ Maintain backward compatibility with CSV format
+- ✅ Use logging for diagnostics, print() for user results
+- ✅ Update requirements.txt if adding dependencies
+- ✅ Update README.md for user-facing changes
+- ✅ Update CLAUDE.md for AI-relevant changes
+- ✅ Test with multiple ticker combinations
+- ✅ Run `pytest -v` before every commit
+- ✅ Normalize weights to sum to 1.0
+- ✅ Use descriptive variable names
 
-### Security Considerations
-- **No credential handling**: No API keys or secrets in this codebase
-- **Public data only**: All data from public Yahoo Finance
-- **No user input sanitization needed**: CLI args are type-checked by argparse
-- **Path traversal**: Uses pathlib.Path which handles paths safely
+#### DON'T ❌
 
-### Performance Notes
-- **Network latency**: yfinance downloads can be slow (mitigated by caching)
-- **Cache performance**: 5-10x faster for cached data (no network calls)
-- **Cache size**: Minimal - pickled DataFrames are compact
-- **Memory usage**: Minimal - all data fits in memory for typical use cases
-- **CPU usage**: Negligible - numpy operations are efficient
-- **Date ranges**: Longer periods = more data but not problematic
-- **First run**: Slower (downloads data), subsequent runs are fast (cached)
+- ❌ Skip writing tests (testing is mandatory!)
+- ❌ Commit code with failing tests
+- ❌ Modify CSV output columns without careful consideration
+- ❌ Change default tickers without good reason
+- ❌ Add dependencies without updating all docs
+- ❌ Break existing CLI interface
+- ❌ Commit .venv/, .cache/, results/, or charts/ directories
+- ❌ Use print() for diagnostic output (use logging)
+- ❌ Remove or modify error handling patterns
+- ❌ Ignore test coverage (maintain 85%+ coverage)
 
-## Typical AI Assistant Workflows
+---
 
-### Scenario 1: User Wants Different Default Tickers
-1. Modify `parse_args()` default values in backtest.py:38-39
-2. Update PROJECT_SUMMARY.md example commands
-3. Test with new defaults
-4. Commit with message: "Change default tickers to X and Y"
+## Phase Completion Summary
 
-### Scenario 2: Add New Performance Metric
-1. Add calculation in `compute_metrics()` function
-2. Add to DataFrame returned at backtest.py:156-164
-3. Optionally add to `summarize()` if it's a summary stat
-4. Test the calculation manually
-5. Update documentation if user-facing
+### ✅ Phase 1: Reliability & Validation
+Cache expiration (TTL), retry logic (exponential backoff), ticker/date validation. **+28 tests** (86→113), ~88% coverage.
 
-### Scenario 3: Enhance Plotting
-1. Read plot_backtest.py to understand current structure
-2. Add new subplot or modify existing plots
-3. Ensure both --output and interactive modes work
-4. Test with real CSV data
-5. Maintain seaborn style consistency
+### ✅ Phase 2: Code Quality & Organization
+Modular architecture (874→1,358 lines across 7 modules), zero duplication (-134 lines), 32 extracted constants, centralized state. **113 tests**, ~88% coverage.
 
-### Scenario 4: Fix Data Alignment Bug
-1. Understand the date alignment logic in `compute_metrics()`
-2. Review lines 127-149 for benchmark alignment
-3. Test with tickers that have different start dates
-4. Ensure forward-fill logic is correct
-5. Validate no data leakage (look-ahead bias)
+### ✅ Phase 3: Performance & Data Validation
+Batch download optimization, data quality validation (NaN/zero/negative/extreme), min data requirements, integration tests. **+42 tests** (113→155), ~88% coverage.
 
-### Scenario 5: Improve Error Messages
-1. Identify where errors occur (ValueError, SystemExit)
-2. Make messages more actionable
-3. Include relevant context (ticker, date range, etc.)
-4. Test error paths explicitly
-5. Ensure errors don't expose sensitive info
+### 🚧 Phase 4: Documentation & Polish (1/3 complete)
+**Completed**: README, CLAUDE.md, CHANGELOG, FILE_REFERENCE, TESTING_GUIDE, DEVELOPER_GUIDE.
+**Pending** (optional): Deployment guide, GitHub templates.
+
+---
 
 ## Quick Reference
 
-### File Locations
-- **Web UI**: app.py (Streamlit interface, ~700 lines)
-- **Main logic**: backtest.py:199-270 (`compute_metrics`)
-- **CLI parsing**: backtest.py:44-90 (`parse_args`)
-- **Caching**: backtest.py:93-128 (cache helper functions)
-- **Data fetching**: backtest.py:131-196 (`download_prices`)
-- **Metrics**: backtest.py:272-307 (`summarize`)
-- **Main flow**: backtest.py:310-373 (`main`)
-- **Plotting**: plot_backtest.py:35-61 (`main`)
-- **Backtest tests**: test_backtest.py (6 test classes, 24 tests)
-- **UI tests**: test_app.py (14 test classes, 62 tests)
-- **User docs**: README.md
-- **AI docs**: CLAUDE.md (this file)
-
-### Key Dependencies
-- **streamlit**: Web UI framework, interactive dashboard
-- **yfinance**: `yf.download()` at backtest.py:143-150
-- **pandas**: DataFrames, Series, datetime handling
-- **numpy**: Arrays, numerical operations, statistics
-- **matplotlib**: Plotting infrastructure
-- **pytest**: Testing framework
-- **pickle**: Cache serialization
-- **hashlib**: Cache key generation (MD5)
-- **logging**: Diagnostic output
-
-### Default Values
-- **Tickers**: VDCP.L, VHYD.L
-- **Weights**: 0.5, 0.5 (auto-normalized)
-- **Benchmark**: VWRA.L
-- **Start**: 2018-01-01
-- **End**: Today
-- **Capital**: 100,000
-- **Cache**: Enabled (use --no-cache to disable)
-- **Plot Style**: seaborn-v0_8
-
-### Performance Metrics Available
-- Ending Value
-- Total Return
-- CAGR (Compound Annual Growth Rate)
-- Volatility (annualized std dev)
-- Sharpe Ratio
-- Sortino Ratio
-- Maximum Drawdown
-
 ### Common Commands
+
 ```bash
 # Install dependencies
 pip install -r requirements.txt
 
-# Run web UI (interactive dashboard)
+# Run web UI
 streamlit run app.py
 
 # Run backtest (CLI)
-python backtest.py --tickers A B --weights 0.6 0.4 --benchmark SPY
+python backtest.py --tickers AAPL MSFT --weights 0.6 0.4 --benchmark SPY
 
-# Plot results (CLI)
+# Plot results
 python plot_backtest.py --csv results/backtest.csv --output charts/test
 
-# Run ALL tests (113 tests)
+# Run all tests (155 tests)
 pytest -v
 
-# Run only backtest tests (51 tests)
-pytest test_backtest.py -v
-
-# Run only UI tests (62 tests)
-pytest test_app.py -v
-
-# Check test coverage
+# Run with coverage
 pytest --cov=backtest --cov=app --cov-report=term-missing
 
-# Clear cache (including old format)
+# Clear cache
 rm -rf .cache/
+```
+
+### Key File Locations
+
+**See [FILE_REFERENCE.md](FILE_REFERENCE.md) for comprehensive documentation.**
+
+**Quick Links**:
+- Core logic: `backtest.py:199-307` (compute_metrics, summarize)
+- Data download: `backtest.py:364-538` (download_prices, validation)
+- CLI parsing: `backtest.py:206-260` (parse_args)
+- Caching: `backtest.py:263-338` (cache functions)
+- Web UI: `app/main.py:75-459` (main orchestration)
+- Charts: `app/charts.py` (Plotly visualizations)
+- Config: `app/config.py` (32 constants)
+
+### Default Values
+
+- **Tickers**: VDCP.L, VHYD.L
+- **Weights**: 0.5, 0.5 (auto-normalized)
+- **Benchmark**: VWRA.L
+- **Start Date**: 2018-01-01
+- **End Date**: Today
+- **Capital**: 100,000
+- **Cache**: Enabled (use `--no-cache` to disable)
+- **Cache TTL**: 24 hours (use `--cache-ttl` to change)
+
+### Performance Metrics
+
+- Ending Value
+- Total Return
+- CAGR (Compound Annual Growth Rate)
+- Volatility (annualized standard deviation)
+- Sharpe Ratio
+- Sortino Ratio
+- Maximum Drawdown
+
+### Dependencies
+
+- **numpy** (>=1.24.0): Numerical computations
+- **pandas** (>=2.0.0): Time-series data handling
+- **yfinance** (>=0.2.0): Yahoo Finance API
+- **matplotlib** (>=3.7.0): Plotting (plot_backtest.py)
+- **pytest** (>=7.0.0): Testing framework
+- **streamlit** (>=1.28.0): Web UI framework
+- **plotly** (>=5.14.0): Interactive charts
+
+---
+
+## Typical Development Workflows
+
+### Adding New Features
+
+**Standard Process**:
+1. **Plan**: Understand requirements, check existing patterns
+2. **Write Tests**: Create failing tests first (TDD approach)
+3. **Implement**: Write minimal code to pass tests
+4. **Refactor**: Clean up while keeping tests green
+5. **Document**: Update README.md, CLAUDE.md, FILE_REFERENCE.md as needed
+6. **Commit**: `pytest -v && git commit -m "feat: description"`
+
+**See**: [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for detailed workflows and scenarios.
+
+### Example: Adding New Metric
+
+```python
+# 1. Write test first
+def test_new_metric_calculation(self):
+    """Test that new_metric is calculated correctly"""
+    dates = pd.date_range("2020-01-01", periods=100, freq="D")
+    # ... setup data ...
+    results = compute_metrics(prices, weights, benchmark, capital)
+    assert 'new_metric' in results.columns
+    assert results['new_metric'].iloc[0] > 0
+
+# 2. Implement in compute_metrics()
+def compute_metrics(prices, weights, benchmark, capital):
+    # ... existing code ...
+    results['new_metric'] = calculate_new_metric(results['portfolio_value'])
+    return results
+
+# 3. Run tests
+pytest test_backtest.py::test_new_metric_calculation -v
+
+# 4. Commit
+git add test_backtest.py backtest.py
+git commit -m "feat: add new_metric calculation"
 ```
 
 ---
 
-**Last Updated**: 2025-11-15 (Latest: **Phase 3 Complete** - Performance optimization and data validation)
-**Repository State**: Production-ready with Phase 1, 2 & 3 enhancements deployed
+## Known Constraints and Edge Cases
+
+**Critical Constraints**: Network required (yfinance), Yahoo Finance data may have gaps, `.cache/` gitignored, testing required before commits.
+
+**Edge Cases**: Missing data (forward-fill & validate), short date ranges (<30 days warned), weight mismatch (auto-normalize), network failures (retry with backoff), bad data (comprehensive validation). See [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for details.
+
+---
+
+## Detailed Documentation References
+
+**📄 [FILE_REFERENCE.md](FILE_REFERENCE.md)**: File-by-file documentation with line counts, purposes, key functions.
+
+**📄 [TESTING_GUIDE.md](TESTING_GUIDE.md)**: TDD rules, test structure, coverage requirements, mocking patterns.
+
+**📄 [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)**: Environment setup, code conventions, git workflow, common tasks.
+
+**📄 [README.md](README.md)**: User documentation with quick start, usage examples, CLI reference, troubleshooting.
+
+**📄 [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)**: Phases 1-4 roadmap with task breakdown and timeline.
+
+**📄 [IMPLEMENTATION_CHECKLIST.md](IMPLEMENTATION_CHECKLIST.md)**: Task tracking (14/16 complete - 87.5%).
+
+**📄 [CHANGELOG.md](CHANGELOG.md)**: Version history and release notes (v1.0.0 → v2.1.0).
+
+---
+
+## Important Notes for AI Assistants
+
+### Development Priorities
+
+1. **Testing First**: Write tests before or alongside code (TDD)
+2. **Maintain Coverage**: Keep test coverage at 85%+ (currently ~88%)
+3. **Backward Compatibility**: Never break existing CLI or CSV format
+4. **Documentation**: Update all relevant docs (README, CLAUDE, FILE_REFERENCE, etc.)
+5. **Code Quality**: Follow existing patterns, no duplication, extract constants
+
+### Security Considerations
+
+- **No credentials**: No API keys or secrets in codebase
+- **Public data only**: All data from public Yahoo Finance
+- **Safe paths**: Uses pathlib.Path (handles paths safely)
+- **No sanitization needed**: CLI args type-checked by argparse
+
+### Performance Notes
+
+- **Caching**: 5-10x faster for cached data (first run slow, subsequent fast)
+- **Memory**: Minimal - all data fits in memory
+- **CPU**: Negligible - numpy operations are efficient
+- **Network**: yfinance downloads can be slow (1-5 seconds per ticker)
+
+---
+
+**Last Updated**: 2025-11-15
+**Version**: v2.1.0 (Phase 3 Complete)
 **Current Branch**: claude/read-imple-01QaXd8PwRSeMGMtHvEeqFGf
-**Test Coverage**: ~88% overall (155 tests, 100% passing)
-**Key Files**: app/ package (7 modules, 1,358 lines), app.py (43 line wrapper), backtest.py (830 lines), plot_backtest.py (395 lines), test_backtest.py (858 lines), test_app.py (933 lines), test_integration.py (420 lines), README.md, requirements.txt, CLAUDE.md, PROJECT_SUMMARY.md, IMPLEMENTATION_PLAN.md, IMPLEMENTATION_CHECKLIST.md, TEST_REPORT.md, PHASE3_SUMMARY.md
-
-**Phase 3 Enhancements (Completed)**:
-- **Batch Download Optimization**: Per-ticker caching for efficient multi-ticker downloads
-  - Checks cache individually for each ticker
-  - Downloads only uncached tickers in single API call
-  - Significant performance improvement for repeat backtests
-- **Data Quality Validation**: Comprehensive validation of price data
-  - All-NaN detection
-  - Excessive NaN (>50% threshold)
-  - Zero/negative price detection
-  - Extreme price changes (>90%/day - likely errors)
-- **Minimum Data Requirements**:
-  - Minimum 2 trading days required for backtest
-  - Warning for <30 days (statistics unreliable)
-  - Minimum 2 rows for plotting
-- **Integration Tests**: 25 comprehensive tests covering end-to-end workflows, edge cases, and data quality
-- **New Functions**:
-  - `validate_price_data()`: Data quality validation
-  - `_process_yfinance_data()`: Helper to process yfinance data
-
-**Phase 2 Enhancements (Completed)**:
-- **Modular Architecture**: Refactored monolithic app.py (874 lines) into 7 focused modules (1,358 organized lines)
-  - app/config.py: 32 configuration constants
-  - app/presets.py: Portfolio and date presets
-  - app/validation.py: Centralized session state and input validation
-  - app/ui_components.py: Reusable UI rendering functions
-  - app/charts.py: Plotly chart generation
-  - app/main.py: Application orchestration
-  - app/__init__.py: Package initialization
-  - app.py: 43-line backward compatibility wrapper
-- **Code Quality**: Eliminated 134 lines of duplicate code (DRY principle applied)
-- **Configuration Management**: Extracted all magic numbers to named constants
-- **Consistent Logging**: Added logging to plot_backtest.py (5 logger.info calls)
-- **100% Backward Compatibility**: Wrapper pattern maintains old entry point
-
-**Phase 1 Enhancements (Completed)**:
-- **Cache Expiration System**: Configurable TTL (default 24h), automatic stale cache deletion
-- **Automatic Retry Logic**: Exponential backoff (3 attempts: 2s→4s→8s)
-- **Comprehensive Ticker Validation**: Supports AAPL, VWRA.L, ^GSPC, EURUSD=X, BRK-B
-- **Flexible Date Validation**: Multiple format support and normalization
-- **Import Error Handling**: User-friendly messages and installation guidance
+**Test Coverage**: ~88% (155 tests, 100% passing)
+**Progress**: 87.5% complete (14/16 tasks, Phase 4 in progress)
