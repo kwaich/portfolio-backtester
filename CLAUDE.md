@@ -34,22 +34,29 @@ backtester/
 
 ### File Purposes
 
-**app.py** (~458 lines, NEW)
+**app.py** (~700 lines, ENHANCED)
 - Streamlit web UI for interactive backtesting
 - Provides user-friendly interface without CLI knowledge
 - Imports and reuses functions from backtest.py module
 - Key features:
+  - **Example Portfolio Presets**: 6 pre-configured portfolios (Default UK ETFs, 60/40, Tech Giants, Dividend Aristocrats, Global Diversified)
+  - **Date Range Presets**: Quick buttons for 1Y, 3Y, 5Y, 10Y, YTD, Max
+  - **Multiple Benchmarks**: Compare against up to 3 benchmarks simultaneously
+  - **Delta Indicators**: Color-coded arrows showing outperformance/underperformance
+  - **Rolling Returns Chart**: Interactive 30/90/180-day rolling returns analysis
   - Dynamic form inputs for tickers and weights
   - Real-time backtest execution with progress indicators
   - Side-by-side results comparison (Portfolio vs Benchmark vs Relative)
-  - Interactive 2x2 chart dashboard with formatted axes
-  - CSV and PNG download capabilities
+  - Interactive Plotly charts with hover tooltips (2x2 dashboard + rolling returns)
+  - Expandable sections for additional benchmark comparisons
+  - CSV and HTML chart download capabilities
   - Weight auto-normalization
   - Cache toggle option
+  - Session state management for smooth UX
 - Run with: `streamlit run app.py`
 - Opens browser at `http://localhost:8501`
 - Uses st.sidebar for inputs, main area for results
-- Integrates matplotlib charts with Streamlit's display functions
+- Integrates Plotly interactive charts with Streamlit's display functions
 
 **backtest.py** (~377 lines)
 - Core backtesting logic with CLI interface
@@ -289,16 +296,80 @@ Added to `summarize()` function (backtest.py:272-307):
   - `TestMain`: Integration tests
 - **Run**: `pytest test_backtest.py -v`
 
+### Streamlit Web UI Enhancements (Added 2025-11-15)
+
+#### 1. Example Portfolio Presets
+- **Location**: app.py sidebar (lines 59-67)
+- **Portfolios Available**:
+  - Custom (Manual Entry)
+  - Default UK ETFs: VDCP.L + VHYD.L vs VWRA.L
+  - 60/40 US Stocks/Bonds: VOO + BND vs SPY
+  - Tech Giants: AAPL + MSFT + GOOGL + AMZN vs QQQ
+  - Dividend Aristocrats: JNJ + PG + KO + PEP vs SPY
+  - Global Diversified: VTI + VXUS + BND vs VT
+- **Behavior**: Auto-populates tickers, weights, and benchmark when selected
+- **Implementation**: Session state management for smooth preset switching
+
+#### 2. Date Range Presets
+- **Location**: app.py sidebar (lines 107-131)
+- **Presets**: 1Y, 3Y, 5Y, 10Y, YTD, Max (2010-01-01)
+- **UI**: 6 quick-select buttons arranged horizontally
+- **Behavior**: One-click sets start_date, keeps end_date as today
+- **Flexibility**: Still allows custom date picker for precise control
+- **Implementation**: Session state for date persistence between reruns
+
+#### 3. Delta Indicators
+- **Location**: app.py results section (lines 390-407)
+- **Metrics with Deltas**:
+  - Excess Return (normal coloring: green ↑ good, red ↓ bad)
+  - Excess CAGR (normal coloring)
+  - Volatility Diff (inverse coloring: red ↑ bad, green ↓ good)
+  - Sharpe Difference (normal coloring)
+  - Sortino Difference (normal coloring)
+- **Visual**: Color-coded arrows with percentage/ratio values
+- **Purpose**: Instant visual feedback on outperformance/underperformance
+
+#### 4. Rolling Returns Chart
+- **Location**: app.py visualization section (lines 514-573)
+- **Windows**: 30-day, 90-day, 180-day rolling returns
+- **Display**: Interactive Plotly chart below main 2x2 dashboard
+- **Data**: Shows both portfolio and all benchmarks
+- **Format**: Percentage returns with hover tooltips
+- **Purpose**: Visualize performance consistency and volatility over time
+- **Implementation**: `pct_change(window)` on value series
+
+#### 5. Multiple Benchmarks Support
+- **Location**: app.py sidebar and results (lines 152-181, 282-321, 409-456)
+- **Capacity**: Up to 3 benchmarks simultaneously
+- **UI Components**:
+  - Number of Benchmarks input (1-3)
+  - Individual text inputs for each benchmark ticker
+  - Auto-populated defaults (VWRA.L, SPY, "")
+- **Results Display**:
+  - Primary benchmark shown in main 3-column layout
+  - Additional benchmarks in expandable sections
+  - Full metrics comparison for each benchmark
+- **Chart Integration**:
+  - All benchmarks on Portfolio Value chart (distinct colors/dashes)
+  - All benchmarks on Cumulative Returns chart
+  - All benchmarks on Drawdown chart
+  - All benchmarks on Rolling Returns chart
+- **Color Scheme**: Purple (#9467bd), Pink (#e377c2), Yellow-Green (#bcbd22)
+- **Line Styles**: dash, dot, dashdot for visual differentiation
+
 ## Git Workflow
 
 ### Branch Naming Convention
-- Feature branches: `claude/claude-md-<session-id>`
-- Current branch: `claude/claude-md-mhzru0wxtf2fhp26-01BiHcWsAHGCMM49CgJT4PL2`
+- Feature branches: `claude/<description>-<session-id>`
+- Current branch: `claude/create-ui-framework-01D656RsUmycaEV3SNmffGrx`
 
 ### Commit History
 Recent commits show incremental development:
-- `64160d1`: "Improve backtest robustness"
-- `3ac63a9`: "Initial backtest scaffolding"
+- `3bb5a88`: "Update README with new UI features documentation"
+- `daa49cd`: "Implement top 5 UI improvements for Streamlit backtester"
+- `77ff143`: "Update documentation for interactive charts"
+- `a5d909c`: "Add interactive hover tooltips to charts using Plotly"
+- `0b507c5`: "Fix all failing tests in test suite"
 
 ### Commit Message Style
 - Use imperative mood ("Add feature" not "Added feature")
@@ -550,7 +621,7 @@ rm -rf .cache/
 
 ---
 
-**Last Updated**: 2025-11-15 (Major update: web UI, UI tests, caching, metrics, docs)
-**Repository State**: Multiple commits, comprehensive improvements
+**Last Updated**: 2025-11-15 (Latest: 5 major UI enhancements - presets, deltas, rolling returns, multi-benchmarks)
+**Repository State**: Production-ready with comprehensive web UI
 **Current Branch**: claude/create-ui-framework-01D656RsUmycaEV3SNmffGrx
-**Key Files**: app.py (458 lines), backtest.py (377 lines), test_backtest.py (370 lines), test_app.py (426 lines), README.md, requirements.txt
+**Key Files**: app.py (~700 lines), backtest.py (377 lines), test_backtest.py (370 lines), test_app.py (426 lines), README.md, requirements.txt, CLAUDE.md, PROJECT_SUMMARY.md
