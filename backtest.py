@@ -361,6 +361,146 @@ def _download_from_yfinance(tickers: List[str], start: str, end: str) -> Any:
     )
 
 
+def validate_price_data(df: pd.DataFrame, tickers: List[str]) -> None:
+    """Validate price data quality.
+
+    Args:
+        df: DataFrame containing price data
+        tickers: List of ticker symbols
+
+    Raises:
+        ValueError: If data quality issues are detected
+    """
+    issues = []
+
+    for ticker in tickers:
+        if ticker not in df.columns:
+            continue  # Will be caught by other validation
+
+        series = df[ticker]
+
+        # Check for all NaN
+        if series.isna().all():
+            issues.append(f"{ticker}: all values are NaN (no price data available)")
+            continue
+
+        # Check for excessive NaN (>50%)
+        nan_pct = series.isna().sum() / len(series)
+        if nan_pct > 0.5:
+            issues.append(
+                f"{ticker}: {nan_pct:.1%} missing values (>50% threshold)"
+            )
+
+        # Check for zero/negative prices (after dropping NaN)
+        valid_prices = series.dropna()
+        if len(valid_prices) > 0:
+            if (valid_prices <= 0).any():
+                zero_count = (valid_prices == 0).sum()
+                neg_count = (valid_prices < 0).sum()
+                issue_parts = []
+                if zero_count > 0:
+                    issue_parts.append(f"{zero_count} zero price(s)")
+                if neg_count > 0:
+                    issue_parts.append(f"{neg_count} negative price(s)")
+                issues.append(f"{ticker}: contains {', '.join(issue_parts)}")
+
+            # Check for extreme price changes (>90% in single day - likely data error)
+            price_changes = valid_prices.pct_change().dropna()
+            if len(price_changes) > 0:
+                extreme_changes = price_changes[price_changes.abs() > 0.9]
+                if len(extreme_changes) > 0:
+                    max_change = extreme_changes.abs().max()
+                    issues.append(
+                        f"{ticker}: contains extreme price change ({max_change:.1%}/day - possible data error)"
+                    )
+
+    if issues:
+        raise ValueError(
+            "Price data quality issues detected:\n" +
+            "\n".join(f"  • {issue}" for issue in issues)
+        )
+
+
+def _process_yfinance_data(data: Any, tickers: List[str], start: str, end: str) -> pd.DataFrame:
+    """Process raw yfinance data into standardized DataFrame format.
+
+    Args:
+        data: Raw data from yfinance
+        tickers: List of ticker symbols
+        start: Start date for error messages
+        end: End date for error messages
+
+    Returns:
+        DataFrame with adjusted close prices for all tickers
+
+    Raises:
+        ValueError: If data is empty or missing required tickers
+    """
+    # Check if data is empty
+    if data.empty:
+        raise ValueError(
+            f"No price data returned for period {start} to {end}.\n"
+            f"Tickers requested: {', '.join(tickers)}\n"
+            f"Please verify:\n"
+            f"  1. Tickers are valid symbols\n"
+            f"  2. Tickers were trading during this period\n"
+            f"  3. Date range is valid (not in the future)"
+        )
+
+    # Handle different yfinance return formats
+    if isinstance(data, pd.Series):  # single ticker result
+        prices = data.to_frame(name=tickers[0])
+    elif isinstance(data.columns, pd.MultiIndex):
+        level0 = data.columns.get_level_values(0)
+        price_field = None
+        for candidate in ("Adj Close", "Close"):
+            if candidate in level0:
+                price_field = candidate
+                break
+        if price_field is None:
+            price_field = level0[0]
+        prices = data.xs(price_field, axis=1, level=0)
+    else:
+        preferred = next((c for c in ("Adj Close", "Close") if c in data.columns), None)
+        column = preferred or data.columns[0]
+        prices = data[[column]].rename(columns={column: tickers[0]})
+
+    # Drop rows with all NaN values
+    prices = prices.dropna(how="all")
+    if prices.empty:
+        raise ValueError(
+            f"No price data returned for period {start} to {end}.\n"
+            f"Tickers requested: {', '.join(tickers)}\n"
+            f"Please verify:\n"
+            f"  1. Tickers are valid symbols\n"
+            f"  2. Tickers were trading during this period\n"
+            f"  3. Date range is valid (not in the future)"
+        )
+
+    # Ensure DataFrame format
+    if isinstance(prices, pd.Series):
+        prices = prices.to_frame(name=tickers[0])
+
+    # Check for missing tickers
+    missing = [ticker for ticker in tickers if ticker not in prices.columns]
+    if missing:
+        available = [t for t in tickers if t not in missing]
+        raise ValueError(
+            f"Missing data for ticker(s): {', '.join(missing)}\n"
+            f"Date range: {start} to {end}\n"
+            f"Available ticker(s): {', '.join(available) if available else 'None'}\n"
+            f"Verify the missing tickers were trading during this period."
+        )
+
+    # Return tickers in requested order
+    prices = prices.loc[:, tickers]
+
+    # Validate data quality
+    validate_price_data(prices, tickers)
+
+    return prices
+
+
 def download_prices(
     tickers: List[str],
     start: str,
@@ -369,6 +509,11 @@ def download_prices(
     cache_ttl_hours: int = DEFAULT_CACHE_TTL_HOURS
 ) -> pd.DataFrame:
     """Fetch adjusted closes for the requested tickers.
+
+    Implements optimized batch downloading with per-ticker caching:
+    - Checks cache individually for each ticker
+    - Downloads only uncached tickers
+    - Combines cached and fresh data efficiently
 
     Args:
         tickers: List of ticker symbols to download
@@ -387,7 +532,57 @@ def download_prices(
     # Validate tickers before attempting download
     validate_tickers(tickers)
 
-    # Try to load from cache first
+    # Optimized batch caching: check each ticker individually
+    if use_cache and len(tickers) > 1:
+        cached_results = {}
+        uncached_tickers = []
+
+        for ticker in tickers:
+            # Check individual ticker cache
+            single_cache_path = get_cache_path([ticker], start, end)
+            cached_data = load_cached_prices(single_cache_path, max_age_hours=cache_ttl_hours)
+
+            if cached_data is not None:
+                cached_results[ticker] = cached_data[ticker]
+                logger.info(f"Cache hit for {ticker}")
+            else:
+                uncached_tickers.append(ticker)
+
+        # Download only uncached tickers
+        if uncached_tickers:
+            logger.info(f"Downloading {len(uncached_tickers)} uncached ticker(s): {', '.join(uncached_tickers)}")
+            new_data = _download_from_yfinance(uncached_tickers, start, end)
+
+            # Process downloaded data
+            new_prices = _process_yfinance_data(new_data, uncached_tickers, start, end)
+
+            # Cache each newly downloaded ticker individually
+            for ticker in uncached_tickers:
+                if ticker in new_prices.columns:
+                    single_cache_path = get_cache_path([ticker], start, end)
+                    save_cached_prices(single_cache_path, new_prices[[ticker]])
+                    cached_results[ticker] = new_prices[ticker]
+
+        # Combine all results in original order
+        if cached_results:
+            combined_prices = pd.DataFrame({ticker: cached_results[ticker] for ticker in tickers if ticker in cached_results})
+
+            # Ensure all requested tickers are present
+            missing = [ticker for ticker in tickers if ticker not in combined_prices.columns]
+            if missing:
+                raise ValueError(
+                    f"Missing data for ticker(s): {', '.join(missing)}\n"
+                    f"Date range: {start} to {end}\n"
+                    f"Verify the missing tickers were trading during this period."
+                )
+
+            logger.info(f"Batch download complete: {len(cached_results)} ticker(s) ({len(cached_results) - len(uncached_tickers)} cached, {len(uncached_tickers)} downloaded)")
+            return combined_prices
+        else:
+            # Fallback to normal download if no cache hits
+            pass
+
+    # Standard path: single ticker or cache disabled
     if use_cache:
         cache_path = get_cache_path(tickers, start, end)
         cached_data = load_cached_prices(cache_path, max_age_hours=cache_ttl_hours)
@@ -397,56 +592,8 @@ def download_prices(
     # Download with retry logic
     data = _download_from_yfinance(tickers, start, end)
 
-    # Check if data is empty before processing
-    if data.empty:
-        raise ValueError(
-            f"No price data returned for period {start} to {end}.\n"
-            f"Tickers requested: {', '.join(tickers)}\n"
-            f"Please verify:\n"
-            f"  1. Tickers are valid symbols\n"
-            f"  2. Tickers were trading during this period\n"
-            f"  3. Date range is valid (not in the future)"
-        )
-
-    if isinstance(data, pd.Series):  # single ticker result
-        prices = data.to_frame(name=tickers[0])
-    elif isinstance(data.columns, pd.MultiIndex):
-        level0 = data.columns.get_level_values(0)
-        price_field = None
-        for candidate in ("Adj Close", "Close"):
-            if candidate in level0:
-                price_field = candidate
-                break
-        if price_field is None:
-            price_field = level0[0]
-        prices = data.xs(price_field, axis=1, level=0)
-    else:
-        preferred = next((c for c in ("Adj Close", "Close") if c in data.columns), None)
-        column = preferred or data.columns[0]
-        prices = data[[column]].rename(columns={column: tickers[0]})
-
-    prices = prices.dropna(how="all")
-    if prices.empty:
-        raise ValueError(
-            f"No price data returned for period {start} to {end}.\n"
-            f"Tickers requested: {', '.join(tickers)}\n"
-            f"Please verify:\n"
-            f"  1. Tickers are valid symbols\n"
-            f"  2. Tickers were trading during this period\n"
-            f"  3. Date range is valid (not in the future)"
-        )
-    if isinstance(prices, pd.Series):
-        prices = prices.to_frame(name=tickers[0])
-    missing = [ticker for ticker in tickers if ticker not in prices.columns]
-    if missing:
-        available = [t for t in tickers if t not in missing]
-        raise ValueError(
-            f"Missing data for ticker(s): {', '.join(missing)}\n"
-            f"Date range: {start} to {end}\n"
-            f"Available ticker(s): {', '.join(available) if available else 'None'}\n"
-            f"Verify the missing tickers were trading during this period."
-        )
-    prices = prices.loc[:, tickers]
+    # Process the downloaded data
+    prices = _process_yfinance_data(data, tickers, start, end)
 
     # Save to cache
     if use_cache:
@@ -505,6 +652,20 @@ def compute_metrics(
             f"Portfolio starts: {aligned.index[0].strftime('%Y-%m-%d')}\n"
             f"Benchmark starts: {bench_start.strftime('%Y-%m-%d')}\n"
             f"Try adjusting the date range or choose a different benchmark."
+        )
+
+    # Validate sufficient data after alignment
+    if len(aligned) < 2:
+        raise ValueError(
+            f"Insufficient overlapping data: only {len(aligned)} trading day(s).\n"
+            f"Need at least 2 days for meaningful backtest.\n"
+            f"Try using a longer date range or different tickers."
+        )
+
+    if len(aligned) < 30:
+        logger.warning(
+            f"Limited data: only {len(aligned)} trading days. "
+            f"Statistics may be unreliable for periods < 30 days."
         )
 
     # Calculate portfolio value with the aligned data

@@ -583,6 +583,229 @@ class TestDownloadPrices:
         with pytest.raises(ValueError, match="No price data returned"):
             backtest.download_prices(["INVALID"], "2020-01-01", "2020-01-05")
 
+    @patch("backtest.yf.download")
+    @patch("backtest.load_cached_prices")
+    @patch("backtest.save_cached_prices")
+    def test_batch_download_all_cached(self, mock_save, mock_load, mock_yf_download):
+        """Test batch download when all tickers are cached"""
+        dates = pd.date_range("2020-01-01", periods=5, freq="D")
+
+        # Mock cache returning data for each ticker
+        def cache_side_effect(path, *args, **kwargs):
+            # Determine which ticker based on the path
+            if "AAPL" in str(path):
+                return pd.DataFrame({"AAPL": [100, 101, 102, 103, 104]}, index=dates)
+            elif "MSFT" in str(path):
+                return pd.DataFrame({"MSFT": [200, 201, 202, 203, 204]}, index=dates)
+            elif "GOOGL" in str(path):
+                return pd.DataFrame({"GOOGL": [300, 301, 302, 303, 304]}, index=dates)
+            return None
+
+        # Use get_cache_path to determine ticker names
+        original_get_cache_path = backtest.get_cache_path
+        def get_cache_path_wrapper(tickers, *args, **kwargs):
+            result = original_get_cache_path(tickers, *args, **kwargs)
+            # Store ticker info in path name for identification
+            result = Path(str(result).replace('.pkl', f'_{tickers[0]}.pkl'))
+            return result
+
+        with patch("backtest.get_cache_path", side_effect=get_cache_path_wrapper):
+            mock_load.side_effect = cache_side_effect
+
+            result = backtest.download_prices(
+                ["AAPL", "MSFT", "GOOGL"], "2020-01-01", "2020-01-05", use_cache=True
+            )
+
+            # Should not download anything
+            mock_yf_download.assert_not_called()
+            # Should have loaded from cache 3 times
+            assert mock_load.call_count == 3
+            # Should have all three tickers
+            assert list(result.columns) == ["AAPL", "MSFT", "GOOGL"]
+
+    @patch("backtest.yf.download")
+    @patch("backtest.load_cached_prices")
+    @patch("backtest.save_cached_prices")
+    def test_batch_download_partial_cache(self, mock_save, mock_load, mock_yf_download):
+        """Test batch download when some tickers are cached"""
+        dates = pd.date_range("2020-01-01", periods=5, freq="D")
+
+        # Mock cache: AAPL cached, MSFT not cached
+        def cache_side_effect(path, *args, **kwargs):
+            if "AAPL" in str(path):
+                return pd.DataFrame({"AAPL": [100, 101, 102, 103, 104]}, index=dates)
+            return None  # MSFT not cached
+
+        original_get_cache_path = backtest.get_cache_path
+        def get_cache_path_wrapper(tickers, *args, **kwargs):
+            result = original_get_cache_path(tickers, *args, **kwargs)
+            result = Path(str(result).replace('.pkl', f'_{tickers[0]}.pkl'))
+            return result
+
+        # Mock yfinance download for uncached ticker
+        mock_yf_download.return_value = pd.DataFrame(
+            {"MSFT": [200, 201, 202, 203, 204]}, index=dates
+        )
+
+        with patch("backtest.get_cache_path", side_effect=get_cache_path_wrapper):
+            mock_load.side_effect = cache_side_effect
+
+            result = backtest.download_prices(
+                ["AAPL", "MSFT"], "2020-01-01", "2020-01-05", use_cache=True
+            )
+
+            # Should download only MSFT
+            mock_yf_download.assert_called_once()
+            # Should check cache for both tickers
+            assert mock_load.call_count == 2
+            # Should save only MSFT to cache
+            assert mock_save.call_count == 1
+            # Should have both tickers in result
+            assert list(result.columns) == ["AAPL", "MSFT"]
+
+    @patch("backtest.yf.download")
+    @patch("backtest.load_cached_prices")
+    @patch("backtest.save_cached_prices")
+    def test_batch_download_no_cache_hits(self, mock_save, mock_load, mock_yf_download):
+        """Test batch download when nothing is cached"""
+        dates = pd.date_range("2020-01-01", periods=5, freq="D")
+
+        # No cache hits
+        mock_load.return_value = None
+
+        # Mock yfinance download
+        mock_yf_download.return_value = pd.DataFrame({
+            "AAPL": [100, 101, 102, 103, 104],
+            "MSFT": [200, 201, 202, 203, 204]
+        }, index=dates)
+
+        original_get_cache_path = backtest.get_cache_path
+        def get_cache_path_wrapper(tickers, *args, **kwargs):
+            result = original_get_cache_path(tickers, *args, **kwargs)
+            if len(tickers) == 1:
+                result = Path(str(result).replace('.pkl', f'_{tickers[0]}.pkl'))
+            return result
+
+        with patch("backtest.get_cache_path", side_effect=get_cache_path_wrapper):
+            result = backtest.download_prices(
+                ["AAPL", "MSFT"], "2020-01-01", "2020-01-05", use_cache=True
+            )
+
+            # Should download both tickers
+            mock_yf_download.assert_called_once()
+            # Should check cache for both
+            assert mock_load.call_count == 2
+            # Should save both to cache individually
+            assert mock_save.call_count == 2
+
+    @patch("backtest.yf.download")
+    def test_single_ticker_uses_standard_path(self, mock_yf_download):
+        """Test that single ticker doesn't use batch optimization"""
+        dates = pd.date_range("2020-01-01", periods=5, freq="D")
+        mock_yf_download.return_value = pd.DataFrame(
+            {"AAPL": [100, 101, 102, 103, 104]}, index=dates
+        )
+
+        with patch("backtest.load_cached_prices") as mock_load:
+            with patch("backtest.save_cached_prices") as mock_save:
+                mock_load.return_value = None
+
+                result = backtest.download_prices(
+                    ["AAPL"], "2020-01-01", "2020-01-05", use_cache=True
+                )
+
+                # Should use standard path (single cache check)
+                assert mock_load.call_count == 1
+                mock_yf_download.assert_called_once()
+                mock_save.assert_called_once()
+
+
+class TestDataValidation:
+    """Test data validation functionality"""
+
+    def test_validate_price_data_all_nan(self):
+        """Test that all-NaN data is rejected"""
+        dates = pd.date_range("2020-01-01", periods=10, freq="D")
+        df = pd.DataFrame({"AAPL": [np.nan] * 10}, index=dates)
+
+        with pytest.raises(ValueError, match="all values are NaN"):
+            backtest.validate_price_data(df, ["AAPL"])
+
+    def test_validate_price_data_excessive_nan(self):
+        """Test that >50% NaN data raises error"""
+        dates = pd.date_range("2020-01-01", periods=10, freq="D")
+        # 6 NaN out of 10 = 60%
+        data = [100, 101, 102, 103, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan]
+        df = pd.DataFrame({"AAPL": data}, index=dates)
+
+        with pytest.raises(ValueError, match="60.0% missing values"):
+            backtest.validate_price_data(df, ["AAPL"])
+
+    def test_validate_price_data_negative_prices(self):
+        """Test that negative prices are detected"""
+        dates = pd.date_range("2020-01-01", periods=10, freq="D")
+        df = pd.DataFrame({"AAPL": [100, 101, -50, 103, 104, 105, 106, 107, 108, 109]}, index=dates)
+
+        with pytest.raises(ValueError, match="negative price"):
+            backtest.validate_price_data(df, ["AAPL"])
+
+    def test_validate_price_data_zero_prices(self):
+        """Test that zero prices are detected"""
+        dates = pd.date_range("2020-01-01", periods=10, freq="D")
+        df = pd.DataFrame({"AAPL": [100, 101, 0, 103, 104, 105, 106, 107, 108, 109]}, index=dates)
+
+        with pytest.raises(ValueError, match="zero price"):
+            backtest.validate_price_data(df, ["AAPL"])
+
+    def test_validate_price_data_extreme_changes(self):
+        """Test that extreme price changes (>90%) are detected"""
+        dates = pd.date_range("2020-01-01", periods=10, freq="D")
+        # 100 -> 1 is a -99% change
+        df = pd.DataFrame({"AAPL": [100, 101, 102, 1, 2, 3, 4, 5, 6, 7]}, index=dates)
+
+        with pytest.raises(ValueError, match="extreme price change"):
+            backtest.validate_price_data(df, ["AAPL"])
+
+    def test_validate_price_data_valid(self):
+        """Test that valid data passes validation"""
+        dates = pd.date_range("2020-01-01", periods=10, freq="D")
+        df = pd.DataFrame({"AAPL": [100, 101, 102, 103, 104, 105, 106, 107, 108, 109]}, index=dates)
+
+        # Should not raise
+        backtest.validate_price_data(df, ["AAPL"])
+
+    def test_validate_price_data_acceptable_nan(self):
+        """Test that <50% NaN data passes"""
+        dates = pd.date_range("2020-01-01", periods=10, freq="D")
+        # 4 NaN out of 10 = 40% (acceptable)
+        data = [100, 101, 102, 103, 104, 105, np.nan, np.nan, np.nan, np.nan]
+        df = pd.DataFrame({"AAPL": data}, index=dates)
+
+        # Should not raise
+        backtest.validate_price_data(df, ["AAPL"])
+
+    def test_compute_metrics_insufficient_data(self):
+        """Test that compute_metrics rejects insufficient data"""
+        # Only 1 day of data
+        dates = pd.date_range("2020-01-01", periods=1, freq="D")
+        prices = pd.DataFrame({"AAPL": [100]}, index=dates)
+        benchmark = pd.Series([400], index=dates)
+        weights = np.array([1.0])
+
+        with pytest.raises(ValueError, match="Insufficient overlapping data"):
+            backtest.compute_metrics(prices, weights, benchmark, 100000)
+
+    def test_compute_metrics_two_days_minimum(self):
+        """Test that compute_metrics accepts 2 days minimum"""
+        dates = pd.date_range("2020-01-01", periods=2, freq="D")
+        prices = pd.DataFrame({"AAPL": [100, 101]}, index=dates)
+        benchmark = pd.Series([400, 401], index=dates)
+        weights = np.array([1.0])
+
+        # Should not raise (2 days is minimum)
+        result = backtest.compute_metrics(prices, weights, benchmark, 100000)
+        assert len(result) == 2
+
 
 class TestMain:
     """Test main function integration"""
