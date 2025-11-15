@@ -363,6 +363,92 @@ class TestTickerValidation:
         assert is_valid
 
 
+class TestDateValidation:
+    """Test date validation functionality"""
+
+    def test_valid_date_formats(self):
+        """Test that various valid date formats are accepted and normalized."""
+        valid_dates = [
+            ("2020-01-01", "2020-01-01"),
+            ("2020/01/01", "2020-01-01"),
+            ("2020.01.01", "2020-01-01"),
+        ]
+
+        for input_date, expected in valid_dates:
+            result = backtest.validate_date_string(input_date)
+            assert result == expected, f"Failed for input: {input_date}"
+
+    def test_date_too_far_in_past(self):
+        """Test that dates before 1970 are rejected."""
+        with pytest.raises(argparse.ArgumentTypeError, match="too far in the past"):
+            backtest.validate_date_string("1969-12-31")
+
+    def test_future_date(self):
+        """Test that future dates are rejected."""
+        future_date = (pd.Timestamp.today() + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+        with pytest.raises(argparse.ArgumentTypeError, match="in the future"):
+            backtest.validate_date_string(future_date)
+
+    def test_invalid_date_format(self):
+        """Test that invalid date strings are rejected."""
+        invalid_dates = ["not-a-date", "2020-13-01", "2020-02-30", "abc"]
+
+        for invalid_date in invalid_dates:
+            with pytest.raises(argparse.ArgumentTypeError, match="Invalid date format"):
+                backtest.validate_date_string(invalid_date)
+
+    def test_date_range_validation_in_main(self):
+        """Test that main() validates date ranges."""
+        # Start date after end date should fail
+        with pytest.raises(SystemExit, match="Invalid date range"):
+            backtest.main([
+                "--start", "2023-12-31",
+                "--end", "2023-01-01",
+                "--tickers", "AAPL",
+                "--weights", "1.0"
+            ])
+
+    def test_short_date_range_warning(self, caplog):
+        """Test that short date ranges trigger a warning."""
+        with patch("backtest.download_prices"):
+            with patch("backtest.compute_metrics"):
+                with patch("backtest.summarize") as mock_summarize:
+                    mock_summarize.return_value = {
+                        "ending_value": 100000,
+                        "total_return": 0.0,
+                        "cagr": 0.0,
+                        "volatility": 0.0,
+                        "sharpe_ratio": 0.0,
+                        "sortino_ratio": 0.0,
+                        "max_drawdown": 0.0,
+                    }
+
+                    # Run with short date range (20 days)
+                    import logging
+                    with caplog.at_level(logging.WARNING):
+                        backtest.main([
+                            "--start", "2023-01-01",
+                            "--end", "2023-01-21",
+                            "--tickers", "AAPL",
+                            "--weights", "1.0",
+                            "--benchmark", "SPY"
+                        ])
+
+                    # Check for warning
+                    assert any("Short backtest period" in record.message for record in caplog.records)
+
+    def test_parse_args_with_date_validation(self):
+        """Test that argparse uses date validation."""
+        # Valid dates should work
+        args = backtest.parse_args(["--start", "2020-01-01", "--end", "2020-12-31"])
+        assert args.start == "2020-01-01"
+        assert args.end == "2020-12-31"
+
+        # Invalid date should raise
+        with pytest.raises(SystemExit):
+            backtest.parse_args(["--start", "invalid-date"])
+
+
 class TestRetryLogic:
     """Test retry logic with exponential backoff"""
 

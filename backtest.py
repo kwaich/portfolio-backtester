@@ -153,6 +153,56 @@ def validate_tickers(tickers: List[str]) -> None:
         )
 
 
+def validate_date_string(date_str: str) -> str:
+    """Validate and normalize date string to YYYY-MM-DD format.
+
+    Args:
+        date_str: Date string in various formats (YYYY-MM-DD, YYYY/MM/DD, etc.)
+
+    Returns:
+        Normalized date string in YYYY-MM-DD format
+
+    Raises:
+        argparse.ArgumentTypeError: If date format is invalid or date is invalid
+
+    Examples:
+        >>> validate_date_string("2020-01-01")
+        '2020-01-01'
+        >>> validate_date_string("2020/01/01")
+        '2020-01-01'
+        >>> validate_date_string("invalid")
+        ArgumentTypeError: Invalid date format...
+    """
+    try:
+        # Try parsing with pandas (accepts many formats)
+        dt = pd.Timestamp(date_str)
+
+        # Check if date is not too far in the past
+        if dt.year < 1970:
+            raise argparse.ArgumentTypeError(
+                f"Date too far in the past: {date_str} (minimum: 1970-01-01)"
+            )
+
+        # Check if date is not in the future
+        if dt > pd.Timestamp.today():
+            raise argparse.ArgumentTypeError(
+                f"Date is in the future: {date_str}"
+            )
+
+        # Return normalized format
+        return dt.strftime("%Y-%m-%d")
+
+    except argparse.ArgumentTypeError:
+        # Re-raise our custom errors
+        raise
+    except (ValueError, TypeError) as e:
+        raise argparse.ArgumentTypeError(
+            f"Invalid date format: '{date_str}'\n"
+            f"Expected format: YYYY-MM-DD (e.g., 2020-01-01)\n"
+            f"Error: {str(e)}"
+        )
+
+
 def parse_args(argv: List[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="ETF backtest helper")
     parser.add_argument(
@@ -175,11 +225,13 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--start",
+        type=validate_date_string,
         default="2018-01-01",
         help="Backtest start date (YYYY-MM-DD)",
     )
     parser.add_argument(
         "--end",
+        type=validate_date_string,
         default=pd.Timestamp.today().strftime("%Y-%m-%d"),
         help="Backtest end date (YYYY-MM-DD)",
     )
@@ -529,6 +581,22 @@ def main(argv: List[str]) -> None:
         validate_tickers([args.benchmark])
     except ValueError as e:
         raise SystemExit(f"Ticker validation failed:\n{e}")
+
+    # Validate date range
+    start_dt = pd.Timestamp(args.start)
+    end_dt = pd.Timestamp(args.end)
+
+    if start_dt >= end_dt:
+        raise SystemExit(
+            f"Invalid date range: start ({args.start}) must be before end ({args.end})"
+        )
+
+    days_in_range = (end_dt - start_dt).days
+    if days_in_range < 30:
+        logger.warning(
+            f"Short backtest period: {days_in_range} days. "
+            f"Results may be unreliable for periods < 30 days."
+        )
 
     if len(tickers) != len(weights):
         raise SystemExit("Number of weights must match number of tickers")
