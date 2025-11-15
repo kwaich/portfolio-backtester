@@ -55,11 +55,21 @@ Generate charts from backtest results:
 python plot_backtest.py --csv results/my_backtest.csv --output charts/my_backtest
 ```
 
-This creates two PNG files:
-- `my_backtest_value.png` - Portfolio vs benchmark value over time
-- `my_backtest_active.png` - Active return (portfolio - benchmark)
+This creates **four** PNG files with comprehensive visualizations:
+- `my_backtest_value.png` - Portfolio vs benchmark value over time (currency-formatted)
+- `my_backtest_returns.png` - Cumulative returns comparison (percentage-formatted)
+- `my_backtest_active.png` - Active return with colored zones (outperformance/underperformance)
+- `my_backtest_drawdown.png` - Drawdown over time with max drawdown annotations
 
-For interactive plots, omit the `--output` parameter:
+**Dashboard Mode**: Create a single comprehensive dashboard with all plots:
+
+```bash
+python plot_backtest.py --csv results/my_backtest.csv --output charts/my_backtest --dashboard
+```
+
+This creates a single `my_backtest_dashboard.png` with a 2x2 grid of all metrics.
+
+**Interactive Mode**: For interactive plots, omit the `--output` parameter:
 
 ```bash
 python plot_backtest.py --csv results/my_backtest.csv
@@ -82,10 +92,13 @@ python plot_backtest.py --csv results/my_backtest.csv
 
 ### plot_backtest.py
 
-| Option | Description |
-|--------|-------------|
-| `--csv` | Path to backtest CSV output (required) |
-| `--output` | Prefix for PNG files (optional, shows interactive plots if omitted) |
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--csv` | (required) | Path to backtest CSV output |
+| `--output` | None | Prefix for PNG files (shows interactive plots if omitted) |
+| `--style` | seaborn-v0_8 | Matplotlib style for plots |
+| `--dpi` | 150 | Output DPI for PNG files |
+| `--dashboard` | False | Create single dashboard instead of individual plots |
 
 ## Performance Metrics
 

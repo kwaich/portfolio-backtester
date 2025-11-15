@@ -39,10 +39,22 @@ plotting helper (`plot_backtest.py`). The workflow is:
       --output results/backtest_series.csv
   ```
 
-- `plot_backtest.py` — Reads the CSV (must include a `date` column plus the columns
-  emitted by `backtest.py`) and plots portfolio vs. benchmark value plus active
-  return. Use `--output charts/run` to save PNGs (`run_value.png`,
-  `run_active.png`); omit `--output` to show the plots interactively.
+- `plot_backtest.py` — Enhanced visualization utility that reads the CSV (must include
+  a `date` column plus the columns emitted by `backtest.py`) and creates comprehensive
+  performance charts.
+
+  **New Features:**
+  - Creates 4 individual plots: value, returns, active return, and drawdown
+  - Dashboard mode (`--dashboard`) for single comprehensive view
+  - Professional color scheme with colored zones for outperformance/underperformance
+  - Currency and percentage formatting on axes
+  - Max drawdown annotations on drawdown chart
+  - Customizable DPI and matplotlib style
+
+  **Usage:**
+  - Individual plots: `--output charts/run` creates 4 PNG files
+  - Dashboard: `--output charts/run --dashboard` creates single dashboard PNG
+  - Interactive: omit `--output` to show plots interactively
 
 - `test_backtest.py` — Comprehensive unit test suite using pytest. Tests all major
   functions including caching, error handling, calculations, and CLI parsing. Mocks
@@ -76,7 +88,7 @@ Price data is automatically cached in `.cache/` for faster repeated backtests:
 ```
 backtester/
 ├── backtest.py           # Main backtesting engine (~377 lines)
-├── plot_backtest.py      # Visualization helper (66 lines)
+├── plot_backtest.py      # Visualization helper (~354 lines, ENHANCED)
 ├── test_backtest.py      # Unit test suite (~370 lines)
 ├── requirements.txt      # Python dependencies
 ├── README.md            # Comprehensive user documentation

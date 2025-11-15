@@ -47,14 +47,18 @@ backtester/
   - `summarize()`: Generates comprehensive statistics (Sharpe, Sortino, drawdown, etc.)
   - `main()`: Orchestrates the backtest workflow
 
-**plot_backtest.py** (66 lines)
-- Visualization utility for backtest results
+**plot_backtest.py** (~354 lines, ENHANCED)
+- Comprehensive visualization utility for backtest results
 - Reads CSV output from backtest.py
-- Generates two plots:
-  1. Portfolio vs benchmark value over time
-  2. Active return (difference) over time
+- Generates four professional plots:
+  1. Portfolio vs benchmark value (currency-formatted axes)
+  2. Cumulative returns comparison (percentage-formatted)
+  3. Active return with colored zones (outperformance/underperformance)
+  4. Drawdown over time with max drawdown annotations
+- Dashboard mode: single 2x2 grid with all metrics
+- Professional color scheme (blue/purple palette with green/red zones)
+- Customizable: --style, --dpi, --dashboard options
 - Supports both interactive display and PNG export
-- Uses matplotlib with seaborn-v0_8 style
 
 **test_backtest.py** (~370 lines, NEW)
 - Comprehensive unit test suite using pytest
