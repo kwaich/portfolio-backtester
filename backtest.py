@@ -872,9 +872,22 @@ def compute_metrics(
 
     portfolio_return = portfolio_value / capital - 1
 
-    # Calculate benchmark value
-    bench_units = capital / benchmark.iloc[0]
-    bench_value = benchmark * bench_units
+    # Calculate benchmark value with same strategy as portfolio for fair comparison
+    if dca_freq is not None and dca_amount is not None and dca_amount > 0:
+        # Apply DCA to benchmark for fair comparison
+        benchmark_df = benchmark.to_frame(name='benchmark')
+        bench_weights = np.array([1.0])  # 100% in benchmark
+        bench_value = _calculate_dca_portfolio(benchmark_df, bench_weights, capital, dca_amount, dca_freq)
+    elif rebalance_freq is not None:
+        # Apply rebalancing to benchmark (though it's a single asset, so effectively same as buy-and-hold)
+        benchmark_df = benchmark.to_frame(name='benchmark')
+        bench_weights = np.array([1.0])
+        bench_value = _calculate_rebalanced_portfolio(benchmark_df, bench_weights, capital, rebalance_freq)
+    else:
+        # Buy-and-hold for benchmark
+        bench_units = capital / benchmark.iloc[0]
+        bench_value = benchmark * bench_units
+
     bench_return = bench_value / capital - 1
 
     table = pd.DataFrame(

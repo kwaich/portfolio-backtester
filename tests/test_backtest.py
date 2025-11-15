@@ -1040,6 +1040,16 @@ class TestDCA:
         # Portfolio value should be greater than initial capital due to contributions
         assert results['portfolio_value'].iloc[-1] > capital
 
+        # Benchmark should also have DCA applied for fair comparison
+        assert results['benchmark_value'].iloc[-1] > capital
+
+        # With constant prices, portfolio and benchmark ending values should be equal
+        # (both have same total contributions)
+        num_contributions = len(pd.date_range(dates[0], dates[-1], freq="M").intersection(dates))
+        expected_total = capital + (dca_amount * (num_contributions - 1))
+        assert abs(results['portfolio_value'].iloc[-1] - expected_total) < 10
+        assert abs(results['benchmark_value'].iloc[-1] - expected_total) < 10
+
     def test_dca_precedence_over_rebalancing(self, caplog):
         """Test that DCA takes precedence over rebalancing when both specified"""
         dates = pd.date_range("2020-01-01", periods=90, freq="D")
