@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -48,6 +49,29 @@ class TestParseArgs:
     def test_output_path(self):
         args = backtest.parse_args(["--output", "test.csv"])
         assert args.output == Path("test.csv")
+
+    def test_dca_arguments(self):
+        """Test DCA argument parsing"""
+        args = backtest.parse_args(["--dca-amount", "1000", "--dca-freq", "M"])
+        assert args.dca_amount == 1000.0
+        assert args.dca_freq == "M"
+
+    def test_dca_defaults(self):
+        """Test DCA default values"""
+        args = backtest.parse_args([])
+        assert args.dca_amount is None
+        assert args.dca_freq is None
+
+    def test_dca_frequency_options(self):
+        """Test various DCA frequency options"""
+        for freq in ['D', 'W', 'M', 'Q', 'Y', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly']:
+            args = backtest.parse_args(["--dca-freq", freq, "--dca-amount", "500"])
+            assert args.dca_freq == freq
+
+    def test_dca_invalid_frequency(self):
+        """Test that invalid DCA frequency raises error"""
+        with pytest.raises(SystemExit):
+            backtest.parse_args(["--dca-freq", "invalid"])
 
 
 class TestCacheFunctions:
@@ -884,6 +908,161 @@ class TestDataValidation:
         # Should not raise (2 days is minimum)
         result = backtest.compute_metrics(prices, weights, benchmark, 100000)
         assert len(result) == 2
+
+
+class TestDCA:
+    """Test Dollar-Cost Averaging (DCA) functionality"""
+
+    def test_dca_monthly_contributions(self):
+        """Test DCA with monthly contributions"""
+        # Create 6 months of data
+        dates = pd.date_range("2020-01-01", periods=180, freq="D")
+        prices = pd.DataFrame({
+            "AAPL": np.linspace(100, 120, 180),  # Price increases from 100 to 120
+        }, index=dates)
+        weights = np.array([1.0])
+        capital = 10000
+        dca_amount = 1000
+        dca_freq = "M"
+
+        portfolio_value = backtest._calculate_dca_portfolio(prices, weights, capital, dca_amount, dca_freq)
+
+        # Check that portfolio value increases due to contributions and price appreciation
+        assert portfolio_value.iloc[0] > 0
+        assert portfolio_value.iloc[-1] > portfolio_value.iloc[0]
+
+        # Portfolio value at end should be greater than total contributions
+        # (assuming price appreciation)
+        expected_contributions = capital + (dca_amount * 5)  # 6 months total (including initial)
+        assert portfolio_value.iloc[-1] > expected_contributions
+
+    def test_dca_weekly_contributions(self):
+        """Test DCA with weekly contributions"""
+        dates = pd.date_range("2020-01-01", periods=90, freq="D")
+        prices = pd.DataFrame({
+            "AAPL": [100] * 90,  # Constant price
+        }, index=dates)
+        weights = np.array([1.0])
+        capital = 5000
+        dca_amount = 500
+        dca_freq = "W"
+
+        portfolio_value = backtest._calculate_dca_portfolio(prices, weights, capital, dca_amount, dca_freq)
+
+        # With constant price, portfolio value should equal total contributions
+        # Number of weeks in 90 days is approximately 12-13
+        num_weeks = len(pd.date_range(dates[0], dates[-1], freq="W").intersection(dates))
+        expected_value = capital + (dca_amount * (num_weeks - 1))  # -1 because first is initial capital
+
+        # Allow small tolerance due to rounding
+        assert abs(portfolio_value.iloc[-1] - expected_value) < 10
+
+    def test_dca_multi_ticker(self):
+        """Test DCA with multiple tickers"""
+        dates = pd.date_range("2020-01-01", periods=60, freq="D")
+        prices = pd.DataFrame({
+            "AAPL": [100] * 60,
+            "MSFT": [200] * 60,
+        }, index=dates)
+        weights = np.array([0.6, 0.4])
+        capital = 10000
+        dca_amount = 1000
+        dca_freq = "M"
+
+        portfolio_value = backtest._calculate_dca_portfolio(prices, weights, capital, dca_amount, dca_freq)
+
+        # Check that contributions are split according to weights
+        assert portfolio_value.iloc[0] == capital
+        assert portfolio_value.iloc[-1] > capital
+
+    def test_dca_with_price_decline(self):
+        """Test DCA benefits when prices decline (buy more shares at lower prices)"""
+        dates = pd.date_range("2020-01-01", periods=90, freq="D")
+        # Price declines from 100 to 50
+        prices = pd.DataFrame({
+            "AAPL": np.linspace(100, 50, 90),
+        }, index=dates)
+        weights = np.array([1.0])
+        capital = 10000
+        dca_amount = 1000
+        dca_freq = "M"
+
+        portfolio_value = backtest._calculate_dca_portfolio(prices, weights, capital, dca_amount, dca_freq)
+
+        # Portfolio value should decline due to price decline
+        # but DCA should accumulate more shares at lower prices
+        assert portfolio_value.iloc[-1] < capital
+
+    def test_dca_no_frequency(self):
+        """Test that DCA with no frequency falls back to lump sum"""
+        dates = pd.date_range("2020-01-01", periods=30, freq="D")
+        prices = pd.DataFrame({
+            "AAPL": [100] * 30,
+        }, index=dates)
+        weights = np.array([1.0])
+        capital = 10000
+        dca_amount = 1000
+        dca_freq = "M"
+
+        # Test with very short period where no DCA dates are generated
+        short_dates = dates[:5]  # Only 5 days
+        short_prices = prices.iloc[:5]
+
+        portfolio_value = backtest._calculate_dca_portfolio(short_prices, weights, capital, dca_amount, "Q")
+
+        # Should have at least initial investment
+        assert portfolio_value.iloc[0] == capital
+
+    def test_compute_metrics_with_dca(self):
+        """Test compute_metrics with DCA parameters"""
+        dates = pd.date_range("2020-01-01", periods=90, freq="D")
+        prices = pd.DataFrame({
+            "AAPL": [100] * 90,
+            "MSFT": [200] * 90,
+        }, index=dates)
+        benchmark = pd.Series([400] * 90, index=dates)
+        weights = np.array([0.5, 0.5])
+        capital = 10000
+        dca_amount = 1000
+        dca_freq = "M"
+
+        results = backtest.compute_metrics(
+            prices, weights, benchmark, capital,
+            dca_amount=dca_amount, dca_freq=dca_freq
+        )
+
+        # Check that results contain expected columns
+        assert 'portfolio_value' in results.columns
+        assert 'portfolio_return' in results.columns
+        assert 'benchmark_value' in results.columns
+        assert 'active_return' in results.columns
+
+        # Portfolio value should be greater than initial capital due to contributions
+        assert results['portfolio_value'].iloc[-1] > capital
+
+    def test_dca_precedence_over_rebalancing(self, caplog):
+        """Test that DCA takes precedence over rebalancing when both specified"""
+        dates = pd.date_range("2020-01-01", periods=90, freq="D")
+        prices = pd.DataFrame({
+            "AAPL": [100] * 90,
+        }, index=dates)
+        benchmark = pd.Series([400] * 90, index=dates)
+        weights = np.array([1.0])
+        capital = 10000
+
+        with caplog.at_level(logging.WARNING):
+            results = backtest.compute_metrics(
+                prices, weights, benchmark, capital,
+                rebalance_freq="M",
+                dca_amount=1000,
+                dca_freq="M"
+            )
+
+        # Check that warning was logged
+        assert any("mutually exclusive" in record.message for record in caplog.records)
+
+        # Portfolio should use DCA logic (value > capital due to contributions)
+        assert results['portfolio_value'].iloc[-1] > capital
 
 
 class TestMain:

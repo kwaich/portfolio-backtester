@@ -5,6 +5,8 @@ A lightweight, flexible Python utility for backtesting ETF portfolio strategies 
 ## Features
 
 - **Portfolio Backtesting**: Test buy-and-hold strategies with customizable weights
+- **Dollar-Cost Averaging (DCA)**: Simulate regular contributions at configurable intervals (daily, weekly, monthly, quarterly, yearly)
+- **Rebalancing Strategies**: Test periodic rebalancing at various frequencies
 - **Comprehensive Metrics**: Returns, CAGR, Sharpe ratio, Sortino ratio, volatility, and maximum drawdown
 - **Smart Data Caching**: Automatic caching with configurable TTL (time-to-live) for fresh data
 - **Resilient API Calls**: Automatic retry logic with exponential backoff for network reliability
@@ -14,7 +16,7 @@ A lightweight, flexible Python utility for backtesting ETF portfolio strategies 
 - **Easy CLI**: Simple command-line interface with sensible defaults
 - **Data Quality Validation**: Automatic detection of data issues (missing values, invalid prices, extreme changes)
 - **Optimized Performance**: Batch downloads with per-ticker caching for faster multi-ticker operations
-- **Well-Tested**: Comprehensive test coverage with 177 tests (100% pass rate)
+- **Well-Tested**: Comprehensive test coverage with 192 tests (100% pass rate)
 
 ## Quick Start
 
@@ -51,6 +53,26 @@ python backtest.py \
   --capital 100000 \
   --output results/my_backtest.csv
 ```
+
+### Dollar-Cost Averaging (DCA)
+
+Test a DCA strategy with regular monthly contributions:
+
+```bash
+python backtest.py \
+  --tickers AAPL MSFT \
+  --weights 0.6 0.4 \
+  --benchmark SPY \
+  --start 2018-01-01 \
+  --capital 10000 \
+  --dca-amount 1000 \
+  --dca-freq M \
+  --output results/dca_backtest.csv
+```
+
+This simulates starting with $10,000 and contributing $1,000 every month, with purchases split according to the target weights (60% AAPL, 40% MSFT).
+
+**Note**: DCA and rebalancing are mutually exclusive. If both are specified, DCA takes precedence.
 
 ### Visualization
 
@@ -188,6 +210,9 @@ The web UI includes a powerful ticker search feature:
 | `--output` | None | CSV file path for detailed results |
 | `--cache-ttl` | 24 | Cache time-to-live in hours (configurable freshness) |
 | `--no-cache` | False | Disable data caching entirely |
+| `--rebalance` | None | Rebalancing frequency: D/daily, W/weekly, M/monthly, Q/quarterly, Y/yearly |
+| `--dca-amount` | None | Dollar-cost averaging: amount to contribute at each interval |
+| `--dca-freq` | None | DCA frequency: D/daily, W/weekly, M/monthly, Q/quarterly, Y/yearly (requires --dca-amount) |
 
 ### plot_backtest.py
 

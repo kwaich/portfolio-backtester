@@ -264,6 +264,19 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
         choices=['D', 'W', 'M', 'Q', 'Y', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly'],
         help="Rebalancing frequency: D/daily, W/weekly, M/monthly, Q/quarterly, Y/yearly (default: None = buy-and-hold)",
     )
+    parser.add_argument(
+        "--dca-amount",
+        type=float,
+        default=None,
+        help="Dollar-cost averaging: amount to contribute at each interval (default: None = lump sum)",
+    )
+    parser.add_argument(
+        "--dca-freq",
+        type=str,
+        default=None,
+        choices=['D', 'W', 'M', 'Q', 'Y', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly'],
+        help="DCA frequency: D/daily, W/weekly, M/monthly, Q/quarterly, Y/yearly (requires --dca-amount)",
+    )
     return parser.parse_args(argv)
 
 
@@ -675,12 +688,90 @@ def _calculate_rebalanced_portfolio(
     return portfolio_values
 
 
+def _calculate_dca_portfolio(
+    prices: pd.DataFrame,
+    weights: np.ndarray,
+    capital: float,
+    dca_amount: float,
+    dca_freq: str
+) -> pd.Series:
+    """Calculate portfolio value with Dollar-Cost Averaging (regular contributions).
+
+    Args:
+        prices: DataFrame with aligned prices for all portfolio tickers
+        weights: Array of target portfolio weights
+        capital: Initial capital amount
+        dca_amount: Amount to contribute at each DCA interval
+        dca_freq: Pandas frequency string for contributions ('D', 'W', 'M', 'Q', 'Y')
+
+    Returns:
+        Series with portfolio value for each date
+    """
+    # Generate DCA contribution dates
+    dca_dates = pd.date_range(
+        start=prices.index[0],
+        end=prices.index[-1],
+        freq=dca_freq
+    )
+
+    # Ensure first date is included for initial investment
+    if prices.index[0] not in dca_dates:
+        dca_dates = dca_dates.insert(0, prices.index[0])
+
+    # Filter to only dates that exist in our price data
+    dca_dates = dca_dates.intersection(prices.index)
+
+    if len(dca_dates) == 0:
+        logger.warning(f"No DCA dates found for frequency '{dca_freq}'. Using lump sum.")
+        first_prices = prices.iloc[0]
+        units = (capital * weights) / first_prices
+        return (prices * units).sum(axis=1)
+
+    # Initialize portfolio value series
+    portfolio_values = pd.Series(index=prices.index, dtype=float)
+
+    # Track current units held for each ticker
+    current_units = np.zeros(len(weights))
+
+    # Process each date
+    for date in prices.index:
+        # Check if we have a contribution on this date
+        if date in dca_dates:
+            # Determine contribution amount (initial capital on first date, then DCA amount)
+            contribution = capital if date == prices.index[0] else dca_amount
+
+            # Buy shares according to target weights at current prices
+            current_prices = prices.loc[date]
+            new_units = (contribution * weights) / current_prices
+            current_units += new_units
+
+            logger.debug(
+                f"DCA contribution on {date.strftime('%Y-%m-%d')}: "
+                f"${contribution:,.2f} invested"
+            )
+
+        # Calculate portfolio value for this date
+        current_value = (prices.loc[date] * current_units).sum()
+        portfolio_values[date] = current_value
+
+    total_contributions = capital + (dca_amount * (len(dca_dates) - 1))
+    logger.info(
+        f"DCA strategy '{dca_freq}': "
+        f"{len(dca_dates)} contributions (initial ${capital:,.2f} + "
+        f"{len(dca_dates) - 1} × ${dca_amount:,.2f} = ${total_contributions:,.2f} total)"
+    )
+
+    return portfolio_values
+
+
 def compute_metrics(
     prices: pd.DataFrame,
     weights: np.ndarray,
     benchmark: pd.Series,
     capital: float,
     rebalance_freq: str = None,
+    dca_amount: float = None,
+    dca_freq: str = None,
 ) -> pd.DataFrame:
     """Builds the backtest table and summary columns.
 
@@ -691,9 +782,15 @@ def compute_metrics(
         capital: Initial capital amount
         rebalance_freq: Rebalancing frequency - None (buy-and-hold), 'M' (monthly),
                        'Q' (quarterly), 'Y' (yearly), 'W' (weekly), 'D' (daily)
+        dca_amount: Dollar-cost averaging contribution amount (None for lump sum)
+        dca_freq: DCA frequency - None (lump sum), 'M' (monthly), 'Q' (quarterly),
+                 'Y' (yearly), 'W' (weekly), 'D' (daily)
 
     Returns:
         DataFrame with portfolio metrics including value, returns, and active return
+
+    Note:
+        DCA and rebalancing are mutually exclusive. If both are specified, DCA takes precedence.
     """
 
     prices = prices.sort_index()
@@ -754,14 +851,23 @@ def compute_metrics(
             f"Statistics may be unreliable for periods < 30 days."
         )
 
-    # Calculate portfolio value based on rebalancing strategy
-    if rebalance_freq is None:
-        # Buy-and-hold strategy
+    # Calculate portfolio value based on strategy
+    # Priority: DCA > Rebalancing > Buy-and-hold
+    if dca_freq is not None and dca_amount is not None and dca_amount > 0:
+        # DCA strategy (dollar-cost averaging with regular contributions)
+        if rebalance_freq is not None:
+            logger.warning(
+                "Both DCA and rebalancing specified. Using DCA strategy only. "
+                "DCA and rebalancing are mutually exclusive."
+            )
+        portfolio_value = _calculate_dca_portfolio(aligned, weights, capital, dca_amount, dca_freq)
+    elif rebalance_freq is None:
+        # Buy-and-hold strategy (lump sum, no rebalancing)
         first_prices = aligned.iloc[0]
         units = (capital * weights) / first_prices
         portfolio_value = (aligned * units).sum(axis=1)
     else:
-        # Rebalancing strategy
+        # Rebalancing strategy (lump sum with periodic rebalancing)
         portfolio_value = _calculate_rebalanced_portfolio(aligned, weights, capital, rebalance_freq)
 
     portfolio_return = portfolio_value / capital - 1
@@ -926,8 +1032,37 @@ def main(argv: List[str]) -> None:
         }
         rebalance_freq = freq_map.get(rebalance_freq.lower(), rebalance_freq.upper())
 
+    # Normalize DCA frequency
+    dca_freq = args.dca_freq
+    dca_amount = args.dca_amount
+    if dca_freq:
+        # Convert long form to pandas frequency codes
+        freq_map = {
+            'daily': 'D',
+            'weekly': 'W',
+            'monthly': 'M',
+            'quarterly': 'Q',
+            'yearly': 'Y'
+        }
+        dca_freq = freq_map.get(dca_freq.lower(), dca_freq.upper())
+
+    # Validate DCA parameters
+    if (dca_freq is not None and dca_amount is None) or (dca_amount is not None and dca_freq is None):
+        raise SystemExit("DCA requires both --dca-amount and --dca-freq to be specified")
+
+    if dca_amount is not None and dca_amount <= 0:
+        raise SystemExit("DCA amount must be positive")
+
     logger.info("Computing backtest metrics...")
-    table = compute_metrics(portfolio_prices, weights, benchmark_prices, args.capital, rebalance_freq=rebalance_freq)
+    table = compute_metrics(
+        portfolio_prices,
+        weights,
+        benchmark_prices,
+        args.capital,
+        rebalance_freq=rebalance_freq,
+        dca_amount=dca_amount,
+        dca_freq=dca_freq
+    )
 
     portfolio_stats = summarize(table["portfolio_value"], args.capital)
     benchmark_stats = summarize(table["benchmark_value"], args.capital)
@@ -941,8 +1076,12 @@ def main(argv: List[str]) -> None:
     print(f"Portfolio: {', '.join(f'{t} ({w:.1%})' for t, w in zip(tickers, weights))}")
     print(f"Benchmark: {args.benchmark}")
 
-    # Show rebalancing strategy
-    if rebalance_freq:
+    # Show strategy
+    if dca_freq and dca_amount:
+        freq_names = {'D': 'Daily', 'W': 'Weekly', 'M': 'Monthly', 'Q': 'Quarterly', 'Y': 'Yearly'}
+        strategy_name = freq_names.get(dca_freq, dca_freq)
+        print(f"Strategy: Dollar-Cost Averaging ({strategy_name}, ${dca_amount:,.2f}/contribution)")
+    elif rebalance_freq:
         freq_names = {'D': 'Daily', 'W': 'Weekly', 'M': 'Monthly', 'Q': 'Quarterly', 'Y': 'Yearly'}
         strategy_name = freq_names.get(rebalance_freq, rebalance_freq)
         print(f"Strategy: {strategy_name} Rebalancing")

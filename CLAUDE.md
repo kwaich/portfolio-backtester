@@ -118,6 +118,7 @@ portfolio-backtester/
 - Rolling returns (30/90/180-day windows)
 - Rolling 12-month Sharpe ratio chart (252-day window for risk-adjusted performance tracking)
 - Rebalancing strategies (buy-and-hold, daily, weekly, monthly, quarterly, yearly)
+- **Dollar-Cost Averaging (DCA)**: Regular contributions at configurable intervals (daily, weekly, monthly, quarterly, yearly)
 - Logarithmic scale toggle for portfolio value charts
 - CSV & HTML export
 
