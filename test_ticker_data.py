@@ -159,6 +159,10 @@ class TestTickerSearch:
 class TestYahooFinanceSearch:
     """Tests for Yahoo Finance search integration."""
 
+    def setup_method(self):
+        """Clear the cache before each test."""
+        search_yahoo_finance.cache_clear()
+
     def test_search_yahoo_finance_empty_query(self):
         """Test search_yahoo_finance with empty query."""
         results = search_yahoo_finance("")
@@ -351,6 +355,10 @@ class TestCombinedSearch:
 
 class TestTickerDataEdgeCases:
     """Tests for edge cases and error conditions."""
+
+    def setup_method(self):
+        """Clear the cache before each test."""
+        search_yahoo_finance.cache_clear()
 
     def test_search_tickers_special_characters(self):
         """Test search handles special characters in ticker symbols."""

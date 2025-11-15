@@ -161,7 +161,7 @@ def search_tickers(query: str) -> List[str]:
     if not query:
         return []
 
-    query_lower = query.lower()
+    query_lower = query.strip().lower()
     all_tickers = get_all_tickers()
 
     matches = []
