@@ -257,6 +257,13 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
         default=DEFAULT_CACHE_TTL_HOURS,
         help=f"Cache time-to-live in hours (default: {DEFAULT_CACHE_TTL_HOURS})",
     )
+    parser.add_argument(
+        "--rebalance",
+        type=str,
+        default=None,
+        choices=['D', 'W', 'M', 'Q', 'Y', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly'],
+        help="Rebalancing frequency: D/daily, W/weekly, M/monthly, Q/quarterly, Y/yearly (default: None = buy-and-hold)",
+    )
     return parser.parse_args(argv)
 
 
@@ -602,13 +609,92 @@ def download_prices(
     return prices
 
 
+def _calculate_rebalanced_portfolio(
+    prices: pd.DataFrame,
+    weights: np.ndarray,
+    capital: float,
+    rebalance_freq: str
+) -> pd.Series:
+    """Calculate portfolio value with periodic rebalancing.
+
+    Args:
+        prices: DataFrame with aligned prices for all portfolio tickers
+        weights: Array of target portfolio weights
+        capital: Initial capital amount
+        rebalance_freq: Pandas frequency string ('D', 'W', 'M', 'Q', 'Y')
+
+    Returns:
+        Series with portfolio value for each date
+    """
+    # Generate rebalancing dates
+    rebalance_dates = pd.date_range(
+        start=prices.index[0],
+        end=prices.index[-1],
+        freq=rebalance_freq
+    )
+
+    # Ensure first date is included
+    if prices.index[0] not in rebalance_dates:
+        rebalance_dates = rebalance_dates.insert(0, prices.index[0])
+
+    # Filter to only dates that exist in our price data
+    rebalance_dates = rebalance_dates.intersection(prices.index)
+
+    if len(rebalance_dates) == 0:
+        logger.warning(f"No rebalancing dates found for frequency '{rebalance_freq}'. Using buy-and-hold.")
+        first_prices = prices.iloc[0]
+        units = (capital * weights) / first_prices
+        return (prices * units).sum(axis=1)
+
+    # Initialize portfolio value series
+    portfolio_values = pd.Series(index=prices.index, dtype=float)
+
+    # Track current units and portfolio value
+    current_value = capital
+    current_units = None
+
+    # Process each date
+    for date in prices.index:
+        # Check if we need to rebalance
+        if date in rebalance_dates or current_units is None:
+            # Rebalance: allocate current_value according to target weights
+            current_prices = prices.loc[date]
+            current_units = (current_value * weights) / current_prices
+            logger.debug(f"Rebalancing on {date.strftime('%Y-%m-%d')}: portfolio value = ${current_value:,.2f}")
+
+        # Calculate portfolio value for this date
+        current_value = (prices.loc[date] * current_units).sum()
+        portfolio_values[date] = current_value
+
+    logger.info(
+        f"Rebalancing strategy '{rebalance_freq}': "
+        f"{len(rebalance_dates)} rebalances from {rebalance_dates[0].strftime('%Y-%m-%d')} "
+        f"to {rebalance_dates[-1].strftime('%Y-%m-%d')}"
+    )
+
+    return portfolio_values
+
+
 def compute_metrics(
     prices: pd.DataFrame,
     weights: np.ndarray,
     benchmark: pd.Series,
     capital: float,
+    rebalance_freq: str = None,
 ) -> pd.DataFrame:
-    """Builds the backtest table and summary columns."""
+    """Builds the backtest table and summary columns.
+
+    Args:
+        prices: DataFrame with adjusted close prices for portfolio tickers
+        weights: Array of portfolio weights (must sum to 1.0)
+        benchmark: Series with benchmark prices
+        capital: Initial capital amount
+        rebalance_freq: Rebalancing frequency - None (buy-and-hold), 'M' (monthly),
+                       'Q' (quarterly), 'Y' (yearly), 'W' (weekly), 'D' (daily)
+
+    Returns:
+        DataFrame with portfolio metrics including value, returns, and active return
+    """
 
     prices = prices.sort_index()
     first_valid_points = [series.first_valid_index() for _, series in prices.items()]
@@ -668,10 +754,16 @@ def compute_metrics(
             f"Statistics may be unreliable for periods < 30 days."
         )
 
-    # Calculate portfolio value with the aligned data
-    first_prices = aligned.iloc[0]
-    units = (capital * weights) / first_prices
-    portfolio_value = (aligned * units).sum(axis=1)
+    # Calculate portfolio value based on rebalancing strategy
+    if rebalance_freq is None:
+        # Buy-and-hold strategy
+        first_prices = aligned.iloc[0]
+        units = (capital * weights) / first_prices
+        portfolio_value = (aligned * units).sum(axis=1)
+    else:
+        # Rebalancing strategy
+        portfolio_value = _calculate_rebalanced_portfolio(aligned, weights, capital, rebalance_freq)
+
     portfolio_return = portfolio_value / capital - 1
 
     # Calculate benchmark value
@@ -778,8 +870,21 @@ def main(argv: List[str]) -> None:
     portfolio_prices = prices[tickers]
     benchmark_prices = prices[args.benchmark]
 
+    # Normalize rebalancing frequency
+    rebalance_freq = args.rebalance
+    if rebalance_freq:
+        # Convert long form to pandas frequency codes
+        freq_map = {
+            'daily': 'D',
+            'weekly': 'W',
+            'monthly': 'M',
+            'quarterly': 'Q',
+            'yearly': 'Y'
+        }
+        rebalance_freq = freq_map.get(rebalance_freq.lower(), rebalance_freq.upper())
+
     logger.info("Computing backtest metrics...")
-    table = compute_metrics(portfolio_prices, weights, benchmark_prices, args.capital)
+    table = compute_metrics(portfolio_prices, weights, benchmark_prices, args.capital, rebalance_freq=rebalance_freq)
 
     portfolio_stats = summarize(table["portfolio_value"], args.capital)
     benchmark_stats = summarize(table["benchmark_value"], args.capital)
@@ -792,6 +897,15 @@ def main(argv: List[str]) -> None:
     print(f"Time Span: {table.index[0].date()} → {table.index[-1].date()}")
     print(f"Portfolio: {', '.join(f'{t} ({w:.1%})' for t, w in zip(tickers, weights))}")
     print(f"Benchmark: {args.benchmark}")
+
+    # Show rebalancing strategy
+    if rebalance_freq:
+        freq_names = {'D': 'Daily', 'W': 'Weekly', 'M': 'Monthly', 'Q': 'Quarterly', 'Y': 'Yearly'}
+        strategy_name = freq_names.get(rebalance_freq, rebalance_freq)
+        print(f"Strategy: {strategy_name} Rebalancing")
+    else:
+        print(f"Strategy: Buy-and-Hold")
+
     print("-"*70)
 
     print("\nPORTFOLIO PERFORMANCE:")

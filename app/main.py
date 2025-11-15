@@ -49,7 +49,8 @@ try:
         CUSTOM_CSS, MAIN_TITLE, SUBTITLE, SIDEBAR_HEADER,
         DEFAULT_TICKER_1, DEFAULT_TICKER_2, DEFAULT_BENCHMARK,
         MAX_TICKERS, MIN_BENCHMARKS, MAX_BENCHMARKS,
-        DEFAULT_CAPITAL, MIN_CAPITAL, MAX_CAPITAL
+        DEFAULT_CAPITAL, MIN_CAPITAL, MAX_CAPITAL,
+        REBALANCE_OPTIONS, DEFAULT_REBALANCE_STRATEGY
     )
     from .presets import get_portfolio_presets, get_date_presets
     from .validation import (
@@ -238,7 +239,17 @@ def main() -> None:
         format="%0.2f",
         help="Initial investment amount"
     )
-    
+
+    # Rebalancing strategy
+    st.sidebar.subheader("Rebalancing Strategy")
+    rebalance_strategy = st.sidebar.selectbox(
+        "Rebalancing Frequency",
+        options=list(REBALANCE_OPTIONS.keys()),
+        index=0,
+        help="How often to rebalance the portfolio back to target weights"
+    )
+    rebalance_freq = REBALANCE_OPTIONS[rebalance_strategy]
+
     # Cache option
     st.sidebar.subheader("Options")
     use_cache = st.sidebar.checkbox(
@@ -310,14 +321,14 @@ def main() -> None:
         with st.spinner("Computing backtest metrics..."):
             try:
                 # Compute metrics for primary benchmark
-                results = compute_metrics(portfolio_prices, weights_array, benchmark_prices, capital)
-                
+                results = compute_metrics(portfolio_prices, weights_array, benchmark_prices, capital, rebalance_freq=rebalance_freq)
+
                 # Compute metrics for additional benchmarks
                 all_benchmark_results = {}
                 for bench_name, bench_prices in all_benchmark_prices.items():
-                    bench_result = compute_metrics(portfolio_prices, weights_array, bench_prices, capital)
+                    bench_result = compute_metrics(portfolio_prices, weights_array, bench_prices, capital, rebalance_freq=rebalance_freq)
                     all_benchmark_results[bench_name] = bench_result
-                
+
                 st.success("✅ Backtest completed successfully!")
                 
             except Exception as e:
@@ -369,7 +380,13 @@ def main() -> None:
         # Portfolio composition
         st.divider()
         render_portfolio_composition(tickers, weights_array)
-        
+
+        # Display rebalancing strategy
+        if rebalance_freq:
+            st.info(f"📊 **Strategy**: {rebalance_strategy}")
+        else:
+            st.info(f"📊 **Strategy**: {rebalance_strategy}")
+
         # Charts
         st.divider()
         st.header("📈 Interactive Visualizations")
