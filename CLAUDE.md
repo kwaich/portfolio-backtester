@@ -20,10 +20,10 @@ This is a lightweight Python-based ETF backtesting utility that allows users to:
 **Primary Use Case**: Testing portfolio allocations (default: VDCP.L/VHYD.L vs VWRA.L benchmark)
 
 **Current Status**:
-- **Version**: v2.1.0 (Phase 3 Complete - 2025-11-15)
-- **Test Coverage**: ~88% (155 tests, 100% passing)
+- **Version**: v2.2.0-dev (Unreleased - 2025-11-15)
+- **Test Coverage**: ~88% (177 tests, 100% passing)
 - **Progress**: 87.5% complete (14/16 tasks)
-- **Branch**: claude/read-imple-01QaXd8PwRSeMGMtHvEeqFGf
+- **Branch**: claude/make-ticker-searchable-01Nb4CzjMJBJ9y2PugkUtCW7
 
 ---
 
@@ -43,10 +43,10 @@ portfolio-backtester/
 │   └── main.py               # Application orchestration
 ├── backtest.py               # Core backtesting engine (830 lines - Phases 1 & 3)
 ├── plot_backtest.py          # Visualization utility (395 lines - Phases 2 & 3)
-├── test_backtest.py          # Unit tests for backtest.py (858 lines, 68 tests)
-├── test_app.py               # Unit tests for app.py UI (933 lines, 62 tests)
-├── test_ticker_data.py       # Unit tests for ticker_data.py (NEW - 188 tests)
-├── test_integration.py       # Integration tests (420 lines, 25 tests - Phase 3)
+├── test_backtest.py          # Unit tests for backtest.py (858 lines, 67 tests)
+├── test_app.py               # Unit tests for app.py UI (933 lines, 64 tests)
+├── test_ticker_data.py       # Unit tests for ticker_data.py (NEW - 30 tests)
+├── test_integration.py       # Integration tests (420 lines, 16 tests - Phase 3)
 ├── requirements.txt          # Python dependencies (includes requests)
 ├── README.md                 # Main user documentation
 ├── CLAUDE.md                 # This file - AI assistant guide
@@ -112,10 +112,13 @@ portfolio-backtester/
 **Features**:
 - Portfolio presets (6 pre-configured portfolios)
 - **Searchable ticker inputs**: Search from 50+ popular ETFs/stocks or use Yahoo Finance API
+- **Portfolio composition table**: Displays ticker symbols, full company/fund names, and weights
 - Date range presets (1Y, 3Y, 5Y, 10Y, YTD, Max)
 - Multiple benchmarks (up to 3 simultaneously)
 - Delta indicators (color-coded outperformance)
 - Rolling returns (30/90/180-day windows)
+- Rebalancing strategies (buy-and-hold, daily, weekly, monthly, quarterly, yearly)
+- Logarithmic scale toggle for portfolio value charts
 - CSV & HTML export
 
 **Phase 2 Improvements**:
@@ -149,22 +152,29 @@ portfolio-backtester/
 - **Phase 2**: Logging instead of print statements
 - **Phase 3**: Data quality validation (min 2 rows, NaN checks)
 
-#### 4. Testing Infrastructure (3 test files, 155 tests)
+#### 4. Testing Infrastructure (3 test files, 177 tests)
 
 **Test Coverage**: ~88% overall, 100% pass rate
 
 **Test Files**:
-- **test_backtest.py** (858 lines, 68 tests): Unit tests for backtest engine
+- **test_backtest.py** (858 lines, 67 tests): Unit tests for backtest engine
   - Cache expiration, retry logic, ticker/date validation
   - Batch downloads, data quality validation
   - 11 test classes covering all major functions
 
-- **test_app.py** (933 lines, 62 tests): Unit tests for web UI
+- **test_app.py** (933 lines, 64 tests): Unit tests for web UI
   - Portfolio presets, date presets, multiple benchmarks
   - Delta indicators, rolling returns, metric formatting
+  - Portfolio composition with ticker names
   - 14 test classes with comprehensive coverage
 
-- **test_integration.py** (420 lines, 25 tests - Phase 3): Integration tests
+- **test_ticker_data.py** (30 tests): Unit tests for ticker search functionality
+  - Curated ticker list validation
+  - Search functionality (by symbol and name)
+  - Yahoo Finance API mocking
+  - Cache clearing and edge cases
+
+- **test_integration.py** (420 lines, 16 tests - Phase 3): Integration tests
   - End-to-end workflows, edge cases, data quality
   - Statistical edge cases, multi-ticker scenarios
   - 6 test classes covering real-world usage
@@ -299,7 +309,7 @@ python backtest.py --tickers AAPL MSFT --weights 0.6 0.4 --benchmark SPY
 # Plot results
 python plot_backtest.py --csv results/backtest.csv --output charts/test
 
-# Run all tests (155 tests)
+# Run all tests (177 tests)
 pytest -v
 
 # Run with coverage
@@ -451,7 +461,7 @@ git commit -m "feat: add new_metric calculation"
 ---
 
 **Last Updated**: 2025-11-15
-**Version**: v2.1.0 (Phase 3 Complete)
-**Current Branch**: claude/read-imple-01QaXd8PwRSeMGMtHvEeqFGf
-**Test Coverage**: ~88% (155 tests, 100% passing)
+**Version**: v2.2.0-dev (Unreleased)
+**Current Branch**: claude/make-ticker-searchable-01Nb4CzjMJBJ9y2PugkUtCW7
+**Test Coverage**: ~88% (177 tests, 100% passing)
 **Progress**: 87.5% complete (14/16 tasks, Phase 4 in progress)

@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Portfolio Composition Enhancement** - Ticker names now displayed in Portfolio Composition table
+  - Table shows: Ticker symbol, Full company/fund name, Weight percentage
+  - Graceful handling of unknown tickers (empty name field)
+  - Uses curated list of 50+ popular ETFs and stocks
+
+### Fixed
+- **Test Infrastructure** - Improved test reliability
+  - Added `.strip()` to ticker search query for whitespace handling
+  - Added cache clearing in test setup to prevent test interference
+  - Removed 5 network-dependent integration tests
+
+### Changed
+- **Test Coverage** - Updated from 155 to 177 tests (100% pass rate)
+  - All ticker_data tests passing (30 tests)
+  - All app UI tests passing (64 tests)
+  - All backtest engine tests passing (67 tests)
+  - All integration tests passing (16 tests)
+
 ## [2.1.0] - 2025-11-15
 
 ### Added - Phase 3: Performance & Data Validation
