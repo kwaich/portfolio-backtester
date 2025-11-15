@@ -387,9 +387,11 @@ portfolio-backtester/
 │   └── main.py             # Main application orchestration
 ├── backtest.py             # Core backtesting engine
 ├── plot_backtest.py        # Visualization utility
-├── test_backtest.py        # Unit tests for backtest.py (68 tests)
-├── test_app.py             # Unit tests for app.py UI (62 tests)
-├── test_integration.py     # Integration tests (25 tests)
+├── tests/                  # Test suite (184 tests, ~88% coverage)
+│   ├── test_backtest.py    # Unit tests for backtest.py (72 tests)
+│   ├── test_app.py         # Unit tests for app.py UI (64 tests)
+│   ├── test_ticker_data.py # Unit tests for ticker_data.py (32 tests)
+│   └── test_integration.py # Integration tests (16 tests)
 ├── requirements.txt        # Python dependencies
 ├── README.md               # This file
 ├── CLAUDE.md               # AI assistant guide
@@ -434,20 +436,20 @@ The Streamlit web UI has been refactored into a clean, modular architecture:
 
 ### Running Tests
 
-The project has comprehensive test coverage with **155 tests** achieving **100% pass rate**.
+The project has comprehensive test coverage with **184 tests** achieving **100% pass rate**.
 
 ```bash
-# Run all tests (155 tests: 68 backtest + 62 UI + 25 integration)
+# Run all tests (184 tests: 72 backtest + 64 UI + 32 ticker_data + 16 integration)
 pytest -v
 
-# Run only backtest tests (68 tests)
-pytest test_backtest.py -v
+# Run only backtest tests (72 tests)
+pytest tests/test_backtest.py -v
 
-# Run only UI tests (62 tests)
-pytest test_app.py -v
+# Run only UI tests (64 tests)
+pytest tests/test_app.py -v
 
-# Run only integration tests (25 tests)
-pytest test_integration.py -v
+# Run only integration tests (16 tests)
+pytest tests/test_integration.py -v
 
 # Run with coverage report
 pytest --cov=backtest --cov=app --cov-report=term-missing
@@ -457,9 +459,9 @@ pytest --cov=backtest --cov=app --cov-report=html
 open htmlcov/index.html
 
 # Run specific test class
-pytest test_backtest.py::TestSummarize -v
-pytest test_app.py::TestMetricLabels -v
-pytest test_integration.py::TestEndToEndWorkflow -v
+pytest tests/test_backtest.py::TestSummarize -v
+pytest tests/test_app.py::TestMetricLabels -v
+pytest tests/test_integration.py::TestEndToEndWorkflow -v
 ```
 
 ### Test Coverage
@@ -558,7 +560,7 @@ Potential improvements (see [PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md) for de
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
-4. Run tests (`pytest test_backtest.py -v`)
+4. Run tests (`pytest -v`)
 5. Commit your changes (`git commit -m 'Add amazing feature'`)
 6. Push to the branch (`git push origin feature/amazing-feature`)
 7. Open a Pull Request

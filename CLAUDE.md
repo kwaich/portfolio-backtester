@@ -43,10 +43,12 @@ portfolio-backtester/
 │   └── main.py               # Application orchestration
 ├── backtest.py               # Core backtesting engine (830 lines - Phases 1 & 3)
 ├── plot_backtest.py          # Visualization utility (395 lines - Phases 2 & 3)
-├── test_backtest.py          # Unit tests for backtest.py (858 lines, 67 tests)
-├── test_app.py               # Unit tests for app.py UI (933 lines, 64 tests)
-├── test_ticker_data.py       # Unit tests for ticker_data.py (NEW - 32 tests)
-├── test_integration.py       # Integration tests (420 lines, 16 tests - Phase 3)
+├── tests/                    # Test suite (184 tests, ~88% coverage)
+│   ├── conftest.py           # pytest configuration
+│   ├── test_backtest.py      # Unit tests for backtest.py (72 tests)
+│   ├── test_app.py           # Unit tests for app.py UI (64 tests)
+│   ├── test_ticker_data.py   # Unit tests for ticker_data.py (32 tests)
+│   └── test_integration.py   # Integration tests (16 tests)
 ├── requirements.txt          # Python dependencies (includes requests)
 ├── README.md                 # Main user documentation
 ├── CLAUDE.md                 # This file - AI assistant guide
@@ -160,20 +162,20 @@ portfolio-backtester/
 
 **Test Coverage**: ~88% overall, 100% pass rate
 
-**Test Files**:
-- **test_backtest.py** (72 tests): Unit tests for backtest engine
+**Test Files** (in `tests/` directory):
+- **tests/test_backtest.py** (72 tests): Unit tests for backtest engine
   - Cache expiration, retry logic, ticker/date validation
   - Batch downloads, data quality validation
   - Rolling 12-month Sharpe ratio calculation and edge cases
   - 11 test classes covering all major functions
 
-- **test_app.py** (933 lines, 64 tests): Unit tests for web UI
+- **tests/test_app.py** (64 tests): Unit tests for web UI
   - Portfolio presets, date presets, multiple benchmarks
   - Delta indicators, rolling returns, metric formatting
   - Portfolio composition with ticker names (fetched from yfinance)
   - 14 test classes with comprehensive coverage
 
-- **test_ticker_data.py** (32 tests): Unit tests for ticker search and name fetching
+- **tests/test_ticker_data.py** (32 tests): Unit tests for ticker search and name fetching
   - Curated ticker list validation
   - Search functionality (by symbol and name)
   - Yahoo Finance API mocking (search and ticker info)
@@ -181,10 +183,14 @@ portfolio-backtester/
   - Fallback to shortName, error handling
   - Cache clearing and edge cases
 
-- **test_integration.py** (420 lines, 16 tests - Phase 3): Integration tests
+- **tests/test_integration.py** (16 tests): Integration tests
   - End-to-end workflows, edge cases, data quality
   - Statistical edge cases, multi-ticker scenarios
   - 6 test classes covering real-world usage
+
+- **tests/conftest.py**: pytest configuration
+  - Automatically adds parent directory to Python path
+  - Enables tests to import modules from project root
 
 **See**: [TESTING_GUIDE.md](docs/TESTING_GUIDE.md) for comprehensive testing rules and patterns.
 
@@ -406,10 +412,10 @@ def compute_metrics(prices, weights, benchmark, capital):
     return results
 
 # 3. Run tests
-pytest test_backtest.py::test_new_metric_calculation -v
+pytest tests/test_backtest.py::test_new_metric_calculation -v
 
 # 4. Commit
-git add test_backtest.py backtest.py
+git add tests/test_backtest.py backtest.py
 git commit -m "feat: add new_metric calculation"
 ```
 
