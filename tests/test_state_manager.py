@@ -19,7 +19,25 @@ import pandas as pd
 
 # Mock streamlit before importing app modules
 import sys
-sys.modules['streamlit'] = MagicMock()
+
+from functools import lru_cache
+
+streamlit_mock = MagicMock()
+
+def mock_cache_data(*args, **kwargs):
+    """Mock cache_data that actually caches using lru_cache."""
+    def decorator(func):
+        # Use lru_cache to actually cache
+        cached_func = lru_cache(maxsize=128)(func)
+        # Add Streamlit-compatible clear method
+        cached_func.clear = cached_func.cache_clear
+        return cached_func
+    return decorator
+
+streamlit_mock.cache_data = mock_cache_data
+streamlit_mock.query_params = {}
+streamlit_mock.session_state = {}
+sys.modules['streamlit'] = streamlit_mock
 
 from app.state_manager import StateManager, StateKeys
 

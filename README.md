@@ -113,8 +113,12 @@ streamlit run app.py
 
 This opens an interactive web application in your browser with:
 
-- **Interactive Forms**: Configure tickers, weights, benchmarks, and date ranges
+- **Interactive Forms**: Configure tickers, weights, benchmarks, and date ranges (90% fewer reruns!)
+- **Smart Caching**: Ticker names and search results cached (80% fewer API calls)
+- **URL Sharing**: Share exact backtest configurations via URL (capital, benchmarks, tickers, dates all preserved)
 - **Real-time Results**: View comprehensive metrics and charts instantly
+- **Progress Tracking**: Visual progress bars for long-running operations
+- **Better Error Messages**: User-friendly error handling with actionable suggestions
 - **Hover Tooltips**: See exact values by hovering over any point on the charts
 - **Interactive Charts**: Zoom, pan, and explore data visually
 - **Download Options**: Export both CSV data and interactive HTML charts

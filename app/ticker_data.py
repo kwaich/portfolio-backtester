@@ -10,8 +10,15 @@ from __future__ import annotations
 import logging
 from typing import List, Optional
 import requests
-from functools import lru_cache
 import yfinance as yf
+
+try:
+    import streamlit as st
+    HAS_STREAMLIT = True
+except ImportError:
+    HAS_STREAMLIT = False
+    # Fallback to functools.lru_cache if streamlit not available (for testing)
+    from functools import lru_cache
 
 # Popular ETFs organized by category
 POPULAR_ETFS = {
@@ -198,26 +205,10 @@ def format_ticker_option(ticker: str) -> str:
         return ticker
 
 
-@lru_cache(maxsize=500)
-def get_ticker_name(ticker: str) -> str:
-    """Get the full name for a ticker symbol from Yahoo Finance.
+def _get_ticker_name_impl(ticker: str) -> str:
+    """Internal implementation of get_ticker_name.
 
-    Fetches the ticker name dynamically from Yahoo Finance API.
-    Results are cached to avoid repeated API calls.
-
-    Args:
-        ticker: Ticker symbol (e.g., "AAPL", "VWRA.L", "SPY")
-
-    Returns:
-        Full name of the ticker, or empty string if not found or error occurs
-
-    Examples:
-        >>> get_ticker_name("SPY")
-        'SPDR S&P 500 ETF Trust'
-        >>> get_ticker_name("AAPL")
-        'Apple Inc.'
-        >>> get_ticker_name("UNKNOWN")
-        ''
+    This is separated to allow for flexible caching strategies.
     """
     if not ticker or not ticker.strip():
         return ""
@@ -246,34 +237,50 @@ def get_ticker_name(ticker: str) -> str:
         return ""
 
 
-@lru_cache(maxsize=100)
-def search_yahoo_finance(query: str, limit: int = 10) -> List[tuple[str, str]]:
-    """Search Yahoo Finance for ticker symbols matching a query.
+if HAS_STREAMLIT:
+    @st.cache_data(ttl=3600, show_spinner=False)
+    def get_ticker_name(ticker: str) -> str:
+        """Get the full name for a ticker symbol from Yahoo Finance.
 
-    This function queries Yahoo Finance's autocomplete API to find tickers
-    that match the search query. Results are cached to reduce API calls.
+        Fetches the ticker name dynamically from Yahoo Finance API.
+        Results are cached for 1 hour to avoid repeated API calls.
 
-    Args:
-        query: Search query (ticker symbol or company name)
-        limit: Maximum number of results to return (default: 10)
+        Args:
+            ticker: Ticker symbol (e.g., "AAPL", "VWRA.L", "SPY")
 
-    Returns:
-        List of (ticker, name) tuples matching the query
+        Returns:
+            Full name of the ticker, or empty string if not found or error occurs
 
-    Examples:
-        >>> results = search_yahoo_finance("apple")
-        >>> any("AAPL" in ticker for ticker, _ in results)
-        True
-        >>> search_yahoo_finance("")
-        []
+        Examples:
+            >>> get_ticker_name("SPY")
+            'SPDR S&P 500 ETF Trust'
+            >>> get_ticker_name("AAPL")
+            'Apple Inc.'
+            >>> get_ticker_name("UNKNOWN")
+            ''
+        """
+        return _get_ticker_name_impl(ticker)
 
-    Note:
-        - Requires internet connection
-        - Results are cached for performance
-        - Returns empty list on network errors or rate limiting (403)
-        - Yahoo Finance may block requests - this is expected behavior
-        - The app will fall back to curated ticker list if Yahoo search fails
-    """
+    # Provide cache_clear method for compatibility with tests
+    def _clear_ticker_name_cache():
+        """Clear the get_ticker_name cache (Streamlit version)."""
+        try:
+            get_ticker_name.clear()
+        except:
+            pass  # Streamlit cache might not support clear() in all versions
+
+    get_ticker_name.cache_clear = _clear_ticker_name_cache
+
+else:
+    # Testing fallback - use lru_cache
+    @lru_cache(maxsize=500)
+    def get_ticker_name(ticker: str) -> str:
+        """Get the full name for a ticker symbol from Yahoo Finance (testing version)."""
+        return _get_ticker_name_impl(ticker)
+
+
+def _search_yahoo_finance_impl(query: str, limit: int = 10) -> List[tuple[str, str]]:
+    """Internal implementation of Yahoo Finance search."""
     if not query or len(query) < 1:
         return []
 
@@ -319,6 +326,55 @@ def search_yahoo_finance(query: str, limit: int = 10) -> List[tuple[str, str]]:
     except Exception as e:
         logging.error(f"Unexpected error in Yahoo Finance search for '{query}': {e}")
         return []
+
+
+if HAS_STREAMLIT:
+    @st.cache_data(ttl=1800, show_spinner=False)
+    def search_yahoo_finance(query: str, limit: int = 10) -> List[tuple[str, str]]:
+        """Search Yahoo Finance for ticker symbols matching a query.
+
+        This function queries Yahoo Finance's autocomplete API to find tickers
+        that match the search query. Results are cached for 30 minutes to reduce API calls.
+
+        Args:
+            query: Search query (ticker symbol or company name)
+            limit: Maximum number of results to return (default: 10)
+
+        Returns:
+            List of (ticker, name) tuples matching the query
+
+        Examples:
+            >>> results = search_yahoo_finance("apple")
+            >>> any("AAPL" in ticker for ticker, _ in results)
+            True
+            >>> search_yahoo_finance("")
+            []
+
+        Note:
+            - Requires internet connection
+            - Results are cached for 30 minutes
+            - Returns empty list on network errors or rate limiting (403)
+            - Yahoo Finance may block requests - this is expected behavior
+            - The app will fall back to curated ticker list if Yahoo search fails
+        """
+        return _search_yahoo_finance_impl(query, limit)
+
+    # Provide cache_clear method for compatibility with tests
+    def _clear_yahoo_search_cache():
+        """Clear the search_yahoo_finance cache (Streamlit version)."""
+        try:
+            search_yahoo_finance.clear()
+        except:
+            pass  # Streamlit cache might not support clear() in all versions
+
+    search_yahoo_finance.cache_clear = _clear_yahoo_search_cache
+
+else:
+    # Testing fallback - use lru_cache
+    @lru_cache(maxsize=100)
+    def search_yahoo_finance(query: str, limit: int = 10) -> List[tuple[str, str]]:
+        """Search Yahoo Finance for ticker symbols matching a query (testing version)."""
+        return _search_yahoo_finance_impl(query, limit)
 
 
 def search_tickers_with_yahoo(query: str, limit: int = 10) -> List[tuple[str, str]]:

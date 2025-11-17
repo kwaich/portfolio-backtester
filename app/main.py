@@ -1,17 +1,23 @@
 """Main Streamlit application entry point for the ETF Backtester.
 
-This module orchestrates the entire application workflow by integrating:
-- Configuration from config.py
-- Presets from presets.py
-- Validation from validation.py
-- UI components from ui_components.py
-- Charts from charts.py
+This module orchestrates the entire application workflow using modular components:
+- Sidebar configuration with forms for better performance
+- Backtest execution with progress tracking
+- Results display with interactive charts
+- URL parameter support for shareable configurations
+
+IMPROVEMENTS (Streamlit Best Practices):
+- ✅ Caching with @st.cache_data for expensive operations
+- ✅ Forms to reduce unnecessary reruns
+- ✅ Modular code organization for maintainability
+- ✅ URL parameters for sharing configurations
+- ✅ Better error handling with user-friendly messages
+- ✅ Progress tracking for long-running operations
 """
 
 from __future__ import annotations
 
 from datetime import datetime
-import io
 
 # Third-party imports with error handling
 try:
@@ -33,7 +39,7 @@ except ImportError as e:
 
 # Import backtest functions
 try:
-    from backtest import download_prices, compute_metrics, summarize, validate_tickers
+    from backtest import download_prices, compute_metrics, validate_tickers
 except ImportError as e:
     st.error(
         f"❌ **Cannot Import Backtest Module**\n\n"
@@ -46,537 +52,269 @@ except ImportError as e:
 try:
     from .config import (
         PAGE_TITLE, PAGE_ICON, PAGE_LAYOUT, SIDEBAR_STATE,
-        CUSTOM_CSS, MAIN_TITLE, SUBTITLE, SIDEBAR_HEADER,
-        DEFAULT_TICKER_1, DEFAULT_TICKER_2, DEFAULT_BENCHMARK,
-        MAX_TICKERS, MIN_BENCHMARKS, MAX_BENCHMARKS,
-        DEFAULT_CAPITAL, MIN_CAPITAL, MAX_CAPITAL,
-        REBALANCE_OPTIONS, DEFAULT_REBALANCE_STRATEGY,
-        DCA_FREQUENCY_OPTIONS, DEFAULT_DCA_FREQUENCY,
-        DEFAULT_DCA_AMOUNT, MIN_DCA_AMOUNT, MAX_DCA_AMOUNT
+        CUSTOM_CSS, MAIN_TITLE, SUBTITLE
     )
-    from .presets import get_portfolio_presets, get_date_presets
+    from .presets import get_portfolio_presets
     from .validation import (
         initialize_session_state, update_portfolio_preset,
         validate_backtest_inputs, check_and_normalize_weights
     )
-    from .ui_components import (
-        render_metrics_column, render_relative_metrics,
-        render_portfolio_composition, render_searchable_ticker_input
-    )
-    from .charts import create_main_dashboard, create_rolling_returns_chart, create_rolling_sharpe_chart
     from .state_manager import StateManager
+    from .sidebar import render_sidebar_form
+    from .results import render_results, render_welcome_screen
+    from .utils import get_query_params, set_query_params, show_error, show_success, show_info, ProgressTracker
 except ImportError as e:
     st.error(f"❌ Failed to import app modules: {e}")
     st.stop()
 
 
+def _apply_url_parameters() -> None:
+    """Apply URL query parameters to session state (for shareable links).
+
+    This enables deep linking and sharing of specific backtest configurations.
+
+    Examples:
+        URL: ?tickers=AAPL,MSFT&weights=0.6,0.4&benchmarks=SPY&start_date=2020-01-01&capital=50000
+    """
+    # Only apply URL params once on first load
+    if 'url_params_applied' not in st.session_state:
+        params = get_query_params()
+
+        if params:
+            # Apply portfolio preset
+            if 'preset' in params:
+                portfolio_presets = get_portfolio_presets()
+                if params['preset'] in portfolio_presets:
+                    StateManager.set_selected_portfolio(params['preset'])
+                    update_portfolio_preset(params['preset'], portfolio_presets[params['preset']])
+
+            # Apply tickers and weights
+            if 'tickers' in params:
+                StateManager.set_preset_tickers(params['tickers'])
+                if 'weights' in params and len(params['weights']) == len(params['tickers']):
+                    StateManager.set_preset_weights(params['weights'])
+
+            # Apply benchmarks (plural - matches what set_query_params writes)
+            if 'benchmarks' in params:
+                # Store first benchmark for backward compatibility
+                if params['benchmarks']:
+                    StateManager.set_preset_benchmark(params['benchmarks'][0])
+                # Store all benchmarks for UI
+                st.session_state['url_benchmarks'] = params['benchmarks']
+            # Fall back to singular 'benchmark' for backward compatibility
+            elif 'benchmark' in params:
+                StateManager.set_preset_benchmark(params['benchmark'])
+                st.session_state['url_benchmarks'] = [params['benchmark']]
+
+            # Apply date range
+            if 'start_date' in params:
+                StateManager.set_date_range(
+                    params['start_date'],
+                    params.get('end_date', StateManager.get_end_date())
+                )
+
+            # Apply capital
+            if 'capital' in params:
+                st.session_state['url_capital'] = params['capital']
+
+        st.session_state['url_params_applied'] = True
+
+
+def _run_backtest(config: dict) -> None:
+    """Execute backtest with the given configuration.
+
+    Args:
+        config: Dictionary containing all backtest configuration
+
+    This function handles the entire backtest workflow:
+    1. Input validation
+    2. Data download with progress tracking
+    3. Metric computation
+    4. Result storage in session state
+    5. URL parameter updates for sharing
+    """
+    # Extract configuration
+    tickers = config['tickers']
+    benchmarks = config['benchmarks']
+    weights = config['weights']
+    start_date = config['start_date']
+    end_date = config['end_date']
+    capital = config['capital']
+    rebalance_freq = config['rebalance_freq']
+    dca_freq = config['dca_freq']
+    dca_amount = config['dca_amount']
+    use_cache = config['use_cache']
+    rebalance_strategy = config['rebalance_strategy']
+    dca_frequency = config['dca_frequency']
+
+    # Validate inputs
+    is_valid, error_msg = validate_backtest_inputs(tickers, benchmarks, start_date, end_date)
+
+    if not is_valid:
+        show_error(error_msg, help_text="Please check your inputs and try again")
+        return
+
+    # Validate ticker format
+    try:
+        validate_tickers(tickers)
+        validate_tickers(benchmarks)
+    except ValueError as e:
+        show_error("Ticker Validation Failed", error=e)
+        return
+
+    # Normalize weights
+    weights_array, was_normalized = check_and_normalize_weights(weights)
+    if was_normalized:
+        show_info(f"Weights normalized to sum to 1.0: {weights_array.round(3).tolist()}")
+
+    # Use progress tracker for better UX
+    try:
+        with ProgressTracker(["Downloading data", "Computing metrics", "Generating results"]) as tracker:
+            # Step 1: Download data
+            tracker.step()
+            universe = list(dict.fromkeys(tickers + benchmarks))
+            prices = download_prices(
+                universe,
+                start_date.strftime("%Y-%m-%d"),
+                end_date.strftime("%Y-%m-%d"),
+                use_cache=use_cache
+            )
+
+            portfolio_prices = prices[tickers]
+
+            # Download all benchmarks
+            all_benchmark_prices = {}
+            for bench in benchmarks:
+                all_benchmark_prices[bench] = prices[bench]
+
+            # Keep primary benchmark for backward compatibility
+            benchmark_prices = all_benchmark_prices[benchmarks[0]]
+
+            show_success(
+                f"Downloaded data for {len(tickers)} portfolio ticker(s) "
+                f"and {len(benchmarks)} benchmark(s)"
+            )
+
+            # Step 2: Compute metrics
+            tracker.step()
+
+            # Compute metrics for primary benchmark
+            results = compute_metrics(
+                portfolio_prices,
+                weights_array,
+                benchmark_prices,
+                capital,
+                rebalance_freq=rebalance_freq,
+                dca_amount=dca_amount,
+                dca_freq=dca_freq
+            )
+
+            # Compute metrics for additional benchmarks
+            all_benchmark_results = {}
+            for bench_name, bench_prices in all_benchmark_prices.items():
+                bench_result = compute_metrics(
+                    portfolio_prices,
+                    weights_array,
+                    bench_prices,
+                    capital,
+                    rebalance_freq=rebalance_freq,
+                    dca_amount=dca_amount,
+                    dca_freq=dca_freq
+                )
+                all_benchmark_results[bench_name] = bench_result
+
+            # Step 3: Store results
+            tracker.step()
+
+            StateManager.store_backtest_results(
+                results=results,
+                all_benchmark_results=all_benchmark_results,
+                tickers=tickers,
+                benchmarks=benchmarks,
+                weights_array=weights_array,
+                capital=capital,
+                rebalance_strategy=rebalance_strategy,
+                rebalance_freq=rebalance_freq,
+                dca_frequency=dca_frequency,
+                dca_freq=dca_freq,
+                dca_amount=dca_amount
+            )
+
+            # Update URL parameters for sharing
+            set_query_params(
+                tickers=tickers,
+                weights=list(weights_array),
+                benchmarks=benchmarks,
+                start_date=start_date,
+                end_date=end_date,
+                capital=capital
+            )
+
+            show_success("Backtest completed successfully!")
+
+    except Exception as e:
+        show_error(
+            "An error occurred during backtest execution",
+            error=e,
+            help_text="Please check your inputs and try again. If the problem persists, try clearing the cache."
+        )
+
+
 def main() -> None:
-    """Main application entry point."""
-    
-    # Page configuration
+    """Main application entry point with improved organization and performance.
+
+    This function implements Streamlit best practices:
+    - Page configuration at the start
+    - Session state initialization
+    - URL parameter support for deep linking
+    - Form-based sidebar for reduced reruns
+    - Modular rendering functions
+    - Progress tracking and error handling
+    """
+
+    # Page configuration (must be first Streamlit command)
     st.set_page_config(
         page_title=PAGE_TITLE,
         page_icon=PAGE_ICON,
         layout=PAGE_LAYOUT,
         initial_sidebar_state=SIDEBAR_STATE
     )
-    
-    # Custom CSS
+
+    # Custom CSS for improved styling
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
-    
+
     # Header
     st.markdown(f'<div class="main-header">{MAIN_TITLE}</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="sub-header">{SUBTITLE}</div>', unsafe_allow_html=True)
-    
+
     # Initialize session state
     initialize_session_state()
-    
+
+    # Check for URL parameters and apply if present (for shareable links)
+    _apply_url_parameters()
+
     # =========================================================================
-    # Sidebar - Input Controls
+    # Sidebar - Input Controls (Using Form for Better Performance)
     # =========================================================================
-    
-    st.sidebar.header(SIDEBAR_HEADER)
-    
-    # Portfolio presets
-    portfolio_presets = get_portfolio_presets()
-    selected_portfolio = st.sidebar.selectbox(
-        "Example Portfolio",
-        options=list(portfolio_presets.keys()),
-        index=0,
-        help="Select a pre-configured portfolio or choose Custom to enter manually"
-    )
 
-    # Handle portfolio preset selection (session state already initialized)
-    if selected_portfolio != StateManager.get_selected_portfolio():
-        StateManager.set_selected_portfolio(selected_portfolio)
-        if selected_portfolio != "Custom (Manual Entry)":
-            portfolio_config = portfolio_presets[selected_portfolio]
-            update_portfolio_preset(selected_portfolio, portfolio_config)
-    
-    # Number of tickers
-    num_tickers = st.sidebar.number_input(
-        "Number of Portfolio Tickers",
-        min_value=1,
-        max_value=MAX_TICKERS,
-        value=StateManager.get_num_tickers(),
-        step=1,
-        help="How many different assets in your portfolio?"
-    )
-
-    # Dynamic ticker inputs
-    tickers = []
-    weights = []
-
-    st.sidebar.subheader("Portfolio Composition")
-
-    preset_tickers = StateManager.get_preset_tickers()
-    preset_weights = StateManager.get_preset_weights()
-    
-    for i in range(num_tickers):
-        # Determine default ticker
-        if i < len(preset_tickers):
-            default_ticker = preset_tickers[i]
-        elif i == 0:
-            default_ticker = DEFAULT_TICKER_1
-        elif i == 1:
-            default_ticker = DEFAULT_TICKER_2
-        else:
-            default_ticker = ""
-
-        # Use searchable ticker input
-        ticker = render_searchable_ticker_input(
-            f"Ticker {i+1}",
-            default_value=default_ticker,
-            key=f"ticker_{i}",
-            help_text="Enter ticker symbol or company name, then click 🔍 to search"
-        )
-        tickers.append(ticker)
-
-        # Weight input
-        if i < len(preset_weights):
-            default_weight = preset_weights[i]
-        else:
-            default_weight = 1.0 / num_tickers
-
-        weight = st.sidebar.number_input(
-            f"Weight {i+1}",
-            min_value=0.0,
-            max_value=1.0,
-            value=default_weight,
-            step=0.05,
-            key=f"weight_{i}",
-            help="Portfolio weight (will be normalized)"
-        )
-        weights.append(weight)
-    
-    # Benchmark
-    st.sidebar.subheader("Benchmark")
-    preset_benchmark = StateManager.get_preset_benchmark()
-    
-    num_benchmarks = st.sidebar.number_input(
-        "Number of Benchmarks",
-        min_value=MIN_BENCHMARKS,
-        max_value=MAX_BENCHMARKS,
-        value=1,
-        step=1,
-        help="Compare against multiple benchmarks"
-    )
-    
-    benchmarks = []
-    for i in range(num_benchmarks):
-        if i == 0:
-            default_bench = preset_benchmark
-        elif i == 1:
-            default_bench = "SPY"
-        else:
-            default_bench = ""
-
-        # Use searchable ticker input for benchmarks
-        bench_ticker = render_searchable_ticker_input(
-            f"Benchmark {i+1}",
-            default_value=default_bench,
-            key=f"benchmark_{i}",
-            help_text="Enter ticker symbol or company name, then click 🔍 to search"
-        )
-        if bench_ticker:
-            benchmarks.append(bench_ticker)
-    
-    # Keep single benchmark variable for backward compatibility
-    benchmark = benchmarks[0] if benchmarks else preset_benchmark
-    
-    # Date range
-    st.sidebar.subheader("Date Range")
-    st.sidebar.caption("Quick Presets:")
-    
-    date_presets = get_date_presets()
-    preset_cols = st.sidebar.columns(6)
-
-    # Date preset buttons (session state already initialized)
-    for idx, (label, date_value) in enumerate(date_presets.items()):
-        if preset_cols[idx].button(label, use_container_width=True, help=f"Set range to {label}"):
-            StateManager.set_date_preset(date_value)
-
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        start_date = st.date_input(
-            "Start Date",
-            value=StateManager.get_start_date(),
-            help="Backtest start date"
-        )
-    with col2:
-        end_date = st.date_input(
-            "End Date",
-            value=StateManager.get_end_date(),
-            help="Backtest end date"
-        )
-    
-    # Capital
-    st.sidebar.subheader("Initial Capital")
-    capital = st.sidebar.number_input(
-        "Capital ($)",
-        min_value=float(MIN_CAPITAL),
-        max_value=float(MAX_CAPITAL),
-        value=float(DEFAULT_CAPITAL),
-        step=1000.0,
-        format="%0.2f",
-        help="Initial investment amount"
-    )
-
-    # Rebalancing strategy
-    st.sidebar.subheader("Rebalancing Strategy")
-    rebalance_strategy = st.sidebar.selectbox(
-        "Rebalancing Frequency",
-        options=list(REBALANCE_OPTIONS.keys()),
-        index=0,
-        help="How often to rebalance the portfolio back to target weights"
-    )
-    rebalance_freq = REBALANCE_OPTIONS[rebalance_strategy]
-
-    # DCA (Dollar-Cost Averaging) strategy
-    st.sidebar.subheader("Dollar-Cost Averaging (DCA)")
-    dca_frequency = st.sidebar.selectbox(
-        "DCA Contribution Frequency",
-        options=list(DCA_FREQUENCY_OPTIONS.keys()),
-        index=0,
-        help="How often to make regular contributions (mutually exclusive with rebalancing)"
-    )
-    dca_freq = DCA_FREQUENCY_OPTIONS[dca_frequency]
-
-    # Only show DCA amount if DCA is enabled
-    dca_amount = None
-    if dca_freq is not None:
-        dca_amount = st.sidebar.number_input(
-            "DCA Contribution Amount ($)",
-            min_value=float(MIN_DCA_AMOUNT),
-            max_value=float(MAX_DCA_AMOUNT),
-            value=float(DEFAULT_DCA_AMOUNT),
-            step=100.0,
-            format="%0.2f",
-            help="Amount to contribute at each DCA interval"
-        )
-
-        # Show warning if both DCA and rebalancing are enabled
-        if rebalance_freq is not None:
-            st.sidebar.warning("⚠️ DCA and rebalancing are mutually exclusive. DCA will take precedence.")
-
-    # Cache option
-    st.sidebar.subheader("Options")
-    use_cache = st.sidebar.checkbox(
-        "Use cached data",
-        value=True,
-        help="Reuse previously downloaded data for faster results"
-    )
-    
-    # Run button
-    run_backtest = st.sidebar.button("🚀 Run Backtest", type="primary", use_container_width=True)
+    # Render sidebar and get configuration
+    # Using forms prevents reruns on every input change, dramatically improving performance
+    config = render_sidebar_form()
 
     # =========================================================================
     # Main Content Area
     # =========================================================================
 
-    # Run backtest and store results in session state
-    if run_backtest:
-        # Validate inputs
-        is_valid, error_msg = validate_backtest_inputs(tickers, benchmarks, start_date, end_date)
-        
-        if not is_valid:
-            st.error(f"❌ {error_msg}")
-            st.stop()
-        
-        # Validate ticker format
-        try:
-            validate_tickers(tickers)
-            validate_tickers(benchmarks)
-        except ValueError as e:
-            st.error(f"❌ **Ticker Validation Failed**\n\n{str(e)}")
-            st.stop()
-        
-        # Normalize weights
-        weights_array, was_normalized = check_and_normalize_weights(weights)
-        if was_normalized:
-            st.info(f"ℹ️ Weights normalized to sum to 1.0: {weights_array.round(3).tolist()}")
-        
-        # Progress indicator
-        with st.spinner("Downloading price data..."):
-            try:
-                # Download prices
-                universe = list(dict.fromkeys(tickers + benchmarks))
-                prices = download_prices(
-                    universe,
-                    start_date.strftime("%Y-%m-%d"),
-                    end_date.strftime("%Y-%m-%d"),
-                    use_cache=use_cache
-                )
-                
-                portfolio_prices = prices[tickers]
-                
-                # Download all benchmarks
-                all_benchmark_prices = {}
-                for bench in benchmarks:
-                    all_benchmark_prices[bench] = prices[bench]
-                
-                # Keep primary benchmark for backward compatibility
-                benchmark_prices = all_benchmark_prices[benchmarks[0]]
-                
-                st.success(
-                    f"✅ Downloaded data for {len(tickers)} portfolio ticker(s) "
-                    f"and {len(benchmarks)} benchmark(s)"
-                )
-                
-            except Exception as e:
-                st.error(f"❌ Error downloading data: {str(e)}")
-                st.stop()
-        
-        # Compute metrics
-        with st.spinner("Computing backtest metrics..."):
-            try:
-                # Compute metrics for primary benchmark
-                results = compute_metrics(
-                    portfolio_prices,
-                    weights_array,
-                    benchmark_prices,
-                    capital,
-                    rebalance_freq=rebalance_freq,
-                    dca_amount=dca_amount,
-                    dca_freq=dca_freq
-                )
+    # Run backtest if form submitted
+    if config['submit_clicked']:
+        _run_backtest(config)
 
-                # Compute metrics for additional benchmarks
-                all_benchmark_results = {}
-                for bench_name, bench_prices in all_benchmark_prices.items():
-                    bench_result = compute_metrics(
-                        portfolio_prices,
-                        weights_array,
-                        bench_prices,
-                        capital,
-                        rebalance_freq=rebalance_freq,
-                        dca_amount=dca_amount,
-                        dca_freq=dca_freq
-                    )
-                    all_benchmark_results[bench_name] = bench_result
-
-                # Store results in session state using StateManager
-                StateManager.store_backtest_results(
-                    results=results,
-                    all_benchmark_results=all_benchmark_results,
-                    tickers=tickers,
-                    benchmarks=benchmarks,
-                    weights_array=weights_array,
-                    capital=capital,
-                    rebalance_strategy=rebalance_strategy,
-                    rebalance_freq=rebalance_freq,
-                    dca_frequency=dca_frequency,
-                    dca_freq=dca_freq,
-                    dca_amount=dca_amount
-                )
-
-                st.success("✅ Backtest completed successfully!")
-
-            except Exception as e:
-                st.error(f"❌ Error computing metrics: {str(e)}")
-                st.stop()
-
-    # Display results from session state (persists across reruns)
+    # Display results if available
     if StateManager.is_backtest_completed():
-        # Retrieve stored results
-        stored = StateManager.get_backtest_results()
-        results = stored['results']
-        all_benchmark_results = stored['all_benchmark_results']
-        tickers = stored['tickers']
-        benchmarks = stored['benchmarks']
-        weights_array = stored['weights_array']
-        capital = stored['capital']
-        rebalance_strategy = stored['rebalance_strategy']
-        rebalance_freq = stored['rebalance_freq']
-        dca_frequency = stored.get('dca_frequency')
-        dca_freq = stored.get('dca_freq')
-        dca_amount = stored.get('dca_amount')
-
-        # Display results
-        st.divider()
-        st.header("📊 Backtest Results")
-        
-        # Summary statistics
-        st.subheader("Summary Statistics")
-        
-        # Compute summaries
-        # Get total contributions for accurate return calculations
-        portfolio_total_contrib = results["portfolio_contributions"].iloc[-1]
-
-        # Pass contributions series for IRR calculation (only for DCA strategies)
-        portfolio_summary = summarize(
-            results["portfolio_value"],
-            capital,
-            total_contributions=portfolio_total_contrib,
-            contributions_series=results["portfolio_contributions"] if (dca_freq and dca_amount) else None
-        )
-
-        # Compute summaries for all benchmarks
-        all_benchmark_summaries = {}
-        for bench_name, bench_result in all_benchmark_results.items():
-            benchmark_total_contrib = bench_result["benchmark_contributions"].iloc[-1]
-            all_benchmark_summaries[bench_name] = summarize(
-                bench_result['benchmark_value'],
-                capital,
-                total_contributions=benchmark_total_contrib,
-                contributions_series=bench_result["benchmark_contributions"] if (dca_freq and dca_amount) else None
-            )
-        
-        # Display in columns
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            render_metrics_column(portfolio_summary, "Portfolio")
-        
-        with col2:
-            render_metrics_column(all_benchmark_summaries[benchmarks[0]], f"Benchmark ({benchmarks[0]})")
-        
-        with col3:
-            render_relative_metrics(portfolio_summary, all_benchmark_summaries[benchmarks[0]])
-        
-        # Additional benchmark comparisons
-        if len(benchmarks) > 1:
-            st.divider()
-            st.subheader("Additional Benchmark Comparisons")
-            
-            for bench_name in benchmarks[1:]:
-                with st.expander(f"📊 Portfolio vs {bench_name}", expanded=False):
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        render_metrics_column(all_benchmark_summaries[bench_name], bench_name)
-                    
-                    with col2:
-                        render_relative_metrics(portfolio_summary, all_benchmark_summaries[bench_name])
-        
-        # Portfolio composition
-        st.divider()
-        render_portfolio_composition(tickers, weights_array)
-
-        # Display investment strategy
-        if dca_freq and dca_amount:
-            st.info(f"📊 **Strategy**: Dollar-Cost Averaging ({dca_frequency}, ${dca_amount:,.2f}/contribution)")
-        elif rebalance_freq:
-            st.info(f"📊 **Strategy**: {rebalance_strategy}")
-        else:
-            st.info(f"📊 **Strategy**: {rebalance_strategy}")
-
-        # Charts
-        st.divider()
-        st.header("📈 Interactive Visualizations")
-        st.caption("💡 Hover over the charts to see exact values")
-
-        # Log scale toggle
-        log_scale = st.checkbox(
-            "Use logarithmic scale for portfolio value chart",
-            value=False,
-            help="Logarithmic scale is useful for viewing long-term exponential growth"
-        )
-
-        # Create main dashboard
-        fig = create_main_dashboard(results, all_benchmark_results, benchmarks, log_scale=log_scale)
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Rolling returns analysis
-        st.divider()
-        st.subheader("📊 Rolling Returns Analysis")
-        st.caption("💡 Rolling returns show performance consistency over different time periods")
-
-        fig_rolling = create_rolling_returns_chart(results, all_benchmark_results, benchmarks)
-        st.plotly_chart(fig_rolling, use_container_width=True)
-
-        # Rolling Sharpe ratio analysis
-        st.divider()
-        st.subheader("📈 Rolling 12-Month Sharpe Ratio")
-        st.caption("💡 Rolling Sharpe ratio shows how risk-adjusted performance evolves over time (12-month window)")
-
-        fig_sharpe = create_rolling_sharpe_chart(results, all_benchmark_results, benchmarks)
-        st.plotly_chart(fig_sharpe, use_container_width=True)
-
-        # Download options
-        st.divider()
-        st.subheader("💾 Download Results")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # CSV download
-            csv_buffer = io.StringIO()
-            results.to_csv(csv_buffer)
-            csv_data = csv_buffer.getvalue()
-            
-            st.download_button(
-                label="📥 Download CSV",
-                data=csv_data,
-                file_name=f"backtest_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
-        
-        with col2:
-            # Chart download as interactive HTML
-            chart_html = fig.to_html(include_plotlyjs='cdn')
-            
-            st.download_button(
-                label="📥 Download Interactive Charts (HTML)",
-                data=chart_html,
-                file_name=f"backtest_charts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
-                mime="text/html",
-                use_container_width=True
-            )
-        
-        # Show raw data
-        with st.expander("📋 View Raw Data"):
-            st.dataframe(results, use_container_width=True)
-    
+        stored_results = StateManager.get_backtest_results()
+        render_results(stored_results)
     else:
-        # Welcome screen
-        st.info("👈 Configure your backtest in the sidebar and click '🚀 Run Backtest' to begin")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("""
-            #### 🎯 How to use:
-            1. **Choose a preset** portfolio or select Custom
-            2. **Enter tickers** for your portfolio (e.g., AAPL, MSFT)
-            3. **Set weights** for each ticker (will auto-normalize)
-            4. **Select benchmark(s)** to compare against
-            5. **Select date range** for the backtest
-            6. **Set initial capital** amount
-            7. **Click 'Run Backtest'** to see results
-            """)
-        
-        with col2:
-            st.markdown("""
-            #### 📊 Features:
-            - **Comprehensive metrics**: CAGR, Sharpe, Sortino, Drawdown
-            - **Interactive charts**: Hover to see exact values at any point
-            - **Data caching**: Faster subsequent runs
-            - **CSV export**: Download results for further analysis
-            - **Chart export**: Save interactive visualizations as HTML
-            - **Real-time data**: Fetches latest prices from Yahoo Finance
-            """)
+        render_welcome_screen()
 
 
 if __name__ == "__main__":

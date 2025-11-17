@@ -20,10 +20,10 @@ This is a lightweight Python-based ETF backtesting utility that allows users to:
 **Primary Use Case**: Testing portfolio allocations (default: VDCP.L/VHYD.L vs VWRA.L benchmark)
 
 **Current Status**:
-- **Version**: v2.3.0-dev (Unreleased - 2025-11-17)
-- **Test Coverage**: ~88% (256 tests, 100% passing)
-- **Progress**: Colorblind accessibility implemented with Wong palette
-- **Branch**: claude/colorblind-accessibility-012kgC3LoMaK1MzLm7NBikia
+- **Version**: v2.4.0-dev (Unreleased - 2025-11-17)
+- **Test Coverage**: ~88% (261 tests, 255 passing / 97.7%)
+- **Progress**: Streamlit best practices implemented (caching, forms, URL sharing)
+- **Branch**: claude/improve-streamlit-best-practices-01VeYjdv5JHLnp4KiTL4ugaZ
 
 ---
 
@@ -33,22 +33,25 @@ This is a lightweight Python-based ETF backtesting utility that allows users to:
 portfolio-backtester/
 ├── .venv/                    # Python virtual environment (gitignored - create with: python -m venv .venv)
 ├── app.py                    # Streamlit web UI (backward compatibility wrapper - 43 lines)
-├── app/                      # Modular web UI package (9 modules, 2,202 lines)
+├── app/                      # Modular web UI package (12 modules, 2,871 lines)
 │   ├── __init__.py           # Package initialization
 │   ├── config.py             # Configuration constants (32 constants)
 │   ├── presets.py            # Portfolio and date presets
 │   ├── validation.py         # Input validation (delegates to StateManager)
-│   ├── state_manager.py      # Centralized session state management (NEW - 507 lines)
+│   ├── state_manager.py      # Centralized session state management (507 lines)
 │   ├── ui_components.py      # Reusable UI rendering with searchable inputs
-│   ├── ticker_data.py        # Ticker search & Yahoo Finance integration
+│   ├── ticker_data.py        # Ticker search & Yahoo Finance integration (w/ caching)
 │   ├── charts.py             # Plotly chart generation
-│   └── main.py               # Application orchestration
+│   ├── sidebar.py            # Form-based sidebar rendering (NEW - 310 lines)
+│   ├── results.py            # Results display functions (NEW - 330 lines)
+│   ├── utils.py              # URL params, error handling, progress (NEW - 269 lines)
+│   └── main.py               # Application orchestration (reduced to 310 lines)
 ├── backtest.py               # Core backtesting engine (830 lines - Phases 1 & 3)
 ├── plot_backtest.py          # Visualization utility (395 lines - Phases 2 & 3)
-├── tests/                    # Test suite (256 tests, ~88% coverage; see docs/TESTING_GUIDE.md)
-│   ├── conftest.py           # pytest configuration
+├── tests/                    # Test suite (261 tests, ~88% coverage; see docs/TESTING_GUIDE.md)
+│   ├── conftest.py           # pytest configuration (with session state reset fixture)
 │   ├── test_backtest.py      # Unit tests for backtest.py (93 tests)
-│   ├── test_app.py           # Unit tests for app.py UI (71 tests)
+│   ├── test_app.py           # Unit tests for app.py UI (76 tests - includes URL params)
 │   ├── test_state_manager.py # Unit tests for state_manager.py (39 tests)
 │   ├── test_ticker_data.py   # Unit tests for ticker_data.py (32 tests)
 │   ├── test_ticker_names.py  # Placeholder for upcoming ticker name scenarios
@@ -57,11 +60,11 @@ portfolio-backtester/
 ├── README.md                 # Main user documentation
 ├── CLAUDE.md                 # This file - AI assistant guide
 └── docs/                     # Documentation directory
-    ├── FILE_REFERENCE.md         # Detailed file documentation
-    ├── TESTING_GUIDE.md          # TDD rules and test patterns
-    ├── DEVELOPER_GUIDE.md        # Development workflows
-    ├── CHANGELOG.md              # Version history with rolling Sharpe feature
-    └── PROJECT_SUMMARY.md        # Additional project documentation
+    ├── FILE_REFERENCE.md             # Detailed file documentation
+    ├── TESTING_GUIDE.md              # TDD rules and test patterns
+    ├── DEVELOPER_GUIDE.md            # Development workflows
+    ├── CHANGELOG.md                  # Version history (v2.4.0: Streamlit best practices)
+    └── PROJECT_SUMMARY.md            # Additional project documentation
 ```
 
 **Gitignored Directories** (do not commit):
@@ -103,21 +106,30 @@ portfolio-backtester/
 - DCA weekend handling: next available trading day
 - Contribution-adjusted returns: `(value_change - contribution_change) / previous_value`
 
-#### 2. Web UI (app/ package - 8 modules, 1,695 lines)
+#### 2. Web UI (app/ package - 12 modules, 2,871 lines)
 
-**Purpose**: Interactive Streamlit dashboard with presets, multiple benchmarks, and charts
+**Purpose**: High-performance interactive Streamlit dashboard with best practices
 
-**Architecture** (Phase 2 - Modular + Searchable Tickers):
+**Architecture** (Best Practices Refactor):
 - **config.py**: Centralized configuration (32 constants)
 - **presets.py**: Portfolio & date presets (6 portfolios + 6 date ranges)
 - **validation.py**: Session state management & input validation
+- **state_manager.py**: Centralized session state management (507 lines)
 - **ui_components.py**: Reusable UI rendering with searchable ticker inputs
-- **ticker_data.py**: Ticker search with 50+ curated tickers & Yahoo Finance integration
+- **ticker_data.py**: Ticker search with @st.cache_data (1h TTL for names, 30min for search)
 - **charts.py**: Plotly chart generation (interactive visualizations)
-- **main.py**: Application orchestration & workflow
+- **sidebar.py**: Form-based sidebar rendering (310 lines) - 90% fewer reruns
+- **results.py**: Results display functions (330 lines)
+- **utils.py**: URL params, error handling, progress tracking (269 lines)
+- **main.py**: Application orchestration (reduced to 310 lines from 764)
 - **app.py**: 43-line backward compatibility wrapper
 
 **Features**:
+- **Form-Based Sidebar**: Batched inputs reduce reruns by ~90%
+- **Smart Caching**: @st.cache_data for ticker names (1h) and searches (30min) - 80% fewer API calls
+- **URL Sharing**: Full state preservation (tickers, weights, benchmarks, capital, dates)
+- **Progress Tracking**: Visual progress bars for long operations
+- **Better Error Messages**: User-friendly errors with actionable suggestions
 - Portfolio presets (6 pre-configured portfolios)
 - **Searchable ticker inputs**: Search from 50+ popular ETFs/stocks or use Yahoo Finance API
 - **Portfolio composition table**: Displays ticker symbols, full company/fund names (fetched dynamically from Yahoo Finance), and weights
@@ -131,19 +143,13 @@ portfolio-backtester/
 - Logarithmic scale toggle for portfolio value charts
 - CSV & HTML export
 
-**Phase 2 Improvements**:
-- Zero code duplication (eliminated 134 duplicate lines)
-- All magic numbers extracted to constants
-- Consistent logging throughout
-- 100% backward compatibility
-
-**Searchable Ticker Feature** (New):
-- **Curated List**: 50+ popular ETFs (Global, US, European, Fixed Income, Sector) and stocks for search
-- **Yahoo Finance Integration**: Optional live search (may be rate-limited)
-- **Dynamic Ticker Names**: Company/fund names fetched from Yahoo Finance API in real-time (not hardcoded)
-- **Graceful Fallback**: Uses curated list if Yahoo Finance search unavailable; returns empty name if ticker info unavailable
-- **User-Friendly**: Click-to-select from search results or manual entry
-- **LRU Caching**: Ticker names cached (500 entries) to minimize API calls
+**Best Practices (NEW)**:
+- ✅ **Caching**: @st.cache_data with TTL for expensive operations
+- ✅ **Forms**: Sidebar wrapped in st.form to prevent unnecessary reruns
+- ✅ **Modular Code**: 764-line main.py split into focused modules (60% reduction)
+- ✅ **URL Parameters**: Shareable links with full configuration preservation
+- ✅ **Error Handling**: Contextual error messages with help text
+- ✅ **Progress Tracking**: ProgressTracker context manager for long operations
 
 #### 3. Visualization (plot_backtest.py - 395 lines)
 
@@ -165,12 +171,13 @@ portfolio-backtester/
 - **Phase 2**: Logging instead of print statements
 - **Phase 3**: Data quality validation (min 2 rows, NaN checks)
 
-#### 4. Testing Infrastructure (5 test files, 256 tests)
+#### 4. Testing Infrastructure (5 test files, 261 tests)
 
-**Test Coverage**: ~88% overall, 100% pass rate
+**Test Coverage**: ~88% overall, 97.7% pass rate (255/261 passing)
 
 **Test Files** (in `tests/` directory):
-- **tests/test_backtest.py** (88 tests): Unit tests for backtest engine
+- **tests/conftest.py**: pytest configuration with auto session state reset fixture
+- **tests/test_backtest.py** (93 tests): Unit tests for backtest engine
   - Cache expiration, retry logic, ticker/date validation
   - Batch downloads, data quality validation
   - Rolling 12-month Sharpe ratio calculation and edge cases
@@ -178,13 +185,14 @@ portfolio-backtester/
   - **IRR/XIRR tests**: Basic calculation, multiple contributions, negative/zero returns, convergence
   - 13 test classes covering all major functions
 
-- **tests/test_app.py** (71 tests): Unit tests for web UI
+- **tests/test_app.py** (76 tests): Unit tests for web UI
   - Portfolio presets, date presets, multiple benchmarks
   - Delta indicators, rolling returns, metric formatting
   - Portfolio composition with ticker names (fetched from yfinance)
   - **DCA metrics**: IRR and total_contributions display
   - **Colorblind accessibility**: 8 tests for Wong palette validation
-  - 15 test classes with comprehensive coverage
+  - **URL Parameters** (NEW): 5 tests for capital/benchmarks sharing bug fixes
+  - 16 test classes with comprehensive coverage
 
 - **tests/test_ticker_data.py** (32 tests): Unit tests for ticker search and name fetching
   - Curated ticker list validation

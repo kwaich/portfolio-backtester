@@ -11,7 +11,24 @@ import pandas as pd
 import pytest
 
 # Mock streamlit before importing app
-sys.modules['streamlit'] = MagicMock()
+# Create a mock that makes cache_data work with lru_cache
+from functools import lru_cache
+
+streamlit_mock = MagicMock()
+
+def mock_cache_data(*args, **kwargs):
+    """Mock cache_data that actually caches using lru_cache."""
+    def decorator(func):
+        # Use lru_cache to actually cache
+        cached_func = lru_cache(maxsize=128)(func)
+        # Add Streamlit-compatible clear method
+        cached_func.clear = cached_func.cache_clear
+        return cached_func
+    return decorator
+
+streamlit_mock.cache_data = mock_cache_data
+streamlit_mock.query_params = {}
+sys.modules['streamlit'] = streamlit_mock
 
 import backtest
 
@@ -242,26 +259,24 @@ class TestErrorHandling:
 class TestPortfolioComposition:
     """Test portfolio composition display logic"""
 
-    @patch('app.ticker_data.yf.Ticker')
-    def test_composition_table_data(self, mock_yf_ticker):
+    @patch('app.ticker_data._get_ticker_name_impl')
+    def test_composition_table_data(self, mock_get_ticker_impl):
         """Test creation of portfolio composition table with ticker names from yfinance"""
         from app.ticker_data import get_ticker_name
 
         # Clear cache
         get_ticker_name.cache_clear()
 
-        # Mock yfinance responses for different tickers
-        def mock_ticker_side_effect(symbol):
-            mock_instance = Mock()
+        # Mock implementation function directly
+        def mock_impl_side_effect(symbol):
             names = {
-                "AAPL": {'longName': 'Apple Inc.'},
-                "MSFT": {'longName': 'Microsoft Corporation'},
-                "GOOGL": {'longName': 'Alphabet Inc. (Google) Class A'}
+                "AAPL": 'Apple Inc.',
+                "MSFT": 'Microsoft Corporation',
+                "GOOGL": 'Alphabet Inc. (Google) Class A'
             }
-            mock_instance.info = names.get(symbol, {})
-            return mock_instance
+            return names.get(symbol, "")
 
-        mock_yf_ticker.side_effect = mock_ticker_side_effect
+        mock_get_ticker_impl.side_effect = mock_impl_side_effect
 
         tickers = ["AAPL", "MSFT", "GOOGL"]
         weights_array = np.array([0.5, 0.3, 0.2])
@@ -291,26 +306,24 @@ class TestPortfolioComposition:
         assert composition_data["Weight"][1] == "30.0%"
         assert composition_data["Weight"][2] == "20.0%"
 
-    @patch('app.ticker_data.yf.Ticker')
-    def test_composition_with_unknown_ticker(self, mock_yf_ticker):
+    @patch('app.ticker_data._get_ticker_name_impl')
+    def test_composition_with_unknown_ticker(self, mock_get_ticker_impl):
         """Test composition table handles unknown tickers gracefully"""
         from app.ticker_data import get_ticker_name
 
         # Clear cache
         get_ticker_name.cache_clear()
 
-        # Mock yfinance responses
-        def mock_ticker_side_effect(symbol):
-            mock_instance = Mock()
+        # Mock implementation function directly
+        def mock_impl_side_effect(symbol):
             names = {
-                "AAPL": {'longName': 'Apple Inc.'},
-                "SPY": {'longName': 'SPDR S&P 500 ETF Trust'},
-                "UNKNOWN_TICKER": None  # No info for unknown ticker
+                "AAPL": 'Apple Inc.',
+                "SPY": 'SPDR S&P 500 ETF Trust',
+                "UNKNOWN_TICKER": ''  # No info for unknown ticker
             }
-            mock_instance.info = names.get(symbol, None)
-            return mock_instance
+            return names.get(symbol, "")
 
-        mock_yf_ticker.side_effect = mock_ticker_side_effect
+        mock_get_ticker_impl.side_effect = mock_impl_side_effect
 
         tickers = ["AAPL", "UNKNOWN_TICKER", "SPY"]
         weights_array = np.array([0.4, 0.3, 0.3])
@@ -1155,6 +1168,90 @@ class TestColorblindAccessibility:
         for bench_color in BENCHMARK_COLORS:
             ratio = contrast_ratio(PORTFOLIO_COLOR, bench_color)
             assert ratio >= 1.4, f"Insufficient contrast between portfolio and benchmark: {ratio:.2f}"
+
+
+class TestURLParameters:
+    """Test URL parameter handling for shareable links"""
+
+    def test_url_params_parse_capital(self):
+        """Test that capital parameter is parsed from URL"""
+        from app.utils import get_query_params
+
+        # Mock query params
+        import sys
+        st_mock = sys.modules['streamlit']
+        st_mock.query_params = {'capital': '50000'}
+
+        params = get_query_params()
+
+        assert 'capital' in params
+        assert params['capital'] == 50000.0
+
+    def test_url_params_parse_benchmarks_plural(self):
+        """Test that benchmarks (plural) parameter is parsed from URL"""
+        from app.utils import get_query_params
+
+        # Mock query params
+        import sys
+        st_mock = sys.modules['streamlit']
+        st_mock.query_params = {'benchmarks': 'SPY,QQQ,VTI'}
+
+        params = get_query_params()
+
+        assert 'benchmarks' in params
+        assert params['benchmarks'] == ['SPY', 'QQQ', 'VTI']
+
+    def test_url_params_parse_single_benchmark(self):
+        """Test backward compatibility with singular benchmark parameter"""
+        from app.utils import get_query_params
+
+        # Mock query params
+        import sys
+        st_mock = sys.modules['streamlit']
+        st_mock.query_params = {'benchmark': 'SPY'}
+
+        params = get_query_params()
+
+        assert 'benchmark' in params
+        assert params['benchmark'] == 'SPY'
+
+    def test_url_params_capital_defaults_to_100k(self):
+        """Test that missing capital parameter doesn't break parsing"""
+        from app.utils import get_query_params
+
+        # Mock query params without capital
+        import sys
+        st_mock = sys.modules['streamlit']
+        st_mock.query_params = {'tickers': 'AAPL,MSFT'}
+
+        params = get_query_params()
+
+        # Capital should not be in params if not provided
+        assert 'capital' not in params
+
+    def test_set_query_params_includes_capital_and_benchmarks(self):
+        """Test that set_query_params writes both capital and benchmarks"""
+        from app.utils import set_query_params
+        from datetime import datetime
+
+        # Mock session state
+        import sys
+        st_mock = sys.modules['streamlit']
+        st_mock.query_params = {}
+
+        set_query_params(
+            tickers=['AAPL', 'MSFT'],
+            weights=[0.6, 0.4],
+            benchmarks=['SPY', 'QQQ'],
+            capital=50000,
+            start_date=datetime(2020, 1, 1)
+        )
+
+        # Verify capital and benchmarks were written (plural)
+        assert 'capital' in st_mock.query_params
+        assert st_mock.query_params['capital'] == '50000'
+        assert 'benchmarks' in st_mock.query_params
+        assert st_mock.query_params['benchmarks'] == 'SPY,QQQ'
 
 
 if __name__ == "__main__":
