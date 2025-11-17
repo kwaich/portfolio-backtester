@@ -23,7 +23,7 @@ import sys
 import time
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, List
+from typing import Any, Callable, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -634,11 +634,13 @@ def _calculate_rebalanced_portfolio(
         prices: DataFrame with aligned prices for all portfolio tickers
         weights: Array of target portfolio weights
         capital: Initial capital amount
-        rebalance_freq: Pandas frequency string ('D', 'W', 'M', 'Q', 'Y')
+        rebalance_freq: Pandas frequency string ('D', 'W', 'ME', 'Q', 'Y')
 
     Returns:
         Series with portfolio value for each date
     """
+    rebalance_freq = _normalize_pandas_frequency(rebalance_freq)
+
     # Generate rebalancing dates
     rebalance_dates = pd.date_range(
         start=prices.index[0],
@@ -702,13 +704,15 @@ def _calculate_dca_portfolio(
         weights: Array of target portfolio weights
         capital: Initial capital amount
         dca_amount: Amount to contribute at each DCA interval
-        dca_freq: Pandas frequency string for contributions ('D', 'W', 'M', 'Q', 'Y')
+        dca_freq: Pandas frequency string for contributions ('D', 'W', 'ME', 'Q', 'Y')
 
     Returns:
         Tuple of (portfolio_values, cumulative_contributions):
             - portfolio_values: Series with portfolio market value for each date
             - cumulative_contributions: Series with total amount invested up to each date
     """
+    dca_freq = _normalize_pandas_frequency(dca_freq)
+
     # Generate DCA contribution dates
     dca_dates = pd.date_range(
         start=prices.index[0],
@@ -930,7 +934,7 @@ def compute_metrics(
     # This shows how risk-adjusted performance evolves over time
     window = 252  # Approximately 12 months of trading days
 
-    def calculate_rolling_sharpe(values: pd.Series, window_size: int) -> pd.Series:
+    def calculate_rolling_sharpe(values: pd.Series, window_size: int, contributions: Optional[pd.Series] = None) -> pd.Series:
         """Calculate rolling Sharpe ratio over a specified window.
 
         Args:
@@ -940,8 +944,8 @@ def compute_metrics(
         Returns:
             Series of rolling Sharpe ratios (NaN for insufficient data)
         """
-        # Calculate daily returns
-        daily_returns = values.pct_change()
+        # Calculate daily returns (exclude contribution spikes when provided)
+        daily_returns = _calculate_daily_returns(values, contributions)
 
         # Calculate rolling mean and std of returns
         rolling_mean = daily_returns.rolling(window=window_size).mean()
@@ -961,8 +965,8 @@ def compute_metrics(
 
         return sharpe
 
-    table["portfolio_rolling_sharpe_12m"] = calculate_rolling_sharpe(portfolio_value, window)
-    table["benchmark_rolling_sharpe_12m"] = calculate_rolling_sharpe(bench_value, window)
+    table["portfolio_rolling_sharpe_12m"] = calculate_rolling_sharpe(portfolio_value, window, portfolio_contributions)
+    table["benchmark_rolling_sharpe_12m"] = calculate_rolling_sharpe(bench_value, window, bench_contributions)
 
     logger.info(
         f"Calculated rolling 12-month Sharpe ratio "
@@ -1021,6 +1025,61 @@ def _calculate_xirr(cashflows: np.ndarray, dates_in_days: np.ndarray, guess: flo
 
     # Didn't converge
     return None
+
+
+def _calculate_daily_returns(series: pd.Series, contributions_series: Optional[pd.Series] = None) -> pd.Series:
+    """Calculate daily returns, optionally removing contribution effects."""
+    if series.empty:
+        return pd.Series(dtype=float)
+
+    if contributions_series is None:
+        return series.pct_change()
+
+    aligned_contributions = contributions_series.reindex(series.index).ffill()
+    aligned_contributions = aligned_contributions.fillna(0.0)
+
+    value_changes = series.diff()
+    contribution_changes = aligned_contributions.diff().fillna(0.0)
+    market_value_changes = value_changes - contribution_changes
+    prev_values = series.shift(1)
+
+    returns = market_value_changes / prev_values
+    return returns.replace([np.inf, -np.inf], np.nan)
+
+
+def _normalize_pandas_frequency(freq: Optional[str]) -> Optional[str]:
+    """Normalize deprecated pandas frequency codes to their modern equivalents."""
+    if freq is None:
+        return None
+
+    normalized = freq.upper()
+    replacements = {
+        'M': 'ME',
+        'Q': 'QE',
+        'Y': 'YE'
+    }
+    return replacements.get(normalized, normalized)
+
+
+def _calculate_max_drawdown(series: pd.Series) -> float:
+    """Return the maximum drawdown for an equity curve as a decimal.
+
+    Args:
+        series: Time series of portfolio values
+
+    Returns:
+        Maximum drawdown (negative decimal, e.g., -0.25 for -25%)
+    """
+    if series.empty:
+        return 0.0
+
+    clean_series = series.dropna()
+    if clean_series.empty:
+        return 0.0
+
+    running_max = clean_series.expanding().max()
+    drawdowns = (clean_series / running_max) - 1.0
+    return float(drawdowns.min())
 
 
 def summarize(
@@ -1098,22 +1157,8 @@ def summarize(
                     )
                     irr = None
 
-    # Calculate daily returns for additional metrics
-    # For DCA strategies, we need to exclude the impact of contributions
-    if contributions_series is not None:
-        # Calculate contribution-adjusted returns
-        # Daily change in value minus any new contributions
-        value_changes = series.diff()
-        contribution_changes = contributions_series.diff().fillna(0)
-        market_value_changes = value_changes - contribution_changes
-
-        # Calculate returns based on previous day's value
-        # This gives the true market return, excluding contribution impact
-        daily_returns = market_value_changes / series.shift(1)
-        daily_returns = daily_returns.dropna()
-    else:
-        # For lump sum investments, use simple percentage change
-        daily_returns = series.pct_change().dropna()
+    # Calculate daily returns for additional metrics (remove contribution effects for DCA)
+    daily_returns = _calculate_daily_returns(series, contributions_series).dropna()
 
     # Volatility (annualized standard deviation)
     volatility = daily_returns.std() * np.sqrt(TRADING_DAYS_PER_YEAR)
@@ -1123,24 +1168,8 @@ def summarize(
     annualized_return = irr if (irr is not None) else cagr
     sharpe_ratio = (annualized_return / volatility) if volatility > 0 else 0.0
 
-    # Maximum drawdown
-    if contributions_series is not None:
-        # For DCA, calculate drawdown on return percentage (value - contributions) / contributions
-        # This shows the maximum decline from a peak return percentage
-        return_pct = (series - contributions_series) / contributions_series
-
-        # Track the running maximum return percentage
-        running_max = return_pct.expanding().max()
-
-        # Drawdown at each point = current return % - peak return %
-        drawdown_series = return_pct - running_max
-
-        # Max drawdown is the worst (most negative) drawdown
-        drawdown = drawdown_series.min()
-    else:
-        # For lump sum, use traditional drawdown calculation on absolute value
-        cumulative = series / series.expanding().max()
-        drawdown = (cumulative - 1).min()
+    # Maximum drawdown on actual equity curve (applies to both lump sum and DCA)
+    drawdown = _calculate_max_drawdown(series)
 
     # Sortino ratio (downside deviation only)
     downside_returns = daily_returns[daily_returns < 0]
@@ -1225,6 +1254,7 @@ def main(argv: List[str]) -> None:
             'yearly': 'Y'
         }
         rebalance_freq = freq_map.get(rebalance_freq.lower(), rebalance_freq.upper())
+        rebalance_freq = _normalize_pandas_frequency(rebalance_freq)
 
     # Normalize DCA frequency
     dca_freq = args.dca_freq
@@ -1239,6 +1269,7 @@ def main(argv: List[str]) -> None:
             'yearly': 'Y'
         }
         dca_freq = freq_map.get(dca_freq.lower(), dca_freq.upper())
+        dca_freq = _normalize_pandas_frequency(dca_freq)
 
     # Validate DCA parameters
     if (dca_freq is not None and dca_amount is None) or (dca_amount is not None and dca_freq is None):
@@ -1289,11 +1320,29 @@ def main(argv: List[str]) -> None:
 
     # Show strategy
     if dca_freq and dca_amount:
-        freq_names = {'D': 'Daily', 'W': 'Weekly', 'M': 'Monthly', 'Q': 'Quarterly', 'Y': 'Yearly'}
+        freq_names = {
+            'D': 'Daily',
+            'W': 'Weekly',
+            'M': 'Monthly',
+            'ME': 'Monthly',
+            'Q': 'Quarterly',
+            'QE': 'Quarterly',
+            'Y': 'Yearly',
+            'YE': 'Yearly'
+        }
         strategy_name = freq_names.get(dca_freq, dca_freq)
         print(f"Strategy: Dollar-Cost Averaging ({strategy_name}, ${dca_amount:,.2f}/contribution)")
     elif rebalance_freq:
-        freq_names = {'D': 'Daily', 'W': 'Weekly', 'M': 'Monthly', 'Q': 'Quarterly', 'Y': 'Yearly'}
+        freq_names = {
+            'D': 'Daily',
+            'W': 'Weekly',
+            'M': 'Monthly',
+            'ME': 'Monthly',
+            'Q': 'Quarterly',
+            'QE': 'Quarterly',
+            'Y': 'Yearly',
+            'YE': 'Yearly'
+        }
         strategy_name = freq_names.get(rebalance_freq, rebalance_freq)
         print(f"Strategy: {strategy_name} Rebalancing")
     else:

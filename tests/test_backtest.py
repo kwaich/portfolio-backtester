@@ -241,10 +241,54 @@ class TestSummarize:
         assert stats["max_drawdown"] < 0
         assert stats["max_drawdown"] == pytest.approx(-0.1818, abs=0.01)
 
+    def test_dca_drawdown_not_triggered_by_contributions(self):
+        dates = pd.date_range("2020-01-01", periods=6, freq="ME")
+        contributions = pd.Series([1000 * (i + 1) for i in range(len(dates))], index=dates, dtype=float)
+        values = contributions.copy()  # portfolio value only grows via contributions
+
+        stats = backtest.summarize(
+            values,
+            1000,
+            total_contributions=contributions.iloc[-1],
+            contributions_series=contributions,
+        )
+
+        assert stats["max_drawdown"] == pytest.approx(0.0)
+        assert stats["volatility"] == 0.0
+        assert stats["sharpe_ratio"] == 0.0
+        assert stats["sortino_ratio"] == 0.0
+
+    def test_dca_drawdown_tracks_equity_decline(self):
+        dates = pd.date_range("2020-01-01", periods=5, freq="ME")
+        contributions = pd.Series([1000 * (i + 1) for i in range(len(dates))], index=dates, dtype=float)
+        values = pd.Series([1000, 2100, 3200, 2800, 3600], index=dates, dtype=float)
+
+        stats = backtest.summarize(
+            values,
+            1000,
+            total_contributions=contributions.iloc[-1],
+            contributions_series=contributions,
+        )
+
+        # Drop from 3200 peak to 2800 trough ~ -12.5%
+        assert stats["max_drawdown"] == pytest.approx(-0.125, abs=0.001)
+
     def test_empty_series_raises_error(self):
         empty_series = pd.Series([], dtype=float)
         with pytest.raises(ValueError, match="Cannot summarize an empty series"):
             backtest.summarize(empty_series, 100_000)
+
+
+class TestHelperFunctions:
+    def test_contribution_adjusted_daily_returns(self):
+        dates = pd.date_range("2020-01-01", periods=3, freq="D")
+        values = pd.Series([100.0, 160.0, 152.0], index=dates)
+        contributions = pd.Series([100.0, 150.0, 150.0], index=dates)
+
+        returns = backtest._calculate_daily_returns(values, contributions)
+        expected = pd.Series([np.nan, 0.1, -0.05], index=dates)
+
+        pd.testing.assert_series_equal(returns, expected)
 
 
 class TestComputeMetrics:
@@ -407,6 +451,25 @@ class TestComputeMetrics:
         # With zero volatility and zero returns, Sharpe should be 0
         valid_sharpe = table["portfolio_rolling_sharpe_12m"].dropna()
         assert (valid_sharpe == 0.0).all()
+
+    def test_dca_rolling_sharpe_ignores_contributions(self):
+        dates = pd.date_range("2020-01-01", periods=260, freq="B")
+        prices = pd.DataFrame({"AAPL": [100.0] * len(dates)}, index=dates)
+        benchmark = pd.Series([100.0] * len(dates), index=dates)
+        weights = np.array([1.0])
+
+        table = backtest.compute_metrics(
+            prices,
+            weights,
+            benchmark,
+            1_000,
+            dca_amount=100,
+            dca_freq="M",
+        )
+
+        # With flat prices, the rolling Sharpe columns should stay NaN (no valid returns)
+        assert table["portfolio_rolling_sharpe_12m"].dropna().empty
+        assert table["benchmark_rolling_sharpe_12m"].dropna().empty
 
     def test_rolling_sharpe_12m_insufficient_data(self):
         """Test rolling Sharpe with less than 252 days of data."""
@@ -1060,7 +1123,7 @@ class TestDCA:
 
         # Check contributions are tracked correctly
         # DCA dates include first date + monthly dates (first date is added if not in monthly schedule)
-        monthly_dates = pd.date_range(dates[0], dates[-1], freq="M").intersection(dates)
+        monthly_dates = pd.date_range(dates[0], dates[-1], freq="ME").intersection(dates)
         if dates[0] not in monthly_dates:
             num_dca_dates = len(monthly_dates) + 1  # Add 1 for initial date
         else:
@@ -1122,7 +1185,7 @@ class TestDCA:
         )
 
         # Generate expected monthly dates
-        monthly_dates = pd.date_range("2022-11-18", "2023-11-18", freq="M")
+        monthly_dates = pd.date_range("2022-11-18", "2023-11-18", freq="ME")
 
         # Count actual contributions
         contrib_changes = cumulative_contributions.diff().fillna(cumulative_contributions.iloc[0])
@@ -1219,7 +1282,7 @@ class TestDCA:
 
         # Monthly contributions: initial 10000, then 1000/month for 5 months
         contributions = pd.Series(0.0, index=dates)
-        monthly_dates = pd.date_range(dates[0], dates[-1], freq="M").intersection(dates)
+        monthly_dates = pd.date_range(dates[0], dates[-1], freq="ME").intersection(dates)
         if dates[0] not in monthly_dates:
             monthly_dates = monthly_dates.insert(0, dates[0])
 
