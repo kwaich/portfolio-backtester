@@ -21,9 +21,9 @@ This is a lightweight Python-based ETF backtesting utility that allows users to:
 
 **Current Status**:
 - **Version**: v2.3.0-dev (Unreleased - 2025-11-17)
-- **Test Coverage**: ~88% (248 tests, 100% passing)
-- **Progress**: Session state refactored with centralized StateManager
-- **Branch**: claude/review-session-state-01BxsjR1cChr8Jg4VRPcYf6b
+- **Test Coverage**: ~88% (256 tests, 100% passing)
+- **Progress**: Colorblind accessibility implemented with Wong palette
+- **Branch**: claude/colorblind-accessibility-012kgC3LoMaK1MzLm7NBikia
 
 ---
 
@@ -45,10 +45,10 @@ portfolio-backtester/
 │   └── main.py               # Application orchestration
 ├── backtest.py               # Core backtesting engine (830 lines - Phases 1 & 3)
 ├── plot_backtest.py          # Visualization utility (395 lines - Phases 2 & 3)
-├── tests/                    # Test suite (248 tests, ~88% coverage)
+├── tests/                    # Test suite (256 tests, ~88% coverage)
 │   ├── conftest.py           # pytest configuration
 │   ├── test_backtest.py      # Unit tests for backtest.py (88 tests - includes DCA & IRR)
-│   ├── test_app.py           # Unit tests for app.py UI (63 tests - includes DCA metrics)
+│   ├── test_app.py           # Unit tests for app.py UI (71 tests - includes accessibility)
 │   ├── test_state_manager.py # Unit tests for state_manager.py (39 tests - NEW)
 │   ├── test_ticker_data.py   # Unit tests for ticker_data.py (32 tests)
 │   └── test_integration.py   # Integration tests (16 tests)
@@ -164,7 +164,7 @@ portfolio-backtester/
 - **Phase 2**: Logging instead of print statements
 - **Phase 3**: Data quality validation (min 2 rows, NaN checks)
 
-#### 4. Testing Infrastructure (4 test files, 204 tests)
+#### 4. Testing Infrastructure (5 test files, 256 tests)
 
 **Test Coverage**: ~88% overall, 100% pass rate
 
@@ -177,12 +177,13 @@ portfolio-backtester/
   - **IRR/XIRR tests**: Basic calculation, multiple contributions, negative/zero returns, convergence
   - 13 test classes covering all major functions
 
-- **tests/test_app.py** (63 tests): Unit tests for web UI
+- **tests/test_app.py** (71 tests): Unit tests for web UI
   - Portfolio presets, date presets, multiple benchmarks
   - Delta indicators, rolling returns, metric formatting
   - Portfolio composition with ticker names (fetched from yfinance)
   - **DCA metrics**: IRR and total_contributions display
-  - 14 test classes with comprehensive coverage
+  - **Colorblind accessibility**: 8 tests for Wong palette validation
+  - 15 test classes with comprehensive coverage
 
 - **tests/test_ticker_data.py** (32 tests): Unit tests for ticker search and name fetching
   - Curated ticker list validation
@@ -219,8 +220,18 @@ portfolio-backtester/
 
 **Test Before Commit**:
 ```bash
+# CRITICAL: Create and activate virtual environment if not already done
+if [ ! -d ".venv" ]; then
+    python -m venv .venv
+fi
+source .venv/bin/activate
+
+# Install dependencies if needed
+pip install -q -r requirements.txt
+
 # ALWAYS run tests before committing
 pytest -v
+
 # If tests fail, fix them before committing
 ```
 
@@ -319,11 +330,17 @@ Batch download optimization, data quality validation (NaN/zero/negative/extreme)
 ### Common Commands
 
 ```bash
-# Set up virtual environment (RECOMMENDED)
-python -m venv .venv
+# CRITICAL: Always use virtual environment for testing and development
+# Check if virtual environment exists, create if needed
+if [ ! -d ".venv" ]; then
+    echo "Creating virtual environment..."
+    python -m venv .venv
+fi
+
+# Activate virtual environment
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-# Install dependencies
+# Install dependencies (if not already installed)
 pip install -r requirements.txt
 
 # Run web UI
@@ -335,8 +352,8 @@ python backtest.py --tickers AAPL MSFT --weights 0.6 0.4 --benchmark SPY
 # Plot results
 python plot_backtest.py --csv results/backtest.csv --output charts/test
 
-# Run all tests (248 tests)
-source .venv/bin/activate  # Activate venv first
+# Run all tests (256 tests)
+source .venv/bin/activate  # Ensure venv is active
 pytest -v
 
 # Run with coverage
@@ -488,6 +505,6 @@ git commit -m "feat: add new_metric calculation"
 
 **Last Updated**: 2025-11-17
 **Version**: v2.3.0-dev (Unreleased)
-**Current Branch**: claude/add-dca-backtest-011xDT3WNDnDov3hKvDZa8cA
-**Test Coverage**: ~88% (204 tests, 100% passing)
-**Progress**: DCA feature complete with IRR, weekend handling, and corrected metrics
+**Current Branch**: claude/colorblind-accessibility-012kgC3LoMaK1MzLm7NBikia
+**Test Coverage**: ~88% (256 tests, 100% passing)
+**Progress**: Colorblind accessibility implemented with Wong palette, DCA feature complete
