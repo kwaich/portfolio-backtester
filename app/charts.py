@@ -286,17 +286,11 @@ def create_main_dashboard(
             font=dict(size=LEGEND_FONT_SIZE)
         ),
         hovermode='x unified',
-        template='plotly_white',
-        # Subplot titles styling
-        annotations=[
-            dict(
-                font=dict(size=SUBPLOT_TITLE_FONT_SIZE, color='#333333'),
-            )
-        ] * 4  # Apply to all 4 subplot titles
+        template='plotly_white'
     )
 
-    # Update all subplot title annotations
-    for i, annotation in enumerate(fig['layout']['annotations']):
+    # Update subplot title annotations (preserve existing text and positioning)
+    for annotation in fig['layout']['annotations']:
         annotation['font'] = dict(size=SUBPLOT_TITLE_FONT_SIZE, color='#333333')
     
     return fig
