@@ -169,7 +169,11 @@ def render_date_range_inputs() -> Tuple[datetime, datetime]:
             help=f"Set range to {label}",
             key=f"date_preset_{label}"
         ):
+            # Update StateManager
             StateManager.set_date_preset(date_value)
+            # Also update widget keys so date_input widgets reflect the change
+            st.session_state['start_date_input'] = date_value
+            st.session_state['end_date_input'] = datetime.today()
 
     col1, col2 = st.sidebar.columns(2)
     with col1:
@@ -186,6 +190,10 @@ def render_date_range_inputs() -> Tuple[datetime, datetime]:
             help="Backtest end date",
             key="end_date_input"
         )
+
+    # Sync widget values back to StateManager
+    if start_date != StateManager.get_start_date() or end_date != StateManager.get_end_date():
+        StateManager.set_date_range(start_date, end_date)
 
     return start_date, end_date
 
