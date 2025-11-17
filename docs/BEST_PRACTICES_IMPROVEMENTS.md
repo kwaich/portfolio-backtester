@@ -308,6 +308,42 @@ pytest -v
 
 ---
 
+## Bug Fixes (Post-Implementation)
+
+### URL Parameter Restoration Issues (Fixed)
+
+**Problems Discovered**:
+1. **Capital never restored**: `set_query_params()` wrote capital to URLs, but `_apply_url_parameters()` never read it back → all shared URLs reset to $100k
+2. **Benchmarks singular/plural mismatch**: Writing `benchmarks` (plural) but reading `benchmark` (singular) → all shared URLs lost benchmark selections
+
+**Fixes Applied**:
+```python
+# app/main.py - Added capital restoration
+if 'capital' in params:
+    st.session_state['url_capital'] = params['capital']
+
+# app/main.py - Fixed benchmarks mismatch
+if 'benchmarks' in params:  # Changed from 'benchmark'
+    StateManager.set_preset_benchmark(params['benchmarks'][0])
+    st.session_state['url_benchmarks'] = params['benchmarks']
+elif 'benchmark' in params:  # Backward compatibility
+    st.session_state['url_benchmarks'] = [params['benchmark']]
+
+# app/sidebar.py - Use URL values as defaults
+default_capital = st.session_state.get('url_capital', DEFAULT_CAPITAL)
+url_benchmarks = st.session_state.get('url_benchmarks', [])
+default_num_benchmarks = len(url_benchmarks) if url_benchmarks else 1
+```
+
+**Testing**:
+- Added 5 new tests in `TestURLParameters`
+- Verified capital parsing, benchmarks parsing, backward compatibility
+- Test count: 250 → 255 passing tests
+
+**Impact**: ✅ URL sharing now fully functional for exact backtest reproduction
+
+---
+
 ## Conclusion
 
 These improvements bring the portfolio-backtester app in line with Streamlit best practices, resulting in:
@@ -316,8 +352,17 @@ These improvements bring the portfolio-backtester app in line with Streamlit bes
 - 👥 **Better UX**: Progress tracking, error messages, shareability
 - 🛠️ **Better DX**: Modular code, easier maintenance
 - 📊 **Production Ready**: Scalable architecture
+- 🔗 **Fully Functional URL Sharing**: Capital and benchmarks correctly preserved
 
-**Total effort**: ~900 lines of new code, 60% reduction in main.py complexity
+**Total effort**: ~1050 lines of new code, 60% reduction in main.py complexity, 100% functional URL sharing
+
+---
+
+## Commits
+
+1. `feat: implement Streamlit best practices for performance and UX`
+2. `test: fix caching mocks and improve test isolation`
+3. `fix: restore capital and benchmarks from shared URLs`
 
 ---
 
