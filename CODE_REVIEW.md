@@ -30,9 +30,11 @@ The portfolio backtester is a **well-structured, professionally developed codeba
 
 ## Critical Issues (Fix Immediately)
 
-### 1. Security: Pickle-Based Caching Vulnerability
+### 1. ✅ FIXED: Security: Pickle-Based Caching Vulnerability
 
-**Location:** `backtest.py:310-337, 340-358`
+**Status:** ✅ **COMPLETED** (2025-11-17)
+
+**Original Location:** `backtest.py:310-337, 340-358`
 
 **Issue:**
 Using `pickle` for caching creates potential security vulnerabilities. Unpickling untrusted data can execute arbitrary code.
@@ -84,6 +86,21 @@ def save_cached_prices(cache_path: Path, prices: pd.DataFrame) -> None:
 **Priority:** CRITICAL
 **Effort:** 2-3 hours
 **Impact:** High - Eliminates security vulnerability
+
+**Implementation:**
+Migrated from pickle to Parquet format with JSON metadata:
+- **New Cache Format:**
+  - `{cache_key}.parquet` - Price data (gzip compressed)
+  - `{cache_key}.json` - Metadata (timestamp, version)
+- **Backward Compatibility:** Automatic migration from old pickle caches
+- **Test Coverage:** 9/9 cache tests passing (including migration tests)
+- **Dependencies:** Added `pyarrow>=10.0.0` to requirements.txt
+- **Cache Version:** Bumped to 2.0
+
+**Files Changed:**
+- `backtest.py`: Updated load/save functions to use Parquet
+- `requirements.txt`: Added pyarrow dependency
+- `tests/test_backtest.py`: Updated cache tests for new format
 
 ---
 
