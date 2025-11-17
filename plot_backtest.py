@@ -36,6 +36,27 @@ POSITIVE_COLOR = "#0173B2"   # Blue (instead of green)
 NEGATIVE_COLOR = "#DE8F05"   # Orange (instead of red)
 ACTIVE_COLOR = "#0173B2"     # Blue
 
+# Visual hierarchy constants (matplotlib uses different units than Plotly)
+# Line widths
+PORTFOLIO_LINE_WIDTH = 2.5    # Primary data - thickest
+BENCHMARK_LINE_WIDTH = 2.0    # Secondary data - medium
+REFERENCE_LINE_WIDTH = 0.8    # Reference lines - thin
+GRID_LINE_WIDTH = 0.5         # Grid lines - thinnest
+
+# Opacity/alpha values
+PORTFOLIO_OPACITY = 1.0       # Primary data - fully opaque
+BENCHMARK_OPACITY = 0.8       # Secondary data - slightly transparent
+FILL_OPACITY = 0.3            # Fill areas - subtle
+GRID_OPACITY = 0.3            # Grid lines - subtle
+REFERENCE_OPACITY = 0.5       # Reference lines - moderate
+
+# Font sizes (matplotlib uses points)
+TITLE_FONT_SIZE = 14          # Main titles
+AXIS_LABEL_FONT_SIZE = 11     # Axis labels
+LEGEND_FONT_SIZE = 10         # Legend text
+TICK_LABEL_FONT_SIZE = 9      # Tick labels
+ANNOTATION_FONT_SIZE = 9      # Annotations
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Plot portfolio vs benchmark")
@@ -75,71 +96,75 @@ def format_percentage(x, p):
 
 
 def create_value_plot(df: pd.DataFrame, style: str) -> tuple:
-    """Create portfolio vs benchmark value plot."""
+    """Create portfolio vs benchmark value plot with visual hierarchy."""
     plt.style.use(style)
     fig, ax = plt.subplots(figsize=(12, 6))
 
     df["portfolio_value"].plot(
         ax=ax,
         color=PORTFOLIO_COLOR,
-        linewidth=2,
+        linewidth=PORTFOLIO_LINE_WIDTH,
         linestyle='-',
+        alpha=PORTFOLIO_OPACITY,
         label="Portfolio"
     )
     df["benchmark_value"].plot(
         ax=ax,
         color=BENCHMARK_COLOR,
-        linewidth=2,
+        linewidth=BENCHMARK_LINE_WIDTH,
         linestyle='--',  # Dashed line for visual differentiation
-        alpha=0.8,
+        alpha=BENCHMARK_OPACITY,
         label="Benchmark"
     )
 
-    ax.set_title("Portfolio vs Benchmark Value", fontsize=14, fontweight='bold')
-    ax.set_ylabel("Value ($)", fontsize=11)
-    ax.set_xlabel("Date", fontsize=11)
+    ax.set_title("Portfolio vs Benchmark Value", fontsize=TITLE_FONT_SIZE, fontweight='bold')
+    ax.set_ylabel("Value ($)", fontsize=AXIS_LABEL_FONT_SIZE)
+    ax.set_xlabel("Date", fontsize=AXIS_LABEL_FONT_SIZE)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(format_currency))
-    ax.legend(loc="upper left", framealpha=0.9, fontsize=10)
-    ax.grid(True, alpha=0.3, linestyle='--')
-    plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
+    ax.legend(loc="upper left", framealpha=0.9, fontsize=LEGEND_FONT_SIZE)
+    ax.grid(True, alpha=GRID_OPACITY, linestyle='--', linewidth=GRID_LINE_WIDTH)
+    plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right', fontsize=TICK_LABEL_FONT_SIZE)
+    plt.setp(ax.yaxis.get_majorticklabels(), fontsize=TICK_LABEL_FONT_SIZE)
 
     return fig, ax
 
 
 def create_returns_plot(df: pd.DataFrame, style: str) -> tuple:
-    """Create cumulative returns comparison plot."""
+    """Create cumulative returns comparison plot with visual hierarchy."""
     plt.style.use(style)
     fig, ax = plt.subplots(figsize=(12, 6))
 
     (df["portfolio_return"] * 100).plot(
         ax=ax,
         color=PORTFOLIO_COLOR,
-        linewidth=2,
+        linewidth=PORTFOLIO_LINE_WIDTH,
         linestyle='-',
+        alpha=PORTFOLIO_OPACITY,
         label="Portfolio"
     )
     (df["benchmark_return"] * 100).plot(
         ax=ax,
         color=BENCHMARK_COLOR,
-        linewidth=2,
+        linewidth=BENCHMARK_LINE_WIDTH,
         linestyle='--',  # Dashed line for visual differentiation
-        alpha=0.8,
+        alpha=BENCHMARK_OPACITY,
         label="Benchmark"
     )
 
-    ax.axhline(0, color='black', linewidth=0.8, linestyle='--', alpha=0.5)
-    ax.set_title("Cumulative Returns Comparison", fontsize=14, fontweight='bold')
-    ax.set_ylabel("Return (%)", fontsize=11)
-    ax.set_xlabel("Date", fontsize=11)
-    ax.legend(loc="upper left", framealpha=0.9, fontsize=10)
-    ax.grid(True, alpha=0.3, linestyle='--')
-    plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
+    ax.axhline(0, color='black', linewidth=REFERENCE_LINE_WIDTH, linestyle='-', alpha=REFERENCE_OPACITY)
+    ax.set_title("Cumulative Returns Comparison", fontsize=TITLE_FONT_SIZE, fontweight='bold')
+    ax.set_ylabel("Return (%)", fontsize=AXIS_LABEL_FONT_SIZE)
+    ax.set_xlabel("Date", fontsize=AXIS_LABEL_FONT_SIZE)
+    ax.legend(loc="upper left", framealpha=0.9, fontsize=LEGEND_FONT_SIZE)
+    ax.grid(True, alpha=GRID_OPACITY, linestyle='--', linewidth=GRID_LINE_WIDTH)
+    plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right', fontsize=TICK_LABEL_FONT_SIZE)
+    plt.setp(ax.yaxis.get_majorticklabels(), fontsize=TICK_LABEL_FONT_SIZE)
 
     return fig, ax
 
 
 def create_active_return_plot(df: pd.DataFrame, style: str) -> tuple:
-    """Create active return plot with colored fill."""
+    """Create active return plot with colored fill and visual hierarchy."""
     plt.style.use(style)
     fig, ax = plt.subplots(figsize=(12, 5))
 
@@ -152,7 +177,7 @@ def create_active_return_plot(df: pd.DataFrame, style: str) -> tuple:
         0,
         where=(active_return_pct >= 0),
         color=POSITIVE_COLOR,
-        alpha=0.3,
+        alpha=FILL_OPACITY,
         interpolate=True,
         label="Outperformance"
     )
@@ -162,21 +187,23 @@ def create_active_return_plot(df: pd.DataFrame, style: str) -> tuple:
         0,
         where=(active_return_pct < 0),
         color=NEGATIVE_COLOR,
-        alpha=0.3,
+        alpha=FILL_OPACITY,
         interpolate=True,
         label="Underperformance"
     )
 
     # Plot the line
-    active_return_pct.plot(ax=ax, color=ACTIVE_COLOR, linewidth=1.5, label="Active Return")
+    active_return_pct.plot(ax=ax, color=ACTIVE_COLOR, linewidth=PORTFOLIO_LINE_WIDTH,
+                          alpha=PORTFOLIO_OPACITY, label="Active Return")
 
-    ax.axhline(0, color='black', linewidth=1, linestyle='-', alpha=0.7)
-    ax.set_title("Active Return (Portfolio - Benchmark)", fontsize=14, fontweight='bold')
-    ax.set_ylabel("Active Return (%)", fontsize=11)
-    ax.set_xlabel("Date", fontsize=11)
-    ax.legend(loc="upper left", framealpha=0.9, fontsize=10)
-    ax.grid(True, alpha=0.3, linestyle='--')
-    plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
+    ax.axhline(0, color='black', linewidth=REFERENCE_LINE_WIDTH, linestyle='-', alpha=REFERENCE_OPACITY)
+    ax.set_title("Active Return (Portfolio - Benchmark)", fontsize=TITLE_FONT_SIZE, fontweight='bold')
+    ax.set_ylabel("Active Return (%)", fontsize=AXIS_LABEL_FONT_SIZE)
+    ax.set_xlabel("Date", fontsize=AXIS_LABEL_FONT_SIZE)
+    ax.legend(loc="upper left", framealpha=0.9, fontsize=LEGEND_FONT_SIZE)
+    ax.grid(True, alpha=GRID_OPACITY, linestyle='--', linewidth=GRID_LINE_WIDTH)
+    plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right', fontsize=TICK_LABEL_FONT_SIZE)
+    plt.setp(ax.yaxis.get_majorticklabels(), fontsize=TICK_LABEL_FONT_SIZE)
 
     return fig, ax
 
@@ -209,16 +236,19 @@ def create_drawdown_plot(df: pd.DataFrame, style: str) -> tuple:
     )
 
     # Plot lines
-    portfolio_dd.plot(ax=ax, color=PORTFOLIO_COLOR, linewidth=1.5, linestyle='-', alpha=0.8)
-    benchmark_dd.plot(ax=ax, color=BENCHMARK_COLOR, linewidth=1.5, linestyle='--', alpha=0.7)
+    portfolio_dd.plot(ax=ax, color=PORTFOLIO_COLOR, linewidth=PORTFOLIO_LINE_WIDTH,
+                     linestyle='-', alpha=PORTFOLIO_OPACITY)
+    benchmark_dd.plot(ax=ax, color=BENCHMARK_COLOR, linewidth=BENCHMARK_LINE_WIDTH,
+                     linestyle='--', alpha=BENCHMARK_OPACITY)
 
-    ax.axhline(0, color='black', linewidth=0.8, linestyle='-', alpha=0.5)
-    ax.set_title("Drawdown Over Time", fontsize=14, fontweight='bold')
-    ax.set_ylabel("Drawdown (%)", fontsize=11)
-    ax.set_xlabel("Date", fontsize=11)
-    ax.legend(loc="lower left", framealpha=0.9, fontsize=10)
-    ax.grid(True, alpha=0.3, linestyle='--')
-    plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
+    ax.axhline(0, color='black', linewidth=REFERENCE_LINE_WIDTH, linestyle='-', alpha=REFERENCE_OPACITY)
+    ax.set_title("Drawdown Over Time", fontsize=TITLE_FONT_SIZE, fontweight='bold')
+    ax.set_ylabel("Drawdown (%)", fontsize=AXIS_LABEL_FONT_SIZE)
+    ax.set_xlabel("Date", fontsize=AXIS_LABEL_FONT_SIZE)
+    ax.legend(loc="lower left", framealpha=0.9, fontsize=LEGEND_FONT_SIZE)
+    ax.grid(True, alpha=GRID_OPACITY, linestyle='--', linewidth=GRID_LINE_WIDTH)
+    plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right', fontsize=TICK_LABEL_FONT_SIZE)
+    plt.setp(ax.yaxis.get_majorticklabels(), fontsize=TICK_LABEL_FONT_SIZE)
 
     # Add annotation for max drawdowns
     port_min_dd = portfolio_dd.min()
@@ -232,7 +262,7 @@ def create_drawdown_plot(df: pd.DataFrame, style: str) -> tuple:
     )
     ax.text(
         0.02, 0.02, stats_text, transform=ax.transAxes,
-        fontsize=9, verticalalignment='bottom',
+        fontsize=ANNOTATION_FONT_SIZE, verticalalignment='bottom',
         bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.7)
     )
 
@@ -254,30 +284,34 @@ def create_rolling_sharpe_plot(df: pd.DataFrame, style: str) -> tuple:
     df["portfolio_rolling_sharpe_12m"].plot(
         ax=ax,
         color=PORTFOLIO_COLOR,
-        linewidth=2,
+        linewidth=PORTFOLIO_LINE_WIDTH,
         linestyle='-',
+        alpha=PORTFOLIO_OPACITY,
         label="Portfolio 12M Sharpe"
     )
     df["benchmark_rolling_sharpe_12m"].plot(
         ax=ax,
         color=BENCHMARK_COLOR,
-        linewidth=2,
+        linewidth=BENCHMARK_LINE_WIDTH,
         linestyle='--',  # Dashed line for visual differentiation
-        alpha=0.8,
+        alpha=BENCHMARK_OPACITY,
         label="Benchmark 12M Sharpe"
     )
 
-    # Add reference lines
-    ax.axhline(0, color='black', linewidth=1, linestyle='-', alpha=0.5)
-    ax.axhline(1, color='green', linewidth=0.8, linestyle='--', alpha=0.4, label="Sharpe = 1")
-    ax.axhline(2, color='darkgreen', linewidth=0.8, linestyle='--', alpha=0.4, label="Sharpe = 2")
+    # Add reference lines (using colorblind-safe teal color)
+    ax.axhline(0, color='black', linewidth=REFERENCE_LINE_WIDTH, linestyle='-', alpha=REFERENCE_OPACITY)
+    ax.axhline(1, color='#029E73', linewidth=REFERENCE_LINE_WIDTH, linestyle='--',
+              alpha=REFERENCE_OPACITY, label="Sharpe = 1")
+    ax.axhline(2, color='#029E73', linewidth=REFERENCE_LINE_WIDTH, linestyle='--',
+              alpha=REFERENCE_OPACITY, label="Sharpe = 2")
 
-    ax.set_title("Rolling 12-Month Sharpe Ratio", fontsize=14, fontweight='bold')
-    ax.set_ylabel("Rolling 12-Month Sharpe Ratio", fontsize=11)
-    ax.set_xlabel("Date", fontsize=11)
-    ax.legend(loc="upper left", framealpha=0.9, fontsize=10)
-    ax.grid(True, alpha=0.3, linestyle='--')
-    plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
+    ax.set_title("Rolling 12-Month Sharpe Ratio", fontsize=TITLE_FONT_SIZE, fontweight='bold')
+    ax.set_ylabel("Rolling 12-Month Sharpe Ratio", fontsize=AXIS_LABEL_FONT_SIZE)
+    ax.set_xlabel("Date", fontsize=AXIS_LABEL_FONT_SIZE)
+    ax.legend(loc="upper left", framealpha=0.9, fontsize=LEGEND_FONT_SIZE)
+    ax.grid(True, alpha=GRID_OPACITY, linestyle='--', linewidth=GRID_LINE_WIDTH)
+    plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right', fontsize=TICK_LABEL_FONT_SIZE)
+    plt.setp(ax.yaxis.get_majorticklabels(), fontsize=TICK_LABEL_FONT_SIZE)
 
     return fig, ax
 
@@ -289,51 +323,58 @@ def create_dashboard(df: pd.DataFrame, style: str) -> tuple:
     fig.suptitle("Portfolio Performance Dashboard", fontsize=16, fontweight='bold', y=0.995)
 
     # Top left: Portfolio vs Benchmark Value
-    df["portfolio_value"].plot(ax=axes[0, 0], color=PORTFOLIO_COLOR, linewidth=2, linestyle='-', label="Portfolio")
-    df["benchmark_value"].plot(ax=axes[0, 0], color=BENCHMARK_COLOR, linewidth=2, linestyle='--', alpha=0.8, label="Benchmark")
+    df["portfolio_value"].plot(ax=axes[0, 0], color=PORTFOLIO_COLOR, linewidth=PORTFOLIO_LINE_WIDTH,
+                               linestyle='-', alpha=PORTFOLIO_OPACITY, label="Portfolio")
+    df["benchmark_value"].plot(ax=axes[0, 0], color=BENCHMARK_COLOR, linewidth=BENCHMARK_LINE_WIDTH,
+                               linestyle='--', alpha=BENCHMARK_OPACITY, label="Benchmark")
     axes[0, 0].set_title("Portfolio Value", fontsize=12, fontweight='bold')
     axes[0, 0].set_ylabel("Value ($)", fontsize=10)
     axes[0, 0].yaxis.set_major_formatter(mticker.FuncFormatter(format_currency))
     axes[0, 0].legend(loc="upper left", fontsize=9)
-    axes[0, 0].grid(True, alpha=0.3, linestyle='--')
+    axes[0, 0].grid(True, alpha=GRID_OPACITY, linestyle='--', linewidth=GRID_LINE_WIDTH)
 
     # Top right: Cumulative Returns
-    (df["portfolio_return"] * 100).plot(ax=axes[0, 1], color=PORTFOLIO_COLOR, linewidth=2, linestyle='-', label="Portfolio")
-    (df["benchmark_return"] * 100).plot(ax=axes[0, 1], color=BENCHMARK_COLOR, linewidth=2, linestyle='--', alpha=0.8, label="Benchmark")
-    axes[0, 1].axhline(0, color='black', linewidth=0.8, linestyle='--', alpha=0.5)
+    (df["portfolio_return"] * 100).plot(ax=axes[0, 1], color=PORTFOLIO_COLOR, linewidth=PORTFOLIO_LINE_WIDTH,
+                                       linestyle='-', alpha=PORTFOLIO_OPACITY, label="Portfolio")
+    (df["benchmark_return"] * 100).plot(ax=axes[0, 1], color=BENCHMARK_COLOR, linewidth=BENCHMARK_LINE_WIDTH,
+                                       linestyle='--', alpha=BENCHMARK_OPACITY, label="Benchmark")
+    axes[0, 1].axhline(0, color='black', linewidth=REFERENCE_LINE_WIDTH, linestyle='-', alpha=REFERENCE_OPACITY)
     axes[0, 1].set_title("Cumulative Returns", fontsize=12, fontweight='bold')
     axes[0, 1].set_ylabel("Return (%)", fontsize=10)
     axes[0, 1].legend(loc="upper left", fontsize=9)
-    axes[0, 1].grid(True, alpha=0.3, linestyle='--')
+    axes[0, 1].grid(True, alpha=GRID_OPACITY, linestyle='--', linewidth=GRID_LINE_WIDTH)
 
     # Bottom left: Active Return
     active_return_pct = df["active_return"] * 100
     axes[1, 0].fill_between(df.index, active_return_pct, 0, where=(active_return_pct >= 0),
-                            color=POSITIVE_COLOR, alpha=0.3, interpolate=True)
+                            color=POSITIVE_COLOR, alpha=FILL_OPACITY, interpolate=True)
     axes[1, 0].fill_between(df.index, active_return_pct, 0, where=(active_return_pct < 0),
-                            color=NEGATIVE_COLOR, alpha=0.3, interpolate=True)
-    active_return_pct.plot(ax=axes[1, 0], color=ACTIVE_COLOR, linewidth=1.5)
-    axes[1, 0].axhline(0, color='black', linewidth=1, linestyle='-', alpha=0.7)
+                            color=NEGATIVE_COLOR, alpha=FILL_OPACITY, interpolate=True)
+    active_return_pct.plot(ax=axes[1, 0], color=ACTIVE_COLOR, linewidth=PORTFOLIO_LINE_WIDTH, alpha=PORTFOLIO_OPACITY)
+    axes[1, 0].axhline(0, color='black', linewidth=REFERENCE_LINE_WIDTH, linestyle='-', alpha=REFERENCE_OPACITY)
     axes[1, 0].set_title("Active Return", fontsize=12, fontweight='bold')
     axes[1, 0].set_ylabel("Active Return (%)", fontsize=10)
-    axes[1, 0].grid(True, alpha=0.3, linestyle='--')
+    axes[1, 0].grid(True, alpha=GRID_OPACITY, linestyle='--', linewidth=GRID_LINE_WIDTH)
 
     # Bottom right: Drawdown
     portfolio_dd = (df["portfolio_value"] / df["portfolio_value"].cummax() - 1) * 100
     benchmark_dd = (df["benchmark_value"] / df["benchmark_value"].cummax() - 1) * 100
-    axes[1, 1].fill_between(df.index, portfolio_dd, 0, alpha=0.4, color=PORTFOLIO_COLOR, label="Portfolio")
-    axes[1, 1].fill_between(df.index, benchmark_dd, 0, alpha=0.3, color=BENCHMARK_COLOR, label="Benchmark")
-    portfolio_dd.plot(ax=axes[1, 1], color=PORTFOLIO_COLOR, linewidth=1.5, linestyle='-', alpha=0.8)
-    benchmark_dd.plot(ax=axes[1, 1], color=BENCHMARK_COLOR, linewidth=1.5, linestyle='--', alpha=0.7)
-    axes[1, 1].axhline(0, color='black', linewidth=0.8, linestyle='-', alpha=0.5)
+    axes[1, 1].fill_between(df.index, portfolio_dd, 0, alpha=FILL_OPACITY, color=PORTFOLIO_COLOR, label="Portfolio")
+    axes[1, 1].fill_between(df.index, benchmark_dd, 0, alpha=FILL_OPACITY, color=BENCHMARK_COLOR, label="Benchmark")
+    portfolio_dd.plot(ax=axes[1, 1], color=PORTFOLIO_COLOR, linewidth=PORTFOLIO_LINE_WIDTH,
+                     linestyle='-', alpha=PORTFOLIO_OPACITY)
+    benchmark_dd.plot(ax=axes[1, 1], color=BENCHMARK_COLOR, linewidth=BENCHMARK_LINE_WIDTH,
+                     linestyle='--', alpha=BENCHMARK_OPACITY)
+    axes[1, 1].axhline(0, color='black', linewidth=REFERENCE_LINE_WIDTH, linestyle='-', alpha=REFERENCE_OPACITY)
     axes[1, 1].set_title("Drawdown", fontsize=12, fontweight='bold')
     axes[1, 1].set_ylabel("Drawdown (%)", fontsize=10)
     axes[1, 1].legend(loc="lower left", fontsize=9)
-    axes[1, 1].grid(True, alpha=0.3, linestyle='--')
+    axes[1, 1].grid(True, alpha=GRID_OPACITY, linestyle='--', linewidth=GRID_LINE_WIDTH)
 
     # Rotate x-axis labels for all subplots
     for ax in axes.flat:
-        plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
+        plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right', fontsize=TICK_LABEL_FONT_SIZE)
+        plt.setp(ax.yaxis.get_majorticklabels(), fontsize=TICK_LABEL_FONT_SIZE)
         ax.set_xlabel("Date", fontsize=10)
 
     plt.tight_layout()

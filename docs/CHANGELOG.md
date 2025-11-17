@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Visual Hierarchy Improvements** - Enhanced chart readability through systematic styling
+  - **Line Weight Hierarchy**: Primary data (2.5px), secondary data (2px), reference lines (0.8-1px), grids (0.5px)
+  - **Opacity Levels**: Primary (100%), secondary (80-85%), fills (25-30%), grids (20%)
+  - **Typography Scale**: Title (16px), subplot titles (13px), axis labels (12px), legend (11px), ticks (10px)
+  - **Improved Spacing**: Increased subplot spacing from 10-12% to 12-15% for better separation
+  - **Subtle Grids**: Reduced grid opacity and line width to minimize visual clutter
+  - **Consistent Styling**: Applied across both Plotly (Streamlit) and matplotlib (CLI) charts
+  - Creates clear information prioritization: data → labels → grids → annotations
+
 - **Colorblind-Accessible Charts** - Universal accessibility for all chart visualizations
   - Implemented Wong's colorblind-safe palette (blue, orange, teal, pink) in all charts
   - Replaced problematic blue-purple and red-green color combinations

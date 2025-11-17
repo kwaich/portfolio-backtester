@@ -148,6 +148,7 @@ This opens an interactive web application in your browser with:
    - Multiple benchmarks displayed on all charts with distinct colors and line styles
    - **Colorblind-Accessible Design**: Uses Wong's colorblind-safe palette (blue, orange, teal, pink) avoiding problematic blue-purple and red-green combinations
    - **Multiple Visual Cues**: Line styles (solid, dashed, dotted) provide differentiation beyond color alone
+   - **Visual Hierarchy**: Clear information prioritization through line weights, opacity levels, and typography scaling for enhanced readability
    - Hover tooltips for exact values at any point
    - Zoom, pan, and explore interactively
 

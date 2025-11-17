@@ -119,6 +119,35 @@ CHART_HEIGHT = 400
 DASHBOARD_HEIGHT = 800
 
 # =============================================================================
+# Visual Hierarchy Configuration
+# =============================================================================
+
+# Line widths - establishes visual priority through weight
+PORTFOLIO_LINE_WIDTH = 2.5  # Primary data - thickest
+BENCHMARK_LINE_WIDTH = 2.0  # Secondary data - medium
+REFERENCE_LINE_WIDTH = 1.0  # Reference lines (zero lines, etc.) - thin
+GRID_LINE_WIDTH = 0.5       # Grid lines - thinnest
+
+# Opacity levels - creates depth and reduces visual clutter
+PORTFOLIO_OPACITY = 1.0     # Primary data - fully opaque
+BENCHMARK_OPACITY = 0.85    # Secondary data - slightly transparent
+FILL_OPACITY = 0.25         # Fill areas - subtle
+GRID_OPACITY = 0.2          # Grid lines - very subtle
+REFERENCE_LINE_OPACITY = 0.4  # Reference lines - moderate
+
+# Font sizes - establishes typographic hierarchy (Plotly uses px)
+TITLE_FONT_SIZE = 16        # Main chart titles
+SUBPLOT_TITLE_FONT_SIZE = 13  # Subplot titles
+AXIS_TITLE_FONT_SIZE = 12   # Axis labels
+LEGEND_FONT_SIZE = 11       # Legend text
+TICK_FONT_SIZE = 10         # Axis tick labels
+ANNOTATION_FONT_SIZE = 10   # Annotations and notes
+
+# Spacing and layout
+SUBPLOT_VERTICAL_SPACING = 0.15    # Vertical spacing between subplots (increased from 0.12)
+SUBPLOT_HORIZONTAL_SPACING = 0.12  # Horizontal spacing between subplots (increased from 0.10)
+
+# =============================================================================
 # Metric Labels
 # =============================================================================
 
