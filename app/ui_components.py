@@ -245,6 +245,10 @@ def render_searchable_ticker_input(
             placeholder="e.g., AAPL"
         ).strip().upper()
 
+    # Create unique keys for Streamlit widgets (needed before accessing widget state)
+    input_key = f"{key}_input"
+    search_key = f"{key}_search"
+
     # Get widget state from StateManager (single dict instead of 3 separate keys)
     widget_state = StateManager.get_widget_state(key, {
         'value': default_value,
@@ -258,10 +262,12 @@ def render_searchable_ticker_input(
         widget_state['pending_value'] = None
         widget_state['show_search'] = False
         StateManager.set_widget_state(key, widget_state)
+        # CRITICAL: Update Streamlit's widget state so text input displays the new value
+        st.session_state[input_key] = widget_state['value']
 
-    # Create unique keys for Streamlit widgets
-    input_key = f"{key}_input"
-    search_key = f"{key}_search"
+    # Initialize widget state if needed (so widget has a value on first render)
+    if input_key not in st.session_state:
+        st.session_state[input_key] = widget_state['value']
 
     # Text input for ticker
     col1, col2 = st.columns([3, 1])
@@ -269,8 +275,7 @@ def render_searchable_ticker_input(
     with col1:
         ticker_input = st.text_input(
             label,
-            value=widget_state['value'],
-            key=input_key,
+            key=input_key,  # Streamlit manages value via session state
             help=help_text or "Enter ticker symbol or company name, then click 🔍 to search",
             placeholder="e.g., AAPL, apple, vanguard"
         )
