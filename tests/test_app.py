@@ -11,7 +11,23 @@ import pandas as pd
 import pytest
 
 # Mock streamlit before importing app
-sys.modules['streamlit'] = MagicMock()
+# Create a mock that makes cache_data work like a pass-through decorator
+streamlit_mock = MagicMock()
+
+def mock_cache_data(*args, **kwargs):
+    """Mock cache_data that actually calls the function."""
+    def decorator(func):
+        # Add cache_clear method for test compatibility
+        def cache_clear():
+            pass
+        func.cache_clear = cache_clear
+        func.clear = cache_clear
+        return func
+    return decorator
+
+streamlit_mock.cache_data = mock_cache_data
+streamlit_mock.query_params = {}
+sys.modules['streamlit'] = streamlit_mock
 
 import backtest
 
@@ -242,26 +258,24 @@ class TestErrorHandling:
 class TestPortfolioComposition:
     """Test portfolio composition display logic"""
 
-    @patch('app.ticker_data.yf.Ticker')
-    def test_composition_table_data(self, mock_yf_ticker):
+    @patch('app.ticker_data._get_ticker_name_impl')
+    def test_composition_table_data(self, mock_get_ticker_impl):
         """Test creation of portfolio composition table with ticker names from yfinance"""
         from app.ticker_data import get_ticker_name
 
         # Clear cache
         get_ticker_name.cache_clear()
 
-        # Mock yfinance responses for different tickers
-        def mock_ticker_side_effect(symbol):
-            mock_instance = Mock()
+        # Mock implementation function directly
+        def mock_impl_side_effect(symbol):
             names = {
-                "AAPL": {'longName': 'Apple Inc.'},
-                "MSFT": {'longName': 'Microsoft Corporation'},
-                "GOOGL": {'longName': 'Alphabet Inc. (Google) Class A'}
+                "AAPL": 'Apple Inc.',
+                "MSFT": 'Microsoft Corporation',
+                "GOOGL": 'Alphabet Inc. (Google) Class A'
             }
-            mock_instance.info = names.get(symbol, {})
-            return mock_instance
+            return names.get(symbol, "")
 
-        mock_yf_ticker.side_effect = mock_ticker_side_effect
+        mock_get_ticker_impl.side_effect = mock_impl_side_effect
 
         tickers = ["AAPL", "MSFT", "GOOGL"]
         weights_array = np.array([0.5, 0.3, 0.2])
@@ -291,26 +305,24 @@ class TestPortfolioComposition:
         assert composition_data["Weight"][1] == "30.0%"
         assert composition_data["Weight"][2] == "20.0%"
 
-    @patch('app.ticker_data.yf.Ticker')
-    def test_composition_with_unknown_ticker(self, mock_yf_ticker):
+    @patch('app.ticker_data._get_ticker_name_impl')
+    def test_composition_with_unknown_ticker(self, mock_get_ticker_impl):
         """Test composition table handles unknown tickers gracefully"""
         from app.ticker_data import get_ticker_name
 
         # Clear cache
         get_ticker_name.cache_clear()
 
-        # Mock yfinance responses
-        def mock_ticker_side_effect(symbol):
-            mock_instance = Mock()
+        # Mock implementation function directly
+        def mock_impl_side_effect(symbol):
             names = {
-                "AAPL": {'longName': 'Apple Inc.'},
-                "SPY": {'longName': 'SPDR S&P 500 ETF Trust'},
-                "UNKNOWN_TICKER": None  # No info for unknown ticker
+                "AAPL": 'Apple Inc.',
+                "SPY": 'SPDR S&P 500 ETF Trust',
+                "UNKNOWN_TICKER": ''  # No info for unknown ticker
             }
-            mock_instance.info = names.get(symbol, None)
-            return mock_instance
+            return names.get(symbol, "")
 
-        mock_yf_ticker.side_effect = mock_ticker_side_effect
+        mock_get_ticker_impl.side_effect = mock_impl_side_effect
 
         tickers = ["AAPL", "UNKNOWN_TICKER", "SPY"]
         weights_array = np.array([0.4, 0.3, 0.3])

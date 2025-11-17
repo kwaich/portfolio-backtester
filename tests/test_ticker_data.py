@@ -8,9 +8,28 @@ Tests ticker data functionality including:
 
 from __future__ import annotations
 
+import sys
 import pytest
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, MagicMock
 import requests
+
+# Mock streamlit before importing app modules (same as test_app.py)
+streamlit_mock = MagicMock()
+
+def mock_cache_data(*args, **kwargs):
+    """Mock cache_data that actually calls the function."""
+    def decorator(func):
+        # Add cache_clear method for test compatibility
+        def cache_clear():
+            pass
+        func.cache_clear = cache_clear
+        func.clear = cache_clear
+        return func
+    return decorator
+
+streamlit_mock.cache_data = mock_cache_data
+streamlit_mock.query_params = {}
+sys.modules['streamlit'] = streamlit_mock
 
 from app.ticker_data import (
     get_all_tickers,

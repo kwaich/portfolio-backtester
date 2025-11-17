@@ -19,7 +19,23 @@ import pandas as pd
 
 # Mock streamlit before importing app modules
 import sys
-sys.modules['streamlit'] = MagicMock()
+
+streamlit_mock = MagicMock()
+
+def mock_cache_data(*args, **kwargs):
+    """Mock cache_data that actually calls the function."""
+    def decorator(func):
+        def cache_clear():
+            pass
+        func.cache_clear = cache_clear
+        func.clear = cache_clear
+        return func
+    return decorator
+
+streamlit_mock.cache_data = mock_cache_data
+streamlit_mock.query_params = {}
+streamlit_mock.session_state = {}
+sys.modules['streamlit'] = streamlit_mock
 
 from app.state_manager import StateManager, StateKeys
 
