@@ -1123,26 +1123,22 @@ def summarize(
     annualized_return = irr if (irr is not None) else cagr
     sharpe_ratio = (annualized_return / volatility) if volatility > 0 else 0.0
 
-    # Maximum drawdown - for DCA, calculate on the return (value - contributions)
+    # Maximum drawdown
     if contributions_series is not None:
-        # Calculate return series (gains/losses relative to contributions)
-        return_series = series - contributions_series
+        # For DCA, calculate drawdown on return percentage (value - contributions) / contributions
+        # This shows the maximum decline from a peak return percentage
+        return_pct = (series - contributions_series) / contributions_series
 
-        # Handle edge case where returns are always non-positive
-        if (return_series <= 0).all():
-            # All losses or break-even - max drawdown is the worst loss
-            drawdown = (return_series / contributions_series).min()
-        else:
-            # Find max drawdown on the return series
-            cumulative = return_series / return_series.expanding().max()
-            # Handle case where returns start negative or have inf values
-            cumulative = cumulative.replace([np.inf, -np.inf], np.nan)
-            drawdown = (cumulative - 1).min()
-            # If no valid drawdown (all NaN), set to 0
-            if np.isnan(drawdown):
-                drawdown = 0.0
+        # Track the running maximum return percentage
+        running_max = return_pct.expanding().max()
+
+        # Drawdown at each point = current return % - peak return %
+        drawdown_series = return_pct - running_max
+
+        # Max drawdown is the worst (most negative) drawdown
+        drawdown = drawdown_series.min()
     else:
-        # For lump sum, use traditional drawdown calculation
+        # For lump sum, use traditional drawdown calculation on absolute value
         cumulative = series / series.expanding().max()
         drawdown = (cumulative - 1).min()
 
