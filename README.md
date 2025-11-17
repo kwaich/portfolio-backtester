@@ -16,7 +16,7 @@ A lightweight, flexible Python utility for backtesting ETF portfolio strategies 
 - **Easy CLI**: Simple command-line interface with sensible defaults
 - **Data Quality Validation**: Automatic detection of data issues (missing values, invalid prices, extreme changes)
 - **Optimized Performance**: Batch downloads with per-ticker caching for faster multi-ticker operations
-- **Well-Tested**: Comprehensive test coverage with 204 tests (100% pass rate)
+- **Well-Tested**: Comprehensive test coverage with 208 tests (100% pass rate)
 
 ## Quick Start
 

@@ -48,16 +48,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Falls back to `shortName` if `longName` unavailable
   - Returns empty string on error or if ticker not found
 
-- **Test Coverage** - Updated from 155 to 204 tests (100% pass rate)
-  - Added 16 new DCA tests (monthly/weekly contributions, multi-ticker, price decline, precedence, weekend handling)
-  - Added 8 new IRR/XIRR tests (basic calculation, multiple contributions, negative/zero returns, convergence)
+- **Test Coverage** - Expanded to 208 tests (100% pass rate)
+  - Added 18 new DCA/IRR tests for contribution handling, volatility, and IRR edge cases
   - Added 5 new tests for rolling 12-month Sharpe ratio calculation
   - Added 2 new tests for yfinance ticker name integration
   - Updated app tests for DCA metrics (IRR, total_contributions)
-  - All ticker_data tests passing (32 tests, +2 new)
-  - All app UI tests passing (63 tests, updated for DCA)
-  - All backtest engine tests passing (88 tests, +21 new for DCA/IRR)
-  - All integration tests passing (16 tests)
+  - All ticker_data tests passing (32 tests)
+  - All app UI tests passing (63 tests)
+  - All backtest engine tests passing (92 tests)
+  - All integration tests passing (21 tests)
 
 ### Fixed
 - **CRITICAL: DCA Weekend/Holiday Handling** - Contributions no longer skipped on non-trading days
