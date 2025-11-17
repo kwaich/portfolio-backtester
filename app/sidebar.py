@@ -115,14 +115,25 @@ def render_benchmark_inputs(num_benchmarks: int) -> List[str]:
     st.sidebar.subheader("Benchmark")
 
     preset_benchmark = StateManager.get_preset_benchmark()
+
+    # Check if benchmarks came from URL
+    url_benchmarks = st.session_state.get('url_benchmarks', [])
+
     benchmarks = []
 
     for i in range(num_benchmarks):
-        if i == 0:
+        # Determine default benchmark for this position
+        if i < len(url_benchmarks):
+            # Use URL benchmark if available
+            default_bench = url_benchmarks[i]
+        elif i == 0:
+            # First benchmark uses preset
             default_bench = preset_benchmark
         elif i == 1:
+            # Second benchmark defaults to SPY
             default_bench = "SPY"
         else:
+            # Additional benchmarks default to empty
             default_bench = ""
 
         # Use searchable ticker input for benchmarks
@@ -212,11 +223,14 @@ def render_sidebar_form() -> Dict[str, Any]:
         )
 
         # Number of benchmarks
+        # Use URL benchmarks count if available, otherwise default to 1
+        url_benchmarks = st.session_state.get('url_benchmarks', [])
+        default_num_benchmarks = len(url_benchmarks) if url_benchmarks else 1
         num_benchmarks = st.number_input(
             "Number of Benchmarks",
             min_value=MIN_BENCHMARKS,
             max_value=MAX_BENCHMARKS,
-            value=1,
+            value=default_num_benchmarks,
             step=1,
             help="Compare against multiple benchmarks",
             key="num_benchmarks_input"
@@ -224,11 +238,13 @@ def render_sidebar_form() -> Dict[str, Any]:
 
         # Capital
         st.subheader("Initial Capital")
+        # Use URL parameter if available, otherwise use default
+        default_capital = st.session_state.get('url_capital', DEFAULT_CAPITAL)
         capital = st.number_input(
             "Capital ($)",
             min_value=float(MIN_CAPITAL),
             max_value=float(MAX_CAPITAL),
-            value=float(DEFAULT_CAPITAL),
+            value=float(default_capital),
             step=1000.0,
             format="%0.2f",
             help="Initial investment amount",

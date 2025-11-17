@@ -74,7 +74,7 @@ def _apply_url_parameters() -> None:
     This enables deep linking and sharing of specific backtest configurations.
 
     Examples:
-        URL: ?tickers=AAPL,MSFT&weights=0.6,0.4&benchmark=SPY&start_date=2020-01-01
+        URL: ?tickers=AAPL,MSFT&weights=0.6,0.4&benchmarks=SPY&start_date=2020-01-01&capital=50000
     """
     # Only apply URL params once on first load
     if 'url_params_applied' not in st.session_state:
@@ -94,9 +94,17 @@ def _apply_url_parameters() -> None:
                 if 'weights' in params and len(params['weights']) == len(params['tickers']):
                     StateManager.set_preset_weights(params['weights'])
 
-            # Apply benchmark
-            if 'benchmark' in params:
+            # Apply benchmarks (plural - matches what set_query_params writes)
+            if 'benchmarks' in params:
+                # Store first benchmark for backward compatibility
+                if params['benchmarks']:
+                    StateManager.set_preset_benchmark(params['benchmarks'][0])
+                # Store all benchmarks for UI
+                st.session_state['url_benchmarks'] = params['benchmarks']
+            # Fall back to singular 'benchmark' for backward compatibility
+            elif 'benchmark' in params:
                 StateManager.set_preset_benchmark(params['benchmark'])
+                st.session_state['url_benchmarks'] = [params['benchmark']]
 
             # Apply date range
             if 'start_date' in params:
@@ -104,6 +112,10 @@ def _apply_url_parameters() -> None:
                     params['start_date'],
                     params.get('end_date', StateManager.get_end_date())
                 )
+
+            # Apply capital
+            if 'capital' in params:
+                st.session_state['url_capital'] = params['capital']
 
         st.session_state['url_params_applied'] = True
 

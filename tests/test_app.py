@@ -1170,5 +1170,89 @@ class TestColorblindAccessibility:
             assert ratio >= 1.4, f"Insufficient contrast between portfolio and benchmark: {ratio:.2f}"
 
 
+class TestURLParameters:
+    """Test URL parameter handling for shareable links"""
+
+    def test_url_params_parse_capital(self):
+        """Test that capital parameter is parsed from URL"""
+        from app.utils import get_query_params
+
+        # Mock query params
+        import sys
+        st_mock = sys.modules['streamlit']
+        st_mock.query_params = {'capital': '50000'}
+
+        params = get_query_params()
+
+        assert 'capital' in params
+        assert params['capital'] == 50000.0
+
+    def test_url_params_parse_benchmarks_plural(self):
+        """Test that benchmarks (plural) parameter is parsed from URL"""
+        from app.utils import get_query_params
+
+        # Mock query params
+        import sys
+        st_mock = sys.modules['streamlit']
+        st_mock.query_params = {'benchmarks': 'SPY,QQQ,VTI'}
+
+        params = get_query_params()
+
+        assert 'benchmarks' in params
+        assert params['benchmarks'] == ['SPY', 'QQQ', 'VTI']
+
+    def test_url_params_parse_single_benchmark(self):
+        """Test backward compatibility with singular benchmark parameter"""
+        from app.utils import get_query_params
+
+        # Mock query params
+        import sys
+        st_mock = sys.modules['streamlit']
+        st_mock.query_params = {'benchmark': 'SPY'}
+
+        params = get_query_params()
+
+        assert 'benchmark' in params
+        assert params['benchmark'] == 'SPY'
+
+    def test_url_params_capital_defaults_to_100k(self):
+        """Test that missing capital parameter doesn't break parsing"""
+        from app.utils import get_query_params
+
+        # Mock query params without capital
+        import sys
+        st_mock = sys.modules['streamlit']
+        st_mock.query_params = {'tickers': 'AAPL,MSFT'}
+
+        params = get_query_params()
+
+        # Capital should not be in params if not provided
+        assert 'capital' not in params
+
+    def test_set_query_params_includes_capital_and_benchmarks(self):
+        """Test that set_query_params writes both capital and benchmarks"""
+        from app.utils import set_query_params
+        from datetime import datetime
+
+        # Mock session state
+        import sys
+        st_mock = sys.modules['streamlit']
+        st_mock.query_params = {}
+
+        set_query_params(
+            tickers=['AAPL', 'MSFT'],
+            weights=[0.6, 0.4],
+            benchmarks=['SPY', 'QQQ'],
+            capital=50000,
+            start_date=datetime(2020, 1, 1)
+        )
+
+        # Verify capital and benchmarks were written (plural)
+        assert 'capital' in st_mock.query_params
+        assert st_mock.query_params['capital'] == '50000'
+        assert 'benchmarks' in st_mock.query_params
+        assert st_mock.query_params['benchmarks'] == 'SPY,QQQ'
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
