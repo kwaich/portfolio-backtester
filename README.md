@@ -7,7 +7,7 @@ A lightweight, flexible Python utility for backtesting ETF portfolio strategies 
 - **Portfolio Backtesting**: Test buy-and-hold strategies with customizable weights
 - **Dollar-Cost Averaging (DCA)**: Simulate regular contributions at configurable intervals (daily, weekly, monthly, quarterly, yearly)
 - **Rebalancing Strategies**: Test periodic rebalancing at various frequencies
-- **Comprehensive Metrics**: Returns, CAGR, Sharpe ratio, Sortino ratio, volatility, and maximum drawdown
+- **Comprehensive Metrics**: Returns, CAGR, IRR (for DCA), Sharpe ratio, Sortino ratio, volatility, and maximum drawdown
 - **Smart Data Caching**: Automatic caching with configurable TTL (time-to-live) for fresh data
 - **Resilient API Calls**: Automatic retry logic with exponential backoff for network reliability
 - **Input Validation**: Comprehensive validation for tickers, dates, and parameters before execution
@@ -16,7 +16,7 @@ A lightweight, flexible Python utility for backtesting ETF portfolio strategies 
 - **Easy CLI**: Simple command-line interface with sensible defaults
 - **Data Quality Validation**: Automatic detection of data issues (missing values, invalid prices, extreme changes)
 - **Optimized Performance**: Batch downloads with per-ticker caching for faster multi-ticker operations
-- **Well-Tested**: Comprehensive test coverage with 192 tests (100% pass rate)
+- **Well-Tested**: Comprehensive test coverage with 204 tests (100% pass rate)
 
 ## Quick Start
 
@@ -229,13 +229,25 @@ The web UI includes a powerful ticker search feature:
 The backtester calculates the following metrics:
 
 - **Ending Value**: Final portfolio/benchmark value
-- **Total Return**: Overall return over the period
-- **CAGR**: Compound Annual Growth Rate
-- **Volatility**: Annualized standard deviation of returns (252 trading days)
-- **Sharpe Ratio**: Risk-adjusted return (assuming 0% risk-free rate)
+- **Total Return**: Overall return over the period (calculated as (value - total_contributions) / total_contributions for DCA)
+- **CAGR**: Compound Annual Growth Rate (approximation for DCA strategies)
+- **IRR**: Internal Rate of Return (calculated for DCA strategies with multiple contributions, using time-weighted cashflows for accuracy)
+- **Volatility**: Annualized standard deviation of returns (252 trading days; for DCA, contribution impacts are excluded)
+- **Sharpe Ratio**: Risk-adjusted return (assuming 0% risk-free rate; uses IRR for DCA when available)
 - **Sortino Ratio**: Return relative to downside deviation only
-- **Max Drawdown**: Largest peak-to-trough decline
+- **Max Drawdown**: Largest peak-to-trough decline (for DCA, calculated on return percentage from peak)
 - **Active Return**: Portfolio return minus benchmark return
+
+### DCA Metrics (Special Handling)
+
+For Dollar-Cost Averaging strategies, metrics are calculated with special considerations:
+
+1. **Returns**: Based on total invested amount, not just initial capital
+2. **Volatility**: Excludes the artificial "returns" from new contributions
+3. **Sharpe/Sortino**: Uses true market volatility and IRR (when available)
+4. **Max Drawdown**: Calculated on return percentage (gains/losses vs. contributions), not absolute value
+5. **IRR**: Time-weighted internal rate of return, more accurate than CAGR for irregular cashflows
+6. **Weekend/Holiday Handling**: DCA contributions scheduled for non-trading days execute on the next available trading day
 
 ## Example Output
 
@@ -412,9 +424,9 @@ portfolio-backtester/
 │   └── main.py             # Main application orchestration
 ├── backtest.py             # Core backtesting engine
 ├── plot_backtest.py        # Visualization utility
-├── tests/                  # Test suite (184 tests, ~88% coverage)
-│   ├── test_backtest.py    # Unit tests for backtest.py (72 tests)
-│   ├── test_app.py         # Unit tests for app.py UI (64 tests)
+├── tests/                  # Test suite (204 tests, ~88% coverage)
+│   ├── test_backtest.py    # Unit tests for backtest.py (88 tests - includes DCA & IRR)
+│   ├── test_app.py         # Unit tests for app.py UI (63 tests - includes DCA metrics)
 │   ├── test_ticker_data.py # Unit tests for ticker_data.py (32 tests)
 │   └── test_integration.py # Integration tests (16 tests)
 ├── requirements.txt        # Python dependencies
@@ -458,16 +470,16 @@ The Streamlit web UI has been refactored into a clean, modular architecture:
 
 ### Running Tests
 
-The project has comprehensive test coverage with **184 tests** achieving **100% pass rate**.
+The project has comprehensive test coverage with **204 tests** achieving **100% pass rate**.
 
 ```bash
-# Run all tests (184 tests: 72 backtest + 64 UI + 32 ticker_data + 16 integration)
+# Run all tests (204 tests: 88 backtest + 63 UI + 32 ticker_data + 16 integration)
 pytest -v
 
-# Run only backtest tests (72 tests)
+# Run only backtest tests (88 tests - includes DCA & IRR)
 pytest tests/test_backtest.py -v
 
-# Run only UI tests (64 tests)
+# Run only UI tests (63 tests - includes DCA metrics)
 pytest tests/test_app.py -v
 
 # Run only integration tests (16 tests)

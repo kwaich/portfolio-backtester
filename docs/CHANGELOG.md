@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Dollar-Cost Averaging (DCA) Support** - Complete implementation of DCA backtesting
+  - CLI arguments: `--dca-amount` and `--dca-freq` for contribution amount and frequency
+  - Supported frequencies: Daily (D), Weekly (W), Monthly (M), Quarterly (Q), Yearly (Y)
+  - Fair comparison: Benchmark also receives DCA treatment for accurate performance comparison
+  - Returns calculated based on total invested amount: `(value - contributions) / contributions`
+  - Contribution tracking in results CSV: `portfolio_contributions` and `benchmark_contributions` columns
+  - Web UI integration: DCA configuration section in sidebar with frequency selector and amount input
+  - Mutually exclusive with rebalancing (DCA takes precedence if both specified)
+
+- **IRR (Internal Rate of Return) Calculation** - More accurate performance metric for DCA
+  - XIRR implementation using Newton-Raphson method for time-weighted cashflows
+  - Automatically calculated for DCA strategies with multiple contributions
+  - Displayed in CLI output and Web UI alongside CAGR
+  - Used in Sharpe/Sortino ratio calculations for better risk-adjusted performance measurement
+  - Includes sanity checks for unrealistic values (rejects <-99% or >1000%)
+  - Falls back to CAGR if IRR calculation fails or doesn't converge
+
 - **Rolling 12-Month Sharpe Ratio Chart** - New visualization for risk-adjusted performance tracking
   - Calculates rolling 12-month (252 trading days) Sharpe ratio for portfolio and benchmarks
   - Shows how risk-adjusted performance evolves over time
@@ -31,16 +48,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Falls back to `shortName` if `longName` unavailable
   - Returns empty string on error or if ticker not found
 
-- **Test Coverage** - Updated from 155 to 184 tests (100% pass rate)
+- **Test Coverage** - Updated from 155 to 204 tests (100% pass rate)
+  - Added 16 new DCA tests (monthly/weekly contributions, multi-ticker, price decline, precedence, weekend handling)
+  - Added 8 new IRR/XIRR tests (basic calculation, multiple contributions, negative/zero returns, convergence)
   - Added 5 new tests for rolling 12-month Sharpe ratio calculation
   - Added 2 new tests for yfinance ticker name integration
-  - Updated portfolio composition tests with yfinance mocking
+  - Updated app tests for DCA metrics (IRR, total_contributions)
   - All ticker_data tests passing (32 tests, +2 new)
-  - All app UI tests passing (64 tests)
-  - All backtest engine tests passing (72 tests, +5 for rolling Sharpe)
+  - All app UI tests passing (63 tests, updated for DCA)
+  - All backtest engine tests passing (88 tests, +21 new for DCA/IRR)
   - All integration tests passing (16 tests)
 
 ### Fixed
+- **CRITICAL: DCA Weekend/Holiday Handling** - Contributions no longer skipped on non-trading days
+  - Previous bug: DCA dates falling on weekends/holidays were completely skipped
+  - Impact: Over 36 months, 10-12 contributions could be lost (~$10,000-$12,000 for $1,000/month DCA)
+  - Fix: DCA dates now map to next available trading day instead of being skipped
+  - Example: Saturday contribution executes on following Monday
+  - Matches real-world DCA behavior
+
+- **CRITICAL: DCA Metrics Corrections** - All metrics now calculated correctly for DCA strategies
+  - **Volatility**: Was massively inflated (26.41% in 0% volatility market)
+    - Previous: Included contribution days as "returns" (e.g., 10% from $1k contribution)
+    - Fixed: Contribution-adjusted returns exclude new money impact
+    - Formula: `(value_change - contribution_change) / previous_value`
+  - **Sharpe/Sortino Ratios**: Were meaningless due to inflated volatility
+    - Previous: Used inflated volatility
+    - Fixed: Uses true market volatility and IRR (when available)
+  - **Max Drawdown**: Was completely wrong for DCA (-167% instead of -68%)
+    - Previous: Calculated on absolute dollar returns
+    - Fixed: Calculated on return percentage `(value - contributions) / contributions`
+    - Tracks peak return percentage and measures decline from peak
+
 - **Test Infrastructure** - Improved test reliability
   - Added `.strip()` to ticker search query for whitespace handling
   - Added cache clearing in test setup to prevent test interference
