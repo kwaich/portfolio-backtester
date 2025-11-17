@@ -64,6 +64,7 @@ try:
         render_portfolio_composition, render_searchable_ticker_input
     )
     from .charts import create_main_dashboard, create_rolling_returns_chart, create_rolling_sharpe_chart
+    from .state_manager import StateManager
 except ImportError as e:
     st.error(f"❌ Failed to import app modules: {e}")
     st.stop()
@@ -104,10 +105,10 @@ def main() -> None:
         index=0,
         help="Select a pre-configured portfolio or choose Custom to enter manually"
     )
-    
+
     # Handle portfolio preset selection (session state already initialized)
-    if selected_portfolio != st.session_state.selected_portfolio:
-        st.session_state.selected_portfolio = selected_portfolio
+    if selected_portfolio != StateManager.get_selected_portfolio():
+        StateManager.set_selected_portfolio(selected_portfolio)
         if selected_portfolio != "Custom (Manual Entry)":
             portfolio_config = portfolio_presets[selected_portfolio]
             update_portfolio_preset(selected_portfolio, portfolio_config)
@@ -117,19 +118,19 @@ def main() -> None:
         "Number of Portfolio Tickers",
         min_value=1,
         max_value=MAX_TICKERS,
-        value=st.session_state.get('num_tickers', 2),
+        value=StateManager.get_num_tickers(),
         step=1,
         help="How many different assets in your portfolio?"
     )
-    
+
     # Dynamic ticker inputs
     tickers = []
     weights = []
-    
+
     st.sidebar.subheader("Portfolio Composition")
-    
-    preset_tickers = st.session_state.get('preset_tickers', [])
-    preset_weights = st.session_state.get('preset_weights', [])
+
+    preset_tickers = StateManager.get_preset_tickers()
+    preset_weights = StateManager.get_preset_weights()
     
     for i in range(num_tickers):
         # Determine default ticker
@@ -170,7 +171,7 @@ def main() -> None:
     
     # Benchmark
     st.sidebar.subheader("Benchmark")
-    preset_benchmark = st.session_state.get('preset_benchmark', DEFAULT_BENCHMARK)
+    preset_benchmark = StateManager.get_preset_benchmark()
     
     num_benchmarks = st.sidebar.number_input(
         "Number of Benchmarks",
@@ -213,20 +214,19 @@ def main() -> None:
     # Date preset buttons (session state already initialized)
     for idx, (label, date_value) in enumerate(date_presets.items()):
         if preset_cols[idx].button(label, use_container_width=True, help=f"Set range to {label}"):
-            st.session_state.start_date = date_value
-            st.session_state.end_date = datetime.today()
-    
+            StateManager.set_date_preset(date_value)
+
     col1, col2 = st.sidebar.columns(2)
     with col1:
         start_date = st.date_input(
             "Start Date",
-            value=st.session_state.start_date,
+            value=StateManager.get_start_date(),
             help="Backtest start date"
         )
     with col2:
         end_date = st.date_input(
             "End Date",
-            value=st.session_state.end_date,
+            value=StateManager.get_end_date(),
             help="Backtest end date"
         )
     
@@ -375,21 +375,20 @@ def main() -> None:
                     )
                     all_benchmark_results[bench_name] = bench_result
 
-                # Store results in session state
-                st.session_state.backtest_results = {
-                    'results': results,
-                    'all_benchmark_results': all_benchmark_results,
-                    'tickers': tickers,
-                    'benchmarks': benchmarks,
-                    'weights_array': weights_array,
-                    'capital': capital,
-                    'rebalance_strategy': rebalance_strategy,
-                    'rebalance_freq': rebalance_freq,
-                    'dca_frequency': dca_frequency,
-                    'dca_freq': dca_freq,
-                    'dca_amount': dca_amount
-                }
-                st.session_state.backtest_completed = True
+                # Store results in session state using StateManager
+                StateManager.store_backtest_results(
+                    results=results,
+                    all_benchmark_results=all_benchmark_results,
+                    tickers=tickers,
+                    benchmarks=benchmarks,
+                    weights_array=weights_array,
+                    capital=capital,
+                    rebalance_strategy=rebalance_strategy,
+                    rebalance_freq=rebalance_freq,
+                    dca_frequency=dca_frequency,
+                    dca_freq=dca_freq,
+                    dca_amount=dca_amount
+                )
 
                 st.success("✅ Backtest completed successfully!")
 
@@ -398,9 +397,9 @@ def main() -> None:
                 st.stop()
 
     # Display results from session state (persists across reruns)
-    if st.session_state.get('backtest_completed', False):
+    if StateManager.is_backtest_completed():
         # Retrieve stored results
-        stored = st.session_state.backtest_results
+        stored = StateManager.get_backtest_results()
         results = stored['results']
         all_benchmark_results = stored['all_benchmark_results']
         tickers = stored['tickers']

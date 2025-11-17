@@ -1,10 +1,13 @@
 """Input validation and session state management for the ETF Backtester.
 
 This module handles:
-- Session state initialization and management
+- Session state initialization (delegated to StateManager)
 - Input validation for tickers, dates, and other parameters
 - Weight normalization
-- Portfolio preset updates
+- Portfolio preset updates (delegated to StateManager)
+
+NOTE: Session state management has been centralized in state_manager.py.
+This module now primarily handles validation logic.
 """
 
 from __future__ import annotations
@@ -12,58 +15,43 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Dict, Any, List, Tuple
 
-import streamlit as st
 import numpy as np
 
-from .config import DEFAULT_NUM_TICKERS, DEFAULT_START_DATE, DEFAULT_BENCHMARK
-
-
-def get_session_defaults() -> Dict[str, Any]:
-    """Get default values for session state.
-    
-    Returns:
-        Dictionary of default session state values
-    """
-    return {
-        'selected_portfolio': "Custom (Manual Entry)",
-        'num_tickers': DEFAULT_NUM_TICKERS,
-        'start_date': DEFAULT_START_DATE,
-        'end_date': datetime.today(),
-        'preset_tickers': [],
-        'preset_weights': [],
-        'preset_benchmark': DEFAULT_BENCHMARK,
-    }
+from .state_manager import StateManager
 
 
 def initialize_session_state() -> None:
     """Initialize all session state variables with defaults.
-    
+
     This should be called once at app startup to ensure all
     session state variables exist.
+
+    Delegates to StateManager for centralized state management.
     """
-    defaults = get_session_defaults()
-    
-    for key, value in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
+    StateManager.initialize()
 
 
 def update_portfolio_preset(preset_name: str, preset_config: Dict[str, Any]) -> None:
     """Update session state when portfolio preset changes.
-    
+
     Args:
         preset_name: Name of the selected preset
-        preset_config: Configuration dictionary for the preset
+        preset_config: Configuration dictionary for the preset with keys:
+            - tickers: List[str]
+            - weights: List[float]
+            - benchmark: str
+
+    Delegates to StateManager for centralized state management.
+
+    Examples:
+        >>> config = {
+        ...     "tickers": ["AAPL", "MSFT"],
+        ...     "weights": [0.6, 0.4],
+        ...     "benchmark": "SPY"
+        ... }
+        >>> update_portfolio_preset("Tech Portfolio", config)
     """
-    if preset_name == "Custom (Manual Entry)":
-        # Don't override for custom entry
-        return
-    
-    # Update session state with preset values
-    st.session_state.num_tickers = len(preset_config["tickers"])
-    st.session_state.preset_tickers = preset_config["tickers"]
-    st.session_state.preset_weights = preset_config["weights"]
-    st.session_state.preset_benchmark = preset_config["benchmark"]
+    StateManager.update_portfolio_preset(preset_name, preset_config)
 
 
 def validate_backtest_inputs(
