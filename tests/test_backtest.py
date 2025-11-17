@@ -1102,6 +1102,45 @@ class TestDCA:
         # Portfolio should use DCA logic (value > capital due to contributions)
         assert results['portfolio_value'].iloc[-1] > capital
 
+    def test_dca_weekend_handling(self):
+        """Test that DCA dates falling on weekends/holidays use next trading day"""
+        # Create date range with only weekdays (simulating market closed on weekends)
+        all_dates = pd.date_range("2022-11-18", "2023-11-18", freq="D")
+        trading_days = all_dates[all_dates.dayofweek < 5]  # Only Mon-Fri
+
+        prices = pd.DataFrame({
+            "AAPL": [100] * len(trading_days),
+        }, index=trading_days)
+
+        weights = np.array([1.0])
+        capital = 10000
+        dca_amount = 1000
+        dca_freq = "M"
+
+        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(
+            prices, weights, capital, dca_amount, dca_freq
+        )
+
+        # Generate expected monthly dates
+        monthly_dates = pd.date_range("2022-11-18", "2023-11-18", freq="M")
+
+        # Count actual contributions
+        contrib_changes = cumulative_contributions.diff().fillna(cumulative_contributions.iloc[0])
+        contrib_events = contrib_changes[contrib_changes > 0]
+
+        # Should have 1 initial + 12 monthly contributions = 13 total
+        # Even though some monthly dates fall on weekends
+        assert len(contrib_events) == 13, \
+            f"Expected 13 contributions (1 initial + 12 monthly), got {len(contrib_events)}"
+
+        # Total should be $22,000 (10k initial + 12*1k monthly)
+        expected_total = capital + (dca_amount * len(monthly_dates))
+        assert cumulative_contributions.iloc[-1] == expected_total, \
+            f"Expected ${expected_total:,.2f}, got ${cumulative_contributions.iloc[-1]:,.2f}"
+
+        # Verify no contributions were skipped due to weekends
+        assert cumulative_contributions.iloc[-1] == 22000.0
+
     def test_xirr_calculation_basic(self):
         """Test basic XIRR calculation with known cashflows"""
         # Simple case: invest $1000, get $1100 back after 365 days = 10% return

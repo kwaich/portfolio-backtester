@@ -720,8 +720,16 @@ def _calculate_dca_portfolio(
     if prices.index[0] not in dca_dates:
         dca_dates = dca_dates.insert(0, prices.index[0])
 
-    # Filter to only dates that exist in our price data
-    dca_dates = dca_dates.intersection(prices.index)
+    # Map DCA dates to actual trading days (handle weekends/holidays)
+    # If a DCA date falls on a weekend/holiday, use the next available trading day
+    actual_dca_dates = []
+    for dca_date in dca_dates:
+        # Find the next available trading day on or after the DCA date
+        available_dates = prices.index[prices.index >= dca_date]
+        if len(available_dates) > 0:
+            actual_dca_dates.append(available_dates[0])
+
+    dca_dates = pd.DatetimeIndex(actual_dca_dates).unique()  # Remove duplicates
 
     if len(dca_dates) == 0:
         logger.warning(f"No DCA dates found for frequency '{dca_freq}'. Using lump sum.")
