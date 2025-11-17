@@ -13,13 +13,23 @@ Key Benefits:
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, MutableMapping
 
-import streamlit as st
+import importlib
 import numpy as np
 import pandas as pd
 
 from .config import DEFAULT_NUM_TICKERS, DEFAULT_START_DATE, DEFAULT_BENCHMARK
+
+
+def _session_state() -> MutableMapping[str, Any]:
+    """Return the active Streamlit session_state mapping.
+
+    Streamlit may be swapped with a mock after this module is imported
+    (e.g., in tests). Import it dynamically so StateManager always uses
+    the latest module instance.
+    """
+    return importlib.import_module("streamlit").session_state
 
 
 class StateKeys:
@@ -80,8 +90,8 @@ class StateManager:
         }
 
         for key, value in defaults.items():
-            if key not in st.session_state:
-                st.session_state[key] = value
+            if key not in _session_state():
+                _session_state()[key] = value
 
     # =========================================================================
     # Portfolio Configuration
@@ -90,52 +100,52 @@ class StateManager:
     @staticmethod
     def get_selected_portfolio() -> str:
         """Get the currently selected portfolio preset name."""
-        return st.session_state.get(StateKeys.SELECTED_PORTFOLIO, "Custom (Manual Entry)")
+        return _session_state().get(StateKeys.SELECTED_PORTFOLIO, "Custom (Manual Entry)")
 
     @staticmethod
     def set_selected_portfolio(name: str) -> None:
         """Set the selected portfolio preset name."""
-        st.session_state[StateKeys.SELECTED_PORTFOLIO] = name
+        _session_state()[StateKeys.SELECTED_PORTFOLIO] = name
 
     @staticmethod
     def get_num_tickers() -> int:
         """Get the number of tickers in the portfolio."""
-        return st.session_state.get(StateKeys.NUM_TICKERS, DEFAULT_NUM_TICKERS)
+        return _session_state().get(StateKeys.NUM_TICKERS, DEFAULT_NUM_TICKERS)
 
     @staticmethod
     def set_num_tickers(num: int) -> None:
         """Set the number of tickers in the portfolio."""
-        st.session_state[StateKeys.NUM_TICKERS] = num
+        _session_state()[StateKeys.NUM_TICKERS] = num
 
     @staticmethod
     def get_preset_tickers() -> List[str]:
         """Get the preset ticker symbols."""
-        return st.session_state.get(StateKeys.PRESET_TICKERS, [])
+        return _session_state().get(StateKeys.PRESET_TICKERS, [])
 
     @staticmethod
     def set_preset_tickers(tickers: List[str]) -> None:
         """Set the preset ticker symbols."""
-        st.session_state[StateKeys.PRESET_TICKERS] = tickers
+        _session_state()[StateKeys.PRESET_TICKERS] = tickers
 
     @staticmethod
     def get_preset_weights() -> List[float]:
         """Get the preset portfolio weights."""
-        return st.session_state.get(StateKeys.PRESET_WEIGHTS, [])
+        return _session_state().get(StateKeys.PRESET_WEIGHTS, [])
 
     @staticmethod
     def set_preset_weights(weights: List[float]) -> None:
         """Set the preset portfolio weights."""
-        st.session_state[StateKeys.PRESET_WEIGHTS] = weights
+        _session_state()[StateKeys.PRESET_WEIGHTS] = weights
 
     @staticmethod
     def get_preset_benchmark() -> str:
         """Get the preset benchmark ticker."""
-        return st.session_state.get(StateKeys.PRESET_BENCHMARK, DEFAULT_BENCHMARK)
+        return _session_state().get(StateKeys.PRESET_BENCHMARK, DEFAULT_BENCHMARK)
 
     @staticmethod
     def set_preset_benchmark(benchmark: str) -> None:
         """Set the preset benchmark ticker."""
-        st.session_state[StateKeys.PRESET_BENCHMARK] = benchmark
+        _session_state()[StateKeys.PRESET_BENCHMARK] = benchmark
 
     @staticmethod
     def update_portfolio_preset(preset_name: str, preset_config: Dict[str, Any]) -> None:
@@ -173,12 +183,12 @@ class StateManager:
     @staticmethod
     def get_start_date() -> datetime:
         """Get the backtest start date."""
-        return st.session_state.get(StateKeys.START_DATE, DEFAULT_START_DATE)
+        return _session_state().get(StateKeys.START_DATE, DEFAULT_START_DATE)
 
     @staticmethod
     def get_end_date() -> datetime:
         """Get the backtest end date."""
-        return st.session_state.get(StateKeys.END_DATE, datetime.today())
+        return _session_state().get(StateKeys.END_DATE, datetime.today())
 
     @staticmethod
     def set_date_range(start_date: datetime, end_date: datetime) -> None:
@@ -194,8 +204,8 @@ class StateManager:
             ...     datetime.today()
             ... )
         """
-        st.session_state[StateKeys.START_DATE] = start_date
-        st.session_state[StateKeys.END_DATE] = end_date
+        _session_state()[StateKeys.START_DATE] = start_date
+        _session_state()[StateKeys.END_DATE] = end_date
 
     @staticmethod
     def set_date_preset(preset_date: datetime) -> None:
@@ -217,7 +227,7 @@ class StateManager:
     @staticmethod
     def is_backtest_completed() -> bool:
         """Check if a backtest has been completed."""
-        return st.session_state.get(StateKeys.BACKTEST_COMPLETED, False)
+        return _session_state().get(StateKeys.BACKTEST_COMPLETED, False)
 
     @staticmethod
     def get_backtest_results() -> Optional[Dict[str, Any]]:
@@ -241,7 +251,7 @@ class StateManager:
         """
         if not StateManager.is_backtest_completed():
             return None
-        return st.session_state.get(StateKeys.BACKTEST_RESULTS)
+        return _session_state().get(StateKeys.BACKTEST_RESULTS)
 
     @staticmethod
     def store_backtest_results(
@@ -284,7 +294,7 @@ class StateManager:
             ...     rebalance_freq=None
             ... )
         """
-        st.session_state[StateKeys.BACKTEST_RESULTS] = {
+        _session_state()[StateKeys.BACKTEST_RESULTS] = {
             'results': results,
             'all_benchmark_results': all_benchmark_results,
             'tickers': tickers,
@@ -297,7 +307,7 @@ class StateManager:
             'dca_freq': dca_freq,
             'dca_amount': dca_amount
         }
-        st.session_state[StateKeys.BACKTEST_COMPLETED] = True
+        _session_state()[StateKeys.BACKTEST_COMPLETED] = True
 
     @staticmethod
     def clear_backtest_results() -> None:
@@ -305,9 +315,9 @@ class StateManager:
 
         Useful for clearing old results before running a new backtest.
         """
-        st.session_state[StateKeys.BACKTEST_COMPLETED] = False
-        if StateKeys.BACKTEST_RESULTS in st.session_state:
-            del st.session_state[StateKeys.BACKTEST_RESULTS]
+        _session_state()[StateKeys.BACKTEST_COMPLETED] = False
+        if StateKeys.BACKTEST_RESULTS in _session_state():
+            del _session_state()[StateKeys.BACKTEST_RESULTS]
 
     # =========================================================================
     # Widget State Management
@@ -328,7 +338,7 @@ class StateManager:
             >>> state = StateManager.get_widget_state("ticker_0", {})
         """
         full_key = f"{StateKeys.WIDGET_PREFIX}{widget_key}"
-        return st.session_state.get(full_key, default)
+        return _session_state().get(full_key, default)
 
     @staticmethod
     def set_widget_state(widget_key: str, value: Any) -> None:
@@ -342,7 +352,7 @@ class StateManager:
             >>> StateManager.set_widget_state("ticker_0", {"value": "AAPL"})
         """
         full_key = f"{StateKeys.WIDGET_PREFIX}{widget_key}"
-        st.session_state[full_key] = value
+        _session_state()[full_key] = value
 
     @staticmethod
     def clear_widget_state(widget_key: str) -> None:
@@ -355,8 +365,8 @@ class StateManager:
             >>> StateManager.clear_widget_state("ticker_0")
         """
         full_key = f"{StateKeys.WIDGET_PREFIX}{widget_key}"
-        if full_key in st.session_state:
-            del st.session_state[full_key]
+        if full_key in _session_state():
+            del _session_state()[full_key]
 
     # =========================================================================
     # Utility Methods
@@ -384,14 +394,14 @@ class StateManager:
         ]
 
         for key in keys_to_clear:
-            if key in st.session_state:
-                del st.session_state[key]
+            if key in _session_state():
+                del _session_state()[key]
 
         # Clear all widget state
-        widget_keys = [k for k in st.session_state.keys()
+        widget_keys = [k for k in _session_state().keys()
                       if k.startswith(StateKeys.WIDGET_PREFIX)]
         for key in widget_keys:
-            del st.session_state[key]
+            del _session_state()[key]
 
         # Re-initialize with defaults
         StateManager.initialize()
@@ -445,7 +455,7 @@ class StateManager:
             StateKeys.PRESET_BENCHMARK,
         ]
 
-        missing_keys = [key for key in required_keys if key not in st.session_state]
+        missing_keys = [key for key in required_keys if key not in _session_state()]
 
         if missing_keys:
             return False
