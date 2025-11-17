@@ -28,12 +28,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Color scheme
-PORTFOLIO_COLOR = "#2E86AB"  # Blue
-BENCHMARK_COLOR = "#A23B72"  # Purple
-POSITIVE_COLOR = "#06A77D"   # Green
-NEGATIVE_COLOR = "#D62246"   # Red
-ACTIVE_COLOR = "#8B4789"     # Purple-ish
+# Colorblind-friendly color scheme (Wong palette)
+# Avoids problematic blue-purple and red-green combinations
+PORTFOLIO_COLOR = "#0173B2"  # Blue
+BENCHMARK_COLOR = "#DE8F05"  # Orange (instead of purple)
+POSITIVE_COLOR = "#0173B2"   # Blue (instead of green)
+NEGATIVE_COLOR = "#DE8F05"   # Orange (instead of red)
+ACTIVE_COLOR = "#0173B2"     # Blue
 
 
 def parse_args() -> argparse.Namespace:
@@ -82,12 +83,14 @@ def create_value_plot(df: pd.DataFrame, style: str) -> tuple:
         ax=ax,
         color=PORTFOLIO_COLOR,
         linewidth=2,
+        linestyle='-',
         label="Portfolio"
     )
     df["benchmark_value"].plot(
         ax=ax,
         color=BENCHMARK_COLOR,
         linewidth=2,
+        linestyle='--',  # Dashed line for visual differentiation
         alpha=0.8,
         label="Benchmark"
     )
@@ -112,12 +115,14 @@ def create_returns_plot(df: pd.DataFrame, style: str) -> tuple:
         ax=ax,
         color=PORTFOLIO_COLOR,
         linewidth=2,
+        linestyle='-',
         label="Portfolio"
     )
     (df["benchmark_return"] * 100).plot(
         ax=ax,
         color=BENCHMARK_COLOR,
         linewidth=2,
+        linestyle='--',  # Dashed line for visual differentiation
         alpha=0.8,
         label="Benchmark"
     )
@@ -204,8 +209,8 @@ def create_drawdown_plot(df: pd.DataFrame, style: str) -> tuple:
     )
 
     # Plot lines
-    portfolio_dd.plot(ax=ax, color=PORTFOLIO_COLOR, linewidth=1.5, alpha=0.8)
-    benchmark_dd.plot(ax=ax, color=BENCHMARK_COLOR, linewidth=1.5, alpha=0.7)
+    portfolio_dd.plot(ax=ax, color=PORTFOLIO_COLOR, linewidth=1.5, linestyle='-', alpha=0.8)
+    benchmark_dd.plot(ax=ax, color=BENCHMARK_COLOR, linewidth=1.5, linestyle='--', alpha=0.7)
 
     ax.axhline(0, color='black', linewidth=0.8, linestyle='-', alpha=0.5)
     ax.set_title("Drawdown Over Time", fontsize=14, fontweight='bold')
@@ -250,12 +255,14 @@ def create_rolling_sharpe_plot(df: pd.DataFrame, style: str) -> tuple:
         ax=ax,
         color=PORTFOLIO_COLOR,
         linewidth=2,
+        linestyle='-',
         label="Portfolio 12M Sharpe"
     )
     df["benchmark_rolling_sharpe_12m"].plot(
         ax=ax,
         color=BENCHMARK_COLOR,
         linewidth=2,
+        linestyle='--',  # Dashed line for visual differentiation
         alpha=0.8,
         label="Benchmark 12M Sharpe"
     )
@@ -282,8 +289,8 @@ def create_dashboard(df: pd.DataFrame, style: str) -> tuple:
     fig.suptitle("Portfolio Performance Dashboard", fontsize=16, fontweight='bold', y=0.995)
 
     # Top left: Portfolio vs Benchmark Value
-    df["portfolio_value"].plot(ax=axes[0, 0], color=PORTFOLIO_COLOR, linewidth=2, label="Portfolio")
-    df["benchmark_value"].plot(ax=axes[0, 0], color=BENCHMARK_COLOR, linewidth=2, alpha=0.8, label="Benchmark")
+    df["portfolio_value"].plot(ax=axes[0, 0], color=PORTFOLIO_COLOR, linewidth=2, linestyle='-', label="Portfolio")
+    df["benchmark_value"].plot(ax=axes[0, 0], color=BENCHMARK_COLOR, linewidth=2, linestyle='--', alpha=0.8, label="Benchmark")
     axes[0, 0].set_title("Portfolio Value", fontsize=12, fontweight='bold')
     axes[0, 0].set_ylabel("Value ($)", fontsize=10)
     axes[0, 0].yaxis.set_major_formatter(mticker.FuncFormatter(format_currency))
@@ -291,8 +298,8 @@ def create_dashboard(df: pd.DataFrame, style: str) -> tuple:
     axes[0, 0].grid(True, alpha=0.3, linestyle='--')
 
     # Top right: Cumulative Returns
-    (df["portfolio_return"] * 100).plot(ax=axes[0, 1], color=PORTFOLIO_COLOR, linewidth=2, label="Portfolio")
-    (df["benchmark_return"] * 100).plot(ax=axes[0, 1], color=BENCHMARK_COLOR, linewidth=2, alpha=0.8, label="Benchmark")
+    (df["portfolio_return"] * 100).plot(ax=axes[0, 1], color=PORTFOLIO_COLOR, linewidth=2, linestyle='-', label="Portfolio")
+    (df["benchmark_return"] * 100).plot(ax=axes[0, 1], color=BENCHMARK_COLOR, linewidth=2, linestyle='--', alpha=0.8, label="Benchmark")
     axes[0, 1].axhline(0, color='black', linewidth=0.8, linestyle='--', alpha=0.5)
     axes[0, 1].set_title("Cumulative Returns", fontsize=12, fontweight='bold')
     axes[0, 1].set_ylabel("Return (%)", fontsize=10)
@@ -316,8 +323,8 @@ def create_dashboard(df: pd.DataFrame, style: str) -> tuple:
     benchmark_dd = (df["benchmark_value"] / df["benchmark_value"].cummax() - 1) * 100
     axes[1, 1].fill_between(df.index, portfolio_dd, 0, alpha=0.4, color=PORTFOLIO_COLOR, label="Portfolio")
     axes[1, 1].fill_between(df.index, benchmark_dd, 0, alpha=0.3, color=BENCHMARK_COLOR, label="Benchmark")
-    portfolio_dd.plot(ax=axes[1, 1], color=PORTFOLIO_COLOR, linewidth=1.5, alpha=0.8)
-    benchmark_dd.plot(ax=axes[1, 1], color=BENCHMARK_COLOR, linewidth=1.5, alpha=0.7)
+    portfolio_dd.plot(ax=axes[1, 1], color=PORTFOLIO_COLOR, linewidth=1.5, linestyle='-', alpha=0.8)
+    benchmark_dd.plot(ax=axes[1, 1], color=BENCHMARK_COLOR, linewidth=1.5, linestyle='--', alpha=0.7)
     axes[1, 1].axhline(0, color='black', linewidth=0.8, linestyle='-', alpha=0.5)
     axes[1, 1].set_title("Drawdown", fontsize=12, fontweight='bold')
     axes[1, 1].set_ylabel("Drawdown (%)", fontsize=10)

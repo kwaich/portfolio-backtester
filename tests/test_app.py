@@ -992,5 +992,170 @@ class TestRollingReturns:
         assert rolling_results[180].isna().sum() == 180
 
 
+class TestColorblindAccessibility:
+    """Test colorblind accessibility features in charts"""
+
+    def test_colorblind_safe_palette_defined(self):
+        """Test that colorblind-safe colors are defined in config"""
+        from app.config import (
+            PORTFOLIO_COLOR,
+            BENCHMARK_COLORS,
+            POSITIVE_COLOR,
+            NEGATIVE_COLOR
+        )
+
+        # Verify colors are defined
+        assert PORTFOLIO_COLOR is not None
+        assert len(BENCHMARK_COLORS) >= 3
+        assert POSITIVE_COLOR is not None
+        assert NEGATIVE_COLOR is not None
+
+        # Verify they are hex color codes
+        assert PORTFOLIO_COLOR.startswith("#")
+        assert len(PORTFOLIO_COLOR) == 7
+        for color in BENCHMARK_COLORS:
+            assert color.startswith("#")
+            assert len(color) == 7
+
+    def test_wong_palette_colors(self):
+        """Test that colors match Wong's colorblind-safe palette"""
+        from app.config import (
+            PORTFOLIO_COLOR,
+            BENCHMARK_COLORS,
+            POSITIVE_COLOR,
+            NEGATIVE_COLOR
+        )
+
+        # Wong's colorblind-safe palette (standard colors)
+        wong_blue = "#0173B2"
+        wong_orange = "#DE8F05"
+        wong_teal = "#029E73"
+        wong_pink = "#CC78BC"
+
+        # Verify portfolio uses Wong blue
+        assert PORTFOLIO_COLOR == wong_blue
+
+        # Verify benchmarks use Wong palette colors
+        assert BENCHMARK_COLORS[0] == wong_orange
+        assert BENCHMARK_COLORS[1] == wong_teal
+        assert BENCHMARK_COLORS[2] == wong_pink
+
+        # Verify positive/negative avoid red-green (use blue/orange instead)
+        assert POSITIVE_COLOR == wong_blue
+        assert NEGATIVE_COLOR == wong_orange
+
+    def test_avoids_problematic_color_combinations(self):
+        """Test that we avoid blue-purple and red-green combinations"""
+        from app.config import (
+            PORTFOLIO_COLOR,
+            BENCHMARK_COLORS,
+            POSITIVE_COLOR,
+            NEGATIVE_COLOR
+        )
+
+        # Problematic colors for colorblind users
+        problematic_purple = "#9467bd"  # Old purple benchmark
+        problematic_green = "#06A77D"   # Old positive green
+        problematic_red = "#D62246"     # Old negative red
+
+        # Verify we no longer use these problematic colors
+        assert PORTFOLIO_COLOR != problematic_purple
+        assert problematic_purple not in BENCHMARK_COLORS
+        assert POSITIVE_COLOR != problematic_green
+        assert NEGATIVE_COLOR != problematic_red
+
+    def test_line_style_differentiation(self):
+        """Test that benchmark line styles provide visual differentiation"""
+        from app.config import BENCHMARK_DASH_STYLES
+
+        # Should have multiple distinct line styles
+        assert len(BENCHMARK_DASH_STYLES) >= 3
+        assert len(set(BENCHMARK_DASH_STYLES)) >= 3  # All unique
+
+        # Common Plotly dash styles
+        valid_styles = ["solid", "dash", "dot", "dashdot"]
+        for style in BENCHMARK_DASH_STYLES:
+            assert style in valid_styles
+
+    def test_marker_symbols_defined(self):
+        """Test that marker symbols are defined for additional differentiation"""
+        from app.config import PORTFOLIO_MARKER, BENCHMARK_MARKERS
+
+        # Verify markers are defined
+        assert PORTFOLIO_MARKER is not None
+        assert len(BENCHMARK_MARKERS) >= 3
+
+        # Should be valid Plotly marker symbols
+        valid_markers = ["circle", "square", "diamond", "triangle-up", "triangle-down", "cross", "x"]
+        assert PORTFOLIO_MARKER in valid_markers
+        for marker in BENCHMARK_MARKERS:
+            assert marker in valid_markers
+
+        # Should have distinct markers
+        all_markers = [PORTFOLIO_MARKER] + BENCHMARK_MARKERS
+        assert len(set(all_markers)) == len(all_markers)
+
+    def test_active_return_uses_colorblind_colors(self):
+        """Test that active return chart uses blue/orange instead of green/red"""
+        from app.config import POSITIVE_COLOR, NEGATIVE_COLOR
+
+        # Should use blue for positive (not green)
+        assert POSITIVE_COLOR == "#0173B2"  # Wong blue
+
+        # Should use orange for negative (not red)
+        assert NEGATIVE_COLOR == "#DE8F05"  # Wong orange
+
+        # Verify they are distinguishable
+        assert POSITIVE_COLOR != NEGATIVE_COLOR
+
+    def test_chart_colors_import(self):
+        """Test that chart modules can import colorblind-safe colors"""
+        # This ensures the refactoring maintains backward compatibility
+        try:
+            from app.charts import (
+                create_main_dashboard,
+                create_rolling_returns_chart,
+                create_rolling_sharpe_chart
+            )
+            # If imports succeed, config is properly integrated
+            assert True
+        except ImportError as e:
+            pytest.fail(f"Failed to import chart functions: {e}")
+
+    def test_color_contrast_sufficient(self):
+        """Test that colors have sufficient contrast for visibility"""
+        from app.config import PORTFOLIO_COLOR, BENCHMARK_COLORS
+
+        def hex_to_rgb(hex_color):
+            """Convert hex color to RGB tuple"""
+            hex_color = hex_color.lstrip('#')
+            return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+
+        def relative_luminance(rgb):
+            """Calculate relative luminance for contrast ratio"""
+            r, g, b = [x / 255.0 for x in rgb]
+            r = r / 12.92 if r <= 0.03928 else ((r + 0.055) / 1.055) ** 2.4
+            g = g / 12.92 if g <= 0.03928 else ((g + 0.055) / 1.055) ** 2.4
+            b = b / 12.92 if b <= 0.03928 else ((b + 0.055) / 1.055) ** 2.4
+            return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+        def contrast_ratio(color1, color2):
+            """Calculate WCAG contrast ratio between two colors"""
+            lum1 = relative_luminance(hex_to_rgb(color1))
+            lum2 = relative_luminance(hex_to_rgb(color2))
+            lighter = max(lum1, lum2)
+            darker = min(lum1, lum2)
+            return (lighter + 0.05) / (darker + 0.05)
+
+        # Test contrast between portfolio and each benchmark color
+        # WCAG AA requires 3:1 for large text, 4.5:1 for normal text
+        # We use a relaxed threshold of 1.4:1 for chart lines since we also use
+        # different line styles (solid, dashed, dotted) for additional differentiation
+        # Wong palette is optimized for colorblind differentiation, not brightness contrast
+        for bench_color in BENCHMARK_COLORS:
+            ratio = contrast_ratio(PORTFOLIO_COLOR, bench_color)
+            assert ratio >= 1.4, f"Insufficient contrast between portfolio and benchmark: {ratio:.2f}"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

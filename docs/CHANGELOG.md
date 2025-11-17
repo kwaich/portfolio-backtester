@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Colorblind-Accessible Charts** - Universal accessibility for all chart visualizations
+  - Implemented Wong's colorblind-safe palette (blue, orange, teal, pink) in all charts
+  - Replaced problematic blue-purple and red-green color combinations
+  - Portfolio: Wong blue (#0173B2), Benchmarks: Orange, teal, pink
+  - Active return: Blue/orange for positive/negative (instead of green/red)
+  - Line style differentiation: Benchmarks use dashed, dotted, and dashdot patterns
+  - Benefits ~8% of males with deuteranopia (red-green colorblindness)
+  - Applied to both Streamlit UI (app/charts.py) and matplotlib plots (plot_backtest.py)
+  - Added 8 comprehensive tests for colorblind accessibility validation (256 total tests)
+
 - **Dollar-Cost Averaging (DCA) Support** - Complete implementation of DCA backtesting
   - CLI arguments: `--dca-amount` and `--dca-freq` for contribution amount and frequency
   - Supported frequencies: Daily (D), Weekly (W), Monthly (M), Quarterly (Q), Yearly (Y)

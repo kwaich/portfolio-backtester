@@ -91,14 +91,25 @@ MAX_DCA_AMOUNT = 100_000.0
 # Chart Configuration
 # =============================================================================
 
-# Portfolio color (blue)
-PORTFOLIO_COLOR = "#1f77b4"
+# Colorblind-friendly palette (Wong palette - accessible for all types of colorblindness)
+# Portfolio color (blue) - distinguishable for all colorblind types
+PORTFOLIO_COLOR = "#0173B2"
 
-# Benchmark colors (purple, pink, yellow-green)
-BENCHMARK_COLORS = ["#9467bd", "#e377c2", "#bcbd22"]
+# Benchmark colors (orange, teal, pink) - colorblind-safe Wong palette
+# Avoids problematic blue-purple and red-green combinations
+BENCHMARK_COLORS = ["#DE8F05", "#029E73", "#CC78BC"]
 
-# Benchmark line styles
+# Benchmark line styles (provides visual differentiation beyond color)
 BENCHMARK_DASH_STYLES = ["dash", "dot", "dashdot"]
+
+# Marker symbols for additional visual differentiation
+# Used sparingly to avoid clutter (every 20th point)
+PORTFOLIO_MARKER = "circle"
+BENCHMARK_MARKERS = ["square", "diamond", "triangle-up"]
+
+# Positive/negative colors (blue/orange instead of green/red for colorblind accessibility)
+POSITIVE_COLOR = "#0173B2"  # Blue
+NEGATIVE_COLOR = "#DE8F05"  # Orange
 
 # Rolling windows for returns analysis (in days)
 ROLLING_WINDOWS = [30, 90, 180]

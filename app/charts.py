@@ -18,6 +18,10 @@ from .config import (
     PORTFOLIO_COLOR,
     BENCHMARK_COLORS,
     BENCHMARK_DASH_STYLES,
+    PORTFOLIO_MARKER,
+    BENCHMARK_MARKERS,
+    POSITIVE_COLOR,
+    NEGATIVE_COLOR,
     ROLLING_WINDOWS,
     DASHBOARD_HEIGHT,
     CHART_HEIGHT
@@ -149,18 +153,42 @@ def create_main_dashboard(
         )
     
     # Chart 3: Active Return (bottom-left)
+    # Split into positive and negative areas for better visual differentiation
+    positive_active = active_return.copy()
+    positive_active[active_return < 0] = 0
+    negative_active = active_return.copy()
+    negative_active[active_return >= 0] = 0
+
+    # Add positive area (blue)
     fig.add_trace(
         go.Scatter(
             x=results.index,
-            y=active_return,
-            name='Active Return',
+            y=positive_active,
+            name='Outperformance',
             fill='tozeroy',
-            line=dict(color=PORTFOLIO_COLOR, width=2),
-            hovertemplate='<b>Active Return</b><br>Date: %{x}<br>Difference: %{y:.2f}%<extra></extra>',
+            fillcolor=f'rgba({int(POSITIVE_COLOR[1:3], 16)}, {int(POSITIVE_COLOR[3:5], 16)}, {int(POSITIVE_COLOR[5:7], 16)}, 0.3)',
+            line=dict(color=POSITIVE_COLOR, width=1.5),
+            hovertemplate='<b>Outperformance</b><br>Date: %{x}<br>Difference: %{y:.2f}%<extra></extra>',
             showlegend=False
         ),
         row=2, col=1
     )
+
+    # Add negative area (orange)
+    fig.add_trace(
+        go.Scatter(
+            x=results.index,
+            y=negative_active,
+            name='Underperformance',
+            fill='tozeroy',
+            fillcolor=f'rgba({int(NEGATIVE_COLOR[1:3], 16)}, {int(NEGATIVE_COLOR[3:5], 16)}, {int(NEGATIVE_COLOR[5:7], 16)}, 0.3)',
+            line=dict(color=NEGATIVE_COLOR, width=1.5),
+            hovertemplate='<b>Underperformance</b><br>Date: %{x}<br>Difference: %{y:.2f}%<extra></extra>',
+            showlegend=False
+        ),
+        row=2, col=1
+    )
+
     fig.add_hline(y=0, line_dash="solid", line_color="black", opacity=0.5, row=2, col=1)
     
     # Chart 4: Drawdown (bottom-right)

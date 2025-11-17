@@ -13,6 +13,7 @@ A lightweight, flexible Python utility for backtesting ETF portfolio strategies 
 - **Input Validation**: Comprehensive validation for tickers, dates, and parameters before execution
 - **Searchable Ticker Selection**: Built-in search for 50+ popular ETFs and stocks with optional Yahoo Finance integration
 - **Flexible Visualization**: Generate publication-ready charts or interactive plots
+- **Colorblind-Accessible Charts**: Uses Wong's colorblind-safe palette with line style differentiation for universal accessibility
 - **Easy CLI**: Simple command-line interface with sensible defaults
 - **Data Quality Validation**: Automatic detection of data issues (missing values, invalid prices, extreme changes)
 - **Optimized Performance**: Batch downloads with per-ticker caching for faster multi-ticker operations
@@ -145,6 +146,8 @@ This opens an interactive web application in your browser with:
    - Rolling Returns Analysis (30/90/180-day periods)
    - Rolling 12-Month Sharpe Ratio: Track risk-adjusted performance over time
    - Multiple benchmarks displayed on all charts with distinct colors and line styles
+   - **Colorblind-Accessible Design**: Uses Wong's colorblind-safe palette (blue, orange, teal, pink) avoiding problematic blue-purple and red-green combinations
+   - **Multiple Visual Cues**: Line styles (solid, dashed, dotted) provide differentiation beyond color alone
    - Hover tooltips for exact values at any point
    - Zoom, pan, and explore interactively
 
