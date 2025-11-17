@@ -21,9 +21,9 @@ This is a lightweight Python-based ETF backtesting utility that allows users to:
 
 **Current Status**:
 - **Version**: v2.3.0-dev (Unreleased - 2025-11-17)
-- **Test Coverage**: ~88% (204 tests, 100% passing)
-- **Progress**: DCA feature complete with IRR, weekend handling, and corrected metrics
-- **Branch**: claude/add-dca-backtest-011xDT3WNDnDov3hKvDZa8cA
+- **Test Coverage**: ~88% (248 tests, 100% passing)
+- **Progress**: Session state refactored with centralized StateManager
+- **Branch**: claude/review-session-state-01BxsjR1cChr8Jg4VRPcYf6b
 
 ---
 
@@ -31,22 +31,25 @@ This is a lightweight Python-based ETF backtesting utility that allows users to:
 
 ```
 portfolio-backtester/
+├── .venv/                    # Python virtual environment (gitignored - create with: python -m venv .venv)
 ├── app.py                    # Streamlit web UI (backward compatibility wrapper - 43 lines)
-├── app/                      # Modular web UI package (Phase 2 - 8 modules, 1,695 lines)
+├── app/                      # Modular web UI package (9 modules, 2,202 lines)
 │   ├── __init__.py           # Package initialization
 │   ├── config.py             # Configuration constants (32 constants)
 │   ├── presets.py            # Portfolio and date presets
-│   ├── validation.py         # Input validation & session state
+│   ├── validation.py         # Input validation (delegates to StateManager)
+│   ├── state_manager.py      # Centralized session state management (NEW - 507 lines)
 │   ├── ui_components.py      # Reusable UI rendering with searchable inputs
-│   ├── ticker_data.py        # Ticker search & Yahoo Finance integration (NEW)
+│   ├── ticker_data.py        # Ticker search & Yahoo Finance integration
 │   ├── charts.py             # Plotly chart generation
 │   └── main.py               # Application orchestration
 ├── backtest.py               # Core backtesting engine (830 lines - Phases 1 & 3)
 ├── plot_backtest.py          # Visualization utility (395 lines - Phases 2 & 3)
-├── tests/                    # Test suite (204 tests, ~88% coverage)
+├── tests/                    # Test suite (248 tests, ~88% coverage)
 │   ├── conftest.py           # pytest configuration
 │   ├── test_backtest.py      # Unit tests for backtest.py (88 tests - includes DCA & IRR)
 │   ├── test_app.py           # Unit tests for app.py UI (63 tests - includes DCA metrics)
+│   ├── test_state_manager.py # Unit tests for state_manager.py (39 tests - NEW)
 │   ├── test_ticker_data.py   # Unit tests for ticker_data.py (32 tests)
 │   └── test_integration.py   # Integration tests (16 tests)
 ├── requirements.txt          # Python dependencies (includes requests)
@@ -316,6 +319,10 @@ Batch download optimization, data quality validation (NaN/zero/negative/extreme)
 ### Common Commands
 
 ```bash
+# Set up virtual environment (RECOMMENDED)
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
 # Install dependencies
 pip install -r requirements.txt
 
@@ -328,7 +335,8 @@ python backtest.py --tickers AAPL MSFT --weights 0.6 0.4 --benchmark SPY
 # Plot results
 python plot_backtest.py --csv results/backtest.csv --output charts/test
 
-# Run all tests (204 tests)
+# Run all tests (248 tests)
+source .venv/bin/activate  # Activate venv first
 pytest -v
 
 # Run with coverage
@@ -336,6 +344,9 @@ pytest --cov=backtest --cov=app --cov-report=term-missing
 
 # Clear cache
 rm -rf .cache/
+
+# Deactivate virtual environment
+deactivate
 ```
 
 ### Key File Locations
