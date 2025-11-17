@@ -98,6 +98,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Fixed: Calculated on return percentage `(value - contributions) / contributions`
     - Tracks peak return percentage and measures decline from peak
 
+- **Dashboard Subplot Titles** - Fixed disappearing subplot titles in visual hierarchy implementation
+  - Issue: `fig.update_layout(annotations=[...] * 4)` was replacing existing annotations
+  - This discarded title text and positioning created by `make_subplots()`
+  - Fix: Update existing annotations in place to preserve text and positioning
+  - Affected file: `app/charts.py:276-294` in `create_main_dashboard()`
+  - All 256 tests passing after fix
+
 - **Test Infrastructure** - Improved test reliability
   - Added `.strip()` to ticker search query for whitespace handling
   - Added cache clearing in test setup to prevent test interference
