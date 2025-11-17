@@ -11,18 +11,19 @@ import pandas as pd
 import pytest
 
 # Mock streamlit before importing app
-# Create a mock that makes cache_data work like a pass-through decorator
+# Create a mock that makes cache_data work with lru_cache
+from functools import lru_cache
+
 streamlit_mock = MagicMock()
 
 def mock_cache_data(*args, **kwargs):
-    """Mock cache_data that actually calls the function."""
+    """Mock cache_data that actually caches using lru_cache."""
     def decorator(func):
-        # Add cache_clear method for test compatibility
-        def cache_clear():
-            pass
-        func.cache_clear = cache_clear
-        func.clear = cache_clear
-        return func
+        # Use lru_cache to actually cache
+        cached_func = lru_cache(maxsize=128)(func)
+        # Add Streamlit-compatible clear method
+        cached_func.clear = cached_func.cache_clear
+        return cached_func
     return decorator
 
 streamlit_mock.cache_data = mock_cache_data
