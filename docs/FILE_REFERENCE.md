@@ -20,12 +20,19 @@ This document provides detailed information about each file in the portfolio-bac
 - Version information (v1.0.0)
 - Exports main entry point for direct imports
 
-### app/config.py (121 lines, 32 constants)
+### app/config.py (198 lines, 32+ constants)
 **Centralized configuration management**
 - Page settings (title, icon, layout)
 - UI limits (MAX_TICKERS=10, MAX_BENCHMARKS=3, DEFAULT_CAPITAL=100k)
-- Chart colors (PORTFOLIO_COLOR, BENCHMARK_COLORS, etc.)
-- Chart configuration (ROLLING_WINDOWS=[30,90,180], BENCHMARK_DASH_STYLES)
+- **Colorblind-friendly colors**: Wong palette (blue, orange, teal, pink) for accessibility
+  - PORTFOLIO_COLOR, BENCHMARK_COLORS (colorblind-safe)
+  - POSITIVE_COLOR, NEGATIVE_COLOR (blue/orange instead of green/red)
+  - BENCHMARK_DASH_STYLES, BENCHMARK_MARKERS for visual differentiation
+- **Visual hierarchy constants**: Line widths, opacity levels, font sizes, spacing
+  - Line widths: Primary (2.5px), secondary (2px), reference (1px), grid (0.5px)
+  - Opacity: Primary (100%), secondary (85%), fills (25%)
+  - Typography: Title (16px), subtitles (13px), axis labels (12px), legend (11px)
+- Chart configuration (ROLLING_WINDOWS=[30,90,180])
 - Metric labels (METRIC_LABELS dictionary for display names)
 - Default values (DEFAULT_NUM_TICKERS, DEFAULT_START_DATE, etc.)
 
@@ -58,18 +65,22 @@ This document provides detailed information about each file in the portfolio-bac
 - `create_portfolio_table()`: Generate portfolio composition table
 - Eliminates metric rendering duplication across the codebase
 
-### app/charts.py (306 lines)
-**Plotly chart generation functions** (interactive visualizations)
+### app/charts.py (473 lines)
+**Plotly chart generation functions** (interactive visualizations with accessibility)
 - `calculate_drawdown()`: Calculate drawdown from value series
-- `calculate_active_return()`: Calculate portfolio - benchmark returns
-- `calculate_rolling_returns()`: Calculate rolling returns for specified window
 - `create_main_dashboard()`: Generate 2x2 dashboard with all main charts
-  - Portfolio vs Benchmark Value (currency-formatted, multiple benchmarks)
+  - Portfolio vs Benchmark Value (currency-formatted, multiple benchmarks, log scale support)
   - Cumulative Returns (percentage-formatted, multiple benchmarks)
-  - Active Return with colored zones (green=outperformance, red=underperformance)
+  - Active Return with colored zones (blue/orange for colorblind accessibility)
   - Drawdown Over Time with max drawdown annotations
-- `create_rolling_returns_chart()`: Generate rolling returns analysis (30/90/180-day)
-- Consistent color scheme and formatting across all charts
+  - **Colorblind accessibility**: Wong palette with line style differentiation
+  - **Visual hierarchy**: Line widths (2.5/2.0/1.0px), opacity (100%/85%/25%), typography (13-10px)
+  - **Bug fix**: Preserves subplot title annotations instead of overwriting them
+- `create_rolling_returns_chart()`: Generate rolling returns analysis (30/90/180-day windows)
+- `create_rolling_sharpe_chart()`: Generate rolling 12-month Sharpe ratio visualization
+  - Reference lines at Sharpe = 1 and 2 for interpretation
+  - Colorblind-safe teal for reference lines
+- Consistent colorblind-accessible styling and visual hierarchy across all charts
 
 ### app/main.py (459 lines)
 **Main application orchestration** (replaces original app.py logic)
@@ -126,18 +137,23 @@ This document provides detailed information about each file in the portfolio-bac
 
 **File Location**: `backtest.py:199-270` (compute_metrics), `backtest.py:272-307` (summarize)
 
-### plot_backtest.py (395 lines)
-**Comprehensive visualization utility for backtest results**
+### plot_backtest.py (489 lines)
+**Comprehensive visualization utility for backtest results with accessibility**
 - **Consistent logging** (Phase 2.5): Uses logging module instead of print()
 - **Data validation** (Phase 3): Minimum data checks, quality validation
+- **Colorblind accessibility**: Wong palette (blue/orange) instead of blue/purple and green/red
+  - Portfolio: Blue (#0173B2), Benchmark: Orange (#DE8F05) with dashed lines
+  - Active return: Blue/orange for positive/negative (not green/red)
+  - Reference lines: Colorblind-safe teal (#029E73)
+- **Visual hierarchy** (matplotlib): Line widths (2.5/2.0/0.8px), opacity (100%/80%/30-50%), typography (14-9pt)
 - Reads CSV output from backtest.py
-- Generates four professional plots:
+- Generates five professional plots:
   1. Portfolio vs benchmark value (currency-formatted axes)
   2. Cumulative returns comparison (percentage-formatted)
-  3. Active return with colored zones (outperformance/underperformance)
+  3. Active return with colored zones (blue/orange for accessibility)
   4. Drawdown over time with max drawdown annotations
+  5. Rolling 12-month Sharpe ratio (with reference lines at 1 and 2)
 - Dashboard mode: single 2x2 grid with all metrics
-- Professional color scheme (blue/purple palette with green/red zones)
 - Customizable: --style, --dpi, --dashboard options
 - Supports both interactive display and PNG export
 
@@ -147,21 +163,21 @@ This document provides detailed information about each file in the portfolio-bac
 - All-NaN column detection
 - Excessive missing data warnings (>50%)
 - Logging configuration: INFO level with timestamps
-- 5 logger.info() calls for key operations (data loading, chart generation, file saving)
+- 5+ logger.info() calls for key operations (data loading, chart generation, file saving)
 
 ---
 
 ## Test Suite
 
-### tests/test_backtest.py (92 tests)
-**Comprehensive unit test suite using pytest**
+### tests/test_backtest.py
+**Comprehensive unit test suite using pytest** (see `docs/TESTING_GUIDE.md` for live counts)
 - Covers caching, data downloads, validations, metrics, DCA logic, IRR, rolling Sharpe, and CLI integration
 - Uses mocking to isolate yfinance/network behavior
 - Includes dedicated fixtures for cache handling and error injection
 
 **Run with**: `pytest tests/test_backtest.py -v`
 
-### tests/test_app.py (63 tests)
+### tests/test_app.py
 **Comprehensive test suite for the Streamlit UI**
 - Validates metric formatting, presets, benchmarking, rolling returns, and download flows
 - Exercises error handling, caching toggles, and multiple benchmark support
@@ -169,14 +185,14 @@ This document provides detailed information about each file in the portfolio-bac
 
 **Run with**: `pytest tests/test_app.py -v`
 
-### tests/test_ticker_data.py (32 tests)
+### tests/test_ticker_data.py
 **Ticker utility tests**
 - Ensures curated lists, search helpers, and Yahoo Finance augmentation work as expected
 - Covers formatting, deduplication, caching, and resilience to malformed API responses
 
 **Run with**: `pytest tests/test_ticker_data.py -v`
 
-### tests/test_integration.py (21 tests)
+### tests/test_integration.py
 **Integration and edge-case coverage**
 - End-to-end CLI workflows
 - Edge cases (leap years, missing data, short windows)
@@ -268,19 +284,18 @@ This document provides detailed information about each file in the portfolio-bac
 
 ### Testing
 
-**Total Tests**: 208 (92 backtest + 63 UI + 32 ticker_data + 21 integration)
-**Coverage**: ~88%
-**Pass Rate**: 100%
+Refer to [`docs/TESTING_GUIDE.md`](TESTING_GUIDE.md) for authoritative counts, coverage metrics (~88%), and workflow expectations. Common commands:
 
-**Run All Tests**: `pytest -v`
-**Run Backtest Tests**: `pytest tests/test_backtest.py -v`
-**Run UI Tests**: `pytest tests/test_app.py -v`
-**Run Ticker Data Tests**: `pytest tests/test_ticker_data.py -v`
-**Run Integration Tests**: `pytest tests/test_integration.py -v`
-**Check Coverage**: `pytest --cov=backtest --cov=app --cov-report=term-missing`
+- `pytest -v`
+- `pytest tests/test_backtest.py -v`
+- `pytest tests/test_app.py -v`
+- `pytest tests/test_state_manager.py -v`
+- `pytest tests/test_ticker_data.py -v`
+- `pytest tests/test_integration.py -v`
+- `pytest --cov=backtest --cov=app --cov-report=term-missing`
 
 ---
 
-**Last Updated**: 2025-11-15  
-**For**: Portfolio Backtester v2.1.0  
+**Last Updated**: 2025-11-17  
+**For**: Portfolio Backtester v2.3.0-dev  
 **See Also**: [CLAUDE.md](../CLAUDE.md), [TESTING_GUIDE.md](TESTING_GUIDE.md), [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)

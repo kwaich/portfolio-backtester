@@ -18,9 +18,26 @@ from .config import (
     PORTFOLIO_COLOR,
     BENCHMARK_COLORS,
     BENCHMARK_DASH_STYLES,
+    PORTFOLIO_MARKER,
+    BENCHMARK_MARKERS,
+    POSITIVE_COLOR,
+    NEGATIVE_COLOR,
     ROLLING_WINDOWS,
     DASHBOARD_HEIGHT,
-    CHART_HEIGHT
+    CHART_HEIGHT,
+    # Visual hierarchy
+    PORTFOLIO_LINE_WIDTH,
+    BENCHMARK_LINE_WIDTH,
+    REFERENCE_LINE_WIDTH,
+    PORTFOLIO_OPACITY,
+    BENCHMARK_OPACITY,
+    FILL_OPACITY,
+    REFERENCE_LINE_OPACITY,
+    SUBPLOT_TITLE_FONT_SIZE,
+    AXIS_TITLE_FONT_SIZE,
+    LEGEND_FONT_SIZE,
+    SUBPLOT_VERTICAL_SPACING,
+    SUBPLOT_HORIZONTAL_SPACING
 )
 
 
@@ -77,13 +94,13 @@ def create_main_dashboard(
     active_return = (results['portfolio_return'] - results['benchmark_return']) * 100
     portfolio_drawdown = calculate_drawdown(results['portfolio_value'])
     
-    # Create 2x2 grid of charts
+    # Create 2x2 grid of charts with improved spacing
     fig = make_subplots(
         rows=2, cols=2,
         subplot_titles=('Portfolio vs Benchmark Value', 'Cumulative Returns',
                        'Active Return (Portfolio - Benchmark)', 'Drawdown Over Time'),
-        vertical_spacing=0.12,
-        horizontal_spacing=0.10
+        vertical_spacing=SUBPLOT_VERTICAL_SPACING,
+        horizontal_spacing=SUBPLOT_HORIZONTAL_SPACING
     )
     
     # Chart 1: Portfolio vs Benchmark Value (top-left)
@@ -92,7 +109,8 @@ def create_main_dashboard(
             x=results.index,
             y=results['portfolio_value'],
             name='Portfolio',
-            line=dict(color=PORTFOLIO_COLOR, width=2),
+            line=dict(color=PORTFOLIO_COLOR, width=PORTFOLIO_LINE_WIDTH),
+            opacity=PORTFOLIO_OPACITY,
             hovertemplate='<b>Portfolio</b><br>Date: %{x}<br>Value: $%{y:,.2f}<extra></extra>'
         ),
         row=1, col=1
@@ -108,9 +126,10 @@ def create_main_dashboard(
                 name=bench_name,
                 line=dict(
                     color=BENCHMARK_COLORS[idx % len(BENCHMARK_COLORS)],
-                    width=2,
+                    width=BENCHMARK_LINE_WIDTH,
                     dash=BENCHMARK_DASH_STYLES[idx % len(BENCHMARK_DASH_STYLES)]
                 ),
+                opacity=BENCHMARK_OPACITY,
                 hovertemplate=f'<b>{bench_name}</b><br>Date: %{{x}}<br>Value: $%{{y:,.2f}}<extra></extra>'
             ),
             row=1, col=1
@@ -122,13 +141,14 @@ def create_main_dashboard(
             x=results.index,
             y=results['portfolio_return'] * 100,
             name='Portfolio Return',
-            line=dict(color=PORTFOLIO_COLOR, width=2),
+            line=dict(color=PORTFOLIO_COLOR, width=PORTFOLIO_LINE_WIDTH),
+            opacity=PORTFOLIO_OPACITY,
             hovertemplate='<b>Portfolio</b><br>Date: %{x}<br>Return: %{y:.2f}%<extra></extra>',
             showlegend=False
         ),
         row=1, col=2
     )
-    
+
     # Add all benchmarks to returns chart
     for idx, bench_name in enumerate(benchmarks):
         bench_result = all_benchmark_results[bench_name]
@@ -139,9 +159,10 @@ def create_main_dashboard(
                 name=f'{bench_name} Return',
                 line=dict(
                     color=BENCHMARK_COLORS[idx % len(BENCHMARK_COLORS)],
-                    width=2,
+                    width=BENCHMARK_LINE_WIDTH,
                     dash=BENCHMARK_DASH_STYLES[idx % len(BENCHMARK_DASH_STYLES)]
                 ),
+                opacity=BENCHMARK_OPACITY,
                 hovertemplate=f'<b>{bench_name}</b><br>Date: %{{x}}<br>Return: %{{y:.2f}}%<extra></extra>',
                 showlegend=False
             ),
@@ -149,19 +170,46 @@ def create_main_dashboard(
         )
     
     # Chart 3: Active Return (bottom-left)
+    # Split into positive and negative areas for better visual differentiation
+    positive_active = active_return.copy()
+    positive_active[active_return < 0] = 0
+    negative_active = active_return.copy()
+    negative_active[active_return >= 0] = 0
+
+    # Add positive area (blue)
     fig.add_trace(
         go.Scatter(
             x=results.index,
-            y=active_return,
-            name='Active Return',
+            y=positive_active,
+            name='Outperformance',
             fill='tozeroy',
-            line=dict(color=PORTFOLIO_COLOR, width=2),
-            hovertemplate='<b>Active Return</b><br>Date: %{x}<br>Difference: %{y:.2f}%<extra></extra>',
+            fillcolor=f'rgba({int(POSITIVE_COLOR[1:3], 16)}, {int(POSITIVE_COLOR[3:5], 16)}, {int(POSITIVE_COLOR[5:7], 16)}, {FILL_OPACITY})',
+            line=dict(color=POSITIVE_COLOR, width=PORTFOLIO_LINE_WIDTH),
+            opacity=PORTFOLIO_OPACITY,
+            hovertemplate='<b>Outperformance</b><br>Date: %{x}<br>Difference: %{y:.2f}%<extra></extra>',
             showlegend=False
         ),
         row=2, col=1
     )
-    fig.add_hline(y=0, line_dash="solid", line_color="black", opacity=0.5, row=2, col=1)
+
+    # Add negative area (orange)
+    fig.add_trace(
+        go.Scatter(
+            x=results.index,
+            y=negative_active,
+            name='Underperformance',
+            fill='tozeroy',
+            fillcolor=f'rgba({int(NEGATIVE_COLOR[1:3], 16)}, {int(NEGATIVE_COLOR[3:5], 16)}, {int(NEGATIVE_COLOR[5:7], 16)}, {FILL_OPACITY})',
+            line=dict(color=NEGATIVE_COLOR, width=PORTFOLIO_LINE_WIDTH),
+            opacity=PORTFOLIO_OPACITY,
+            hovertemplate='<b>Underperformance</b><br>Date: %{x}<br>Difference: %{y:.2f}%<extra></extra>',
+            showlegend=False
+        ),
+        row=2, col=1
+    )
+
+    fig.add_hline(y=0, line_dash="solid", line_color="black",
+                  line_width=REFERENCE_LINE_WIDTH, opacity=REFERENCE_LINE_OPACITY, row=2, col=1)
     
     # Chart 4: Drawdown (bottom-right)
     fig.add_trace(
@@ -170,56 +218,62 @@ def create_main_dashboard(
             y=portfolio_drawdown,
             name='Portfolio DD',
             fill='tozeroy',
-            line=dict(color=PORTFOLIO_COLOR, width=1.5),
+            fillcolor=f'rgba({int(PORTFOLIO_COLOR[1:3], 16)}, {int(PORTFOLIO_COLOR[3:5], 16)}, {int(PORTFOLIO_COLOR[5:7], 16)}, {FILL_OPACITY})',
+            line=dict(color=PORTFOLIO_COLOR, width=PORTFOLIO_LINE_WIDTH),
+            opacity=PORTFOLIO_OPACITY,
             hovertemplate='<b>Portfolio</b><br>Date: %{x}<br>Drawdown: %{y:.2f}%<extra></extra>',
             showlegend=False
         ),
         row=2, col=2
     )
-    
+
     # Add all benchmarks drawdowns
     for idx, bench_name in enumerate(benchmarks):
         bench_result = all_benchmark_results[bench_name]
         bench_dd = calculate_drawdown(bench_result['benchmark_value'])
-        
+
         fig.add_trace(
             go.Scatter(
                 x=bench_result.index,
                 y=bench_dd,
                 name=f'{bench_name} DD',
                 fill='tozeroy',
+                fillcolor=f'rgba({int(BENCHMARK_COLORS[idx % len(BENCHMARK_COLORS)][1:3], 16)}, {int(BENCHMARK_COLORS[idx % len(BENCHMARK_COLORS)][3:5], 16)}, {int(BENCHMARK_COLORS[idx % len(BENCHMARK_COLORS)][5:7], 16)}, {FILL_OPACITY})',
                 line=dict(
                     color=BENCHMARK_COLORS[idx % len(BENCHMARK_COLORS)],
-                    width=1.5,
+                    width=BENCHMARK_LINE_WIDTH,
                     dash=BENCHMARK_DASH_STYLES[idx % len(BENCHMARK_DASH_STYLES)]
                 ),
+                opacity=BENCHMARK_OPACITY,
                 hovertemplate=f'<b>{bench_name}</b><br>Date: %{{x}}<br>Drawdown: %{{y:.2f}}%<extra></extra>',
                 showlegend=False
             ),
             row=2, col=2
         )
+
+    fig.add_hline(y=0, line_dash="solid", line_color="black",
+                  line_width=REFERENCE_LINE_WIDTH, opacity=REFERENCE_LINE_OPACITY, row=2, col=2)
     
-    fig.add_hline(y=0, line_dash="solid", line_color="black", opacity=0.5, row=2, col=2)
-    
-    # Update axes labels
-    fig.update_xaxes(title_text="Date", row=1, col=1)
-    fig.update_xaxes(title_text="Date", row=1, col=2)
-    fig.update_xaxes(title_text="Date", row=2, col=1)
-    fig.update_xaxes(title_text="Date", row=2, col=2)
+    # Update axes labels with improved typography
+    fig.update_xaxes(title_text="Date", title_font=dict(size=AXIS_TITLE_FONT_SIZE), row=1, col=1)
+    fig.update_xaxes(title_text="Date", title_font=dict(size=AXIS_TITLE_FONT_SIZE), row=1, col=2)
+    fig.update_xaxes(title_text="Date", title_font=dict(size=AXIS_TITLE_FONT_SIZE), row=2, col=1)
+    fig.update_xaxes(title_text="Date", title_font=dict(size=AXIS_TITLE_FONT_SIZE), row=2, col=2)
 
     # Set y-axis labels and scale
     # Log scale for value chart (always positive)
     if log_scale:
-        fig.update_yaxes(title_text="Value ($) - Log Scale", type="log", row=1, col=1)
+        fig.update_yaxes(title_text="Value ($) - Log Scale", title_font=dict(size=AXIS_TITLE_FONT_SIZE),
+                        type="log", row=1, col=1)
     else:
-        fig.update_yaxes(title_text="Value ($)", row=1, col=1)
+        fig.update_yaxes(title_text="Value ($)", title_font=dict(size=AXIS_TITLE_FONT_SIZE), row=1, col=1)
 
     # Returns chart stays linear (can be negative)
-    fig.update_yaxes(title_text="Return (%)", row=1, col=2)
-    fig.update_yaxes(title_text="Active Return (%)", row=2, col=1)
-    fig.update_yaxes(title_text="Drawdown (%)", row=2, col=2)
-    
-    # Update layout
+    fig.update_yaxes(title_text="Return (%)", title_font=dict(size=AXIS_TITLE_FONT_SIZE), row=1, col=2)
+    fig.update_yaxes(title_text="Active Return (%)", title_font=dict(size=AXIS_TITLE_FONT_SIZE), row=2, col=1)
+    fig.update_yaxes(title_text="Drawdown (%)", title_font=dict(size=AXIS_TITLE_FONT_SIZE), row=2, col=2)
+
+    # Update layout with improved visual hierarchy
     fig.update_layout(
         height=DASHBOARD_HEIGHT,
         showlegend=True,
@@ -228,11 +282,16 @@ def create_main_dashboard(
             yanchor="bottom",
             y=1.02,
             xanchor="right",
-            x=1
+            x=1,
+            font=dict(size=LEGEND_FONT_SIZE)
         ),
         hovermode='x unified',
         template='plotly_white'
     )
+
+    # Update subplot title annotations (preserve existing text and positioning)
+    for annotation in fig['layout']['annotations']:
+        annotation['font'] = dict(size=SUBPLOT_TITLE_FONT_SIZE, color='#333333')
     
     return fig
 
@@ -266,23 +325,24 @@ def create_rolling_returns_chart(
     for window in windows:
         # Calculate rolling returns for portfolio
         portfolio_rolling = results['portfolio_value'].pct_change(window) * 100
-        
+
         fig.add_trace(
             go.Scatter(
                 x=results.index,
                 y=portfolio_rolling,
                 name=f'Portfolio {window}D',
-                line=dict(width=2),
+                line=dict(width=PORTFOLIO_LINE_WIDTH),
+                opacity=PORTFOLIO_OPACITY,
                 hovertemplate=f'<b>Portfolio {window}D</b><br>Date: %{{x}}<br>Return: %{{y:.2f}}%<extra></extra>'
             )
         )
-    
+
     # Add all benchmarks rolling returns for comparison
     for idx, bench_name in enumerate(benchmarks):
         bench_result = all_benchmark_results[bench_name]
         for window in windows:
             bench_rolling = bench_result['benchmark_value'].pct_change(window) * 100
-            
+
             fig.add_trace(
                 go.Scatter(
                     x=bench_result.index,
@@ -290,21 +350,26 @@ def create_rolling_returns_chart(
                     name=f'{bench_name} {window}D',
                     line=dict(
                         color=BENCHMARK_COLORS[idx % len(BENCHMARK_COLORS)],
-                        width=1.5,
+                        width=BENCHMARK_LINE_WIDTH,
                         dash=BENCHMARK_DASH_STYLES[idx % len(BENCHMARK_DASH_STYLES)]
                     ),
+                    opacity=BENCHMARK_OPACITY,
                     hovertemplate=f'<b>{bench_name} {window}D</b><br>Date: %{{x}}<br>Return: %{{y:.2f}}%<extra></extra>'
                 )
             )
+
+    # Add zero line with subtle styling
+    fig.add_hline(y=0, line_dash="solid", line_color="black",
+                  line_width=REFERENCE_LINE_WIDTH, opacity=REFERENCE_LINE_OPACITY)
     
-    # Add zero line
-    fig.add_hline(y=0, line_dash="solid", line_color="black", opacity=0.3)
-    
-    # Update layout
+    # Update layout with improved typography
     fig.update_layout(
-        title="Rolling Returns (30, 90, 180 Day Periods)",
-        xaxis_title="Date",
-        yaxis_title="Rolling Return (%)",
+        title=dict(
+            text="Rolling Returns (30, 90, 180 Day Periods)",
+            font=dict(size=SUBPLOT_TITLE_FONT_SIZE)
+        ),
+        xaxis_title=dict(text="Date", font=dict(size=AXIS_TITLE_FONT_SIZE)),
+        yaxis_title=dict(text="Rolling Return (%)", font=dict(size=AXIS_TITLE_FONT_SIZE)),
         height=CHART_HEIGHT,
         hovermode='x unified',
         template='plotly_white',
@@ -313,7 +378,8 @@ def create_rolling_returns_chart(
             yanchor="bottom",
             y=1.02,
             xanchor="right",
-            x=1
+            x=1,
+            font=dict(size=LEGEND_FONT_SIZE)
         )
     )
 
@@ -346,7 +412,8 @@ def create_rolling_sharpe_chart(
             x=results.index,
             y=results['portfolio_rolling_sharpe_12m'],
             name='Portfolio',
-            line=dict(color=PORTFOLIO_COLOR, width=2),
+            line=dict(color=PORTFOLIO_COLOR, width=PORTFOLIO_LINE_WIDTH),
+            opacity=PORTFOLIO_OPACITY,
             hovertemplate='<b>Portfolio</b><br>Date: %{x}<br>12M Sharpe: %{y:.2f}<extra></extra>'
         )
     )
@@ -362,27 +429,34 @@ def create_rolling_sharpe_chart(
                 name=bench_name,
                 line=dict(
                     color=BENCHMARK_COLORS[idx % len(BENCHMARK_COLORS)],
-                    width=2,
+                    width=BENCHMARK_LINE_WIDTH,
                     dash=BENCHMARK_DASH_STYLES[idx % len(BENCHMARK_DASH_STYLES)]
                 ),
+                opacity=BENCHMARK_OPACITY,
                 hovertemplate=f'<b>{bench_name}</b><br>Date: %{{x}}<br>12M Sharpe: %{{y:.2f}}<extra></extra>'
             )
         )
 
-    # Add zero line for reference
-    fig.add_hline(y=0, line_dash="solid", line_color="black", opacity=0.3)
+    # Add zero line for reference (subtle)
+    fig.add_hline(y=0, line_dash="solid", line_color="black",
+                  line_width=REFERENCE_LINE_WIDTH, opacity=REFERENCE_LINE_OPACITY)
 
-    # Add reference lines for "good" Sharpe ratios
-    fig.add_hline(y=1, line_dash="dash", line_color="green", opacity=0.2,
+    # Add reference lines for "good" Sharpe ratios (subtle, colorblind-safe teal)
+    fig.add_hline(y=1, line_dash="dash", line_color="#029E73",
+                  line_width=REFERENCE_LINE_WIDTH, opacity=REFERENCE_LINE_OPACITY,
                   annotation_text="Sharpe = 1", annotation_position="right")
-    fig.add_hline(y=2, line_dash="dash", line_color="darkgreen", opacity=0.2,
+    fig.add_hline(y=2, line_dash="dash", line_color="#029E73",
+                  line_width=REFERENCE_LINE_WIDTH, opacity=REFERENCE_LINE_OPACITY,
                   annotation_text="Sharpe = 2", annotation_position="right")
 
-    # Update layout
+    # Update layout with improved typography
     fig.update_layout(
-        title="Rolling 12-Month Sharpe Ratio",
-        xaxis_title="Date",
-        yaxis_title="Rolling 12-Month Sharpe Ratio",
+        title=dict(
+            text="Rolling 12-Month Sharpe Ratio",
+            font=dict(size=SUBPLOT_TITLE_FONT_SIZE)
+        ),
+        xaxis_title=dict(text="Date", font=dict(size=AXIS_TITLE_FONT_SIZE)),
+        yaxis_title=dict(text="Rolling 12-Month Sharpe Ratio", font=dict(size=AXIS_TITLE_FONT_SIZE)),
         height=CHART_HEIGHT,
         hovermode='x unified',
         template='plotly_white',
@@ -391,7 +465,8 @@ def create_rolling_sharpe_chart(
             yanchor="bottom",
             y=1.02,
             xanchor="right",
-            x=1
+            x=1,
+            font=dict(size=LEGEND_FONT_SIZE)
         )
     )
 

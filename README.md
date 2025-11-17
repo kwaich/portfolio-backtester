@@ -13,10 +13,11 @@ A lightweight, flexible Python utility for backtesting ETF portfolio strategies 
 - **Input Validation**: Comprehensive validation for tickers, dates, and parameters before execution
 - **Searchable Ticker Selection**: Built-in search for 50+ popular ETFs and stocks with optional Yahoo Finance integration
 - **Flexible Visualization**: Generate publication-ready charts or interactive plots
+- **Colorblind-Accessible Charts**: Uses Wong's colorblind-safe palette with line style differentiation for universal accessibility
 - **Easy CLI**: Simple command-line interface with sensible defaults
 - **Data Quality Validation**: Automatic detection of data issues (missing values, invalid prices, extreme changes)
 - **Optimized Performance**: Batch downloads with per-ticker caching for faster multi-ticker operations
-- **Well-Tested**: Comprehensive test coverage with 208 tests (100% pass rate)
+- **Well-Tested**: Comprehensive suite (256 tests, see `docs/TESTING_GUIDE.md`) with 100% pass rate
 
 ## Quick Start
 
@@ -145,6 +146,9 @@ This opens an interactive web application in your browser with:
    - Rolling Returns Analysis (30/90/180-day periods)
    - Rolling 12-Month Sharpe Ratio: Track risk-adjusted performance over time
    - Multiple benchmarks displayed on all charts with distinct colors and line styles
+   - **Colorblind-Accessible Design**: Uses Wong's colorblind-safe palette (blue, orange, teal, pink) avoiding problematic blue-purple and red-green combinations
+   - **Multiple Visual Cues**: Line styles (solid, dashed, dotted) provide differentiation beyond color alone
+   - **Visual Hierarchy**: Clear information prioritization through line weights, opacity levels, and typography scaling for enhanced readability
    - Hover tooltips for exact values at any point
    - Zoom, pan, and explore interactively
 
@@ -418,17 +422,21 @@ portfolio-backtester/
 │   ├── __init__.py         # Package initialization
 │   ├── config.py           # Configuration constants (32 constants)
 │   ├── presets.py          # Portfolio and date presets
-│   ├── validation.py       # Input validation and session state
+│   ├── validation.py       # Input validation and session defaults
+│   ├── state_manager.py    # Centralized Streamlit session state
 │   ├── ui_components.py    # Reusable UI rendering functions
+│   ├── ticker_data.py      # Searchable ticker helpers + Yahoo Finance integration
 │   ├── charts.py           # Plotly chart generation
 │   └── main.py             # Main application orchestration
 ├── backtest.py             # Core backtesting engine
 ├── plot_backtest.py        # Visualization utility
-├── tests/                  # Test suite (208 tests, ~88% coverage)
-│   ├── test_backtest.py    # Unit tests for backtest.py (92 tests)
-│   ├── test_app.py         # Unit tests for app.py UI (63 tests)
-│   ├── test_ticker_data.py # Unit tests for ticker_data.py (32 tests)
-│   └── test_integration.py # Integration tests (21 tests)
+├── tests/                  # Test suite (256 tests, ~88% coverage; see docs/TESTING_GUIDE.md)
+│   ├── test_backtest.py    # Unit tests for backtest engine
+│   ├── test_app.py         # Streamlit UI regression suite
+│   ├── test_state_manager.py
+│   ├── test_ticker_data.py
+│   ├── test_ticker_names.py
+│   └── test_integration.py
 ├── requirements.txt        # Python dependencies
 ├── README.md               # This file
 ├── CLAUDE.md               # AI assistant guide
@@ -470,70 +478,29 @@ The Streamlit web UI has been refactored into a clean, modular architecture:
 
 ### Running Tests
 
-The project has comprehensive test coverage with **208 tests** achieving **100% pass rate**.
+See [`docs/TESTING_GUIDE.md`](docs/TESTING_GUIDE.md) for the authoritative breakdown, coverage targets, and workflow. Quick commands:
 
 ```bash
-# Run all tests (208 tests: 92 backtest + 63 UI + 32 ticker_data + 21 integration)
+# Entire suite (256 tests, ~88% coverage)
 pytest -v
 
-# Run only backtest tests (92 tests)
+# Focus on a single area
 pytest tests/test_backtest.py -v
-
-# Run only UI tests (63 tests)
 pytest tests/test_app.py -v
 
-# Run only ticker data tests (32 tests)
-pytest tests/test_ticker_data.py -v
-
-# Run only integration tests (21 tests)
-pytest tests/test_integration.py -v
-
-# Run with coverage report
+# Generate coverage reports
 pytest --cov=backtest --cov=app --cov-report=term-missing
-
-# Generate HTML coverage report
 pytest --cov=backtest --cov=app --cov-report=html
 open htmlcov/index.html
-
-# Run specific test class
-pytest tests/test_backtest.py::TestSummarize -v
-pytest tests/test_app.py::TestMetricLabels -v
-pytest tests/test_integration.py::TestEndToEndWorkflow -v
 ```
 
 ### Test Coverage
 
-**Overall Coverage**: **100% pass rate** with comprehensive test suite
+Up-to-date coverage statistics, module-level breakdowns, and TDD expectations live in [`docs/TESTING_GUIDE.md`](docs/TESTING_GUIDE.md). Highlights:
 
-| Component | Tests | Coverage | Status |
-|-----------|-------|----------|--------|
-| backtest.py | 92 tests | 95% | ✅ Excellent |
-| app package | 63 tests | 82% | ✅ Good |
-| ticker_data.py | 32 tests | - | ✅ Covered |
-| Integration | 21 tests | - | ✅ Comprehensive |
-| **Total** | **208 tests** | **~88%** | **✅ Production-ready** |
-
-**Test Breakdown**:
-
-**Backtest Engine** (92 tests):
-- CLI argument parsing
-- Cache functions with TTL
-- Performance metrics (returns, drawdown, risk measures)
-- Portfolio computation (buy & hold, rebalancing, DCA)
-- Retry logic and caching
-- Ticker/date validation and data downloads
-- Rolling Sharpe, drawdown, and IRR edge cases
-
-**Web UI** (63 tests):
-- Metric formatting and validation flows
-- Portfolio & date presets
-- Multiple benchmarks and delta indicators
-- Rolling returns widgets and chart data
-- File downloads, caching toggle, and error paths
-
-**Ticker Data Utilities** (32 tests):
-- Curated ticker lists and formatting helpers
-- Search capabilities with/without Yahoo Finance
+- backtest engine remains at ~95% line coverage with comprehensive metric/performance tests
+- Streamlit UI modules are ~80%+ covered through targeted unit and integration tests
+- Additional utilities (ticker data, state manager, integration flows) are tracked centrally in the testing guide
 - Edge cases for duplicate handling and malformed input
 
 **Integration Tests** (21 tests):

@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Visual Hierarchy Improvements** - Enhanced chart readability through systematic styling
+  - **Line Weight Hierarchy**: Primary data (2.5px), secondary data (2px), reference lines (0.8-1px), grids (0.5px)
+  - **Opacity Levels**: Primary (100%), secondary (80-85%), fills (25-30%), grids (20%)
+  - **Typography Scale**: Title (16px), subplot titles (13px), axis labels (12px), legend (11px), ticks (10px)
+  - **Improved Spacing**: Increased subplot spacing from 10-12% to 12-15% for better separation
+  - **Subtle Grids**: Reduced grid opacity and line width to minimize visual clutter
+  - **Consistent Styling**: Applied across both Plotly (Streamlit) and matplotlib (CLI) charts
+  - Creates clear information prioritization: data → labels → grids → annotations
+
+- **Colorblind-Accessible Charts** - Universal accessibility for all chart visualizations
+  - Implemented Wong's colorblind-safe palette (blue, orange, teal, pink) in all charts
+  - Replaced problematic blue-purple and red-green color combinations
+  - Portfolio: Wong blue (#0173B2), Benchmarks: Orange, teal, pink
+  - Active return: Blue/orange for positive/negative (instead of green/red)
+  - Line style differentiation: Benchmarks use dashed, dotted, and dashdot patterns
+  - Benefits ~8% of males with deuteranopia (red-green colorblindness)
+  - Applied to both Streamlit UI (app/charts.py) and matplotlib plots (plot_backtest.py)
+  - Added 8 comprehensive tests for colorblind accessibility validation (256 total tests)
+
 - **Dollar-Cost Averaging (DCA) Support** - Complete implementation of DCA backtesting
   - CLI arguments: `--dca-amount` and `--dca-freq` for contribution amount and frequency
   - Supported frequencies: Daily (D), Weekly (W), Monthly (M), Quarterly (Q), Yearly (Y)
@@ -78,6 +97,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Previous: Calculated on absolute dollar returns
     - Fixed: Calculated on return percentage `(value - contributions) / contributions`
     - Tracks peak return percentage and measures decline from peak
+
+- **Dashboard Subplot Titles** - Fixed disappearing subplot titles in visual hierarchy implementation
+  - Issue: `fig.update_layout(annotations=[...] * 4)` was replacing existing annotations
+  - This discarded title text and positioning created by `make_subplots()`
+  - Fix: Update existing annotations in place to preserve text and positioning
+  - Affected file: `app/charts.py:276-294` in `create_main_dashboard()`
+  - All 256 tests passing after fix
 
 - **Test Infrastructure** - Improved test reliability
   - Added `.strip()` to ticker search query for whitespace handling

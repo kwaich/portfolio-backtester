@@ -91,14 +91,25 @@ MAX_DCA_AMOUNT = 100_000.0
 # Chart Configuration
 # =============================================================================
 
-# Portfolio color (blue)
-PORTFOLIO_COLOR = "#1f77b4"
+# Colorblind-friendly palette (Wong palette - accessible for all types of colorblindness)
+# Portfolio color (blue) - distinguishable for all colorblind types
+PORTFOLIO_COLOR = "#0173B2"
 
-# Benchmark colors (purple, pink, yellow-green)
-BENCHMARK_COLORS = ["#9467bd", "#e377c2", "#bcbd22"]
+# Benchmark colors (orange, teal, pink) - colorblind-safe Wong palette
+# Avoids problematic blue-purple and red-green combinations
+BENCHMARK_COLORS = ["#DE8F05", "#029E73", "#CC78BC"]
 
-# Benchmark line styles
+# Benchmark line styles (provides visual differentiation beyond color)
 BENCHMARK_DASH_STYLES = ["dash", "dot", "dashdot"]
+
+# Marker symbols for additional visual differentiation
+# Used sparingly to avoid clutter (every 20th point)
+PORTFOLIO_MARKER = "circle"
+BENCHMARK_MARKERS = ["square", "diamond", "triangle-up"]
+
+# Positive/negative colors (blue/orange instead of green/red for colorblind accessibility)
+POSITIVE_COLOR = "#0173B2"  # Blue
+NEGATIVE_COLOR = "#DE8F05"  # Orange
 
 # Rolling windows for returns analysis (in days)
 ROLLING_WINDOWS = [30, 90, 180]
@@ -106,6 +117,35 @@ ROLLING_WINDOWS = [30, 90, 180]
 # Chart dimensions
 CHART_HEIGHT = 400
 DASHBOARD_HEIGHT = 800
+
+# =============================================================================
+# Visual Hierarchy Configuration
+# =============================================================================
+
+# Line widths - establishes visual priority through weight
+PORTFOLIO_LINE_WIDTH = 2.5  # Primary data - thickest
+BENCHMARK_LINE_WIDTH = 2.0  # Secondary data - medium
+REFERENCE_LINE_WIDTH = 1.0  # Reference lines (zero lines, etc.) - thin
+GRID_LINE_WIDTH = 0.5       # Grid lines - thinnest
+
+# Opacity levels - creates depth and reduces visual clutter
+PORTFOLIO_OPACITY = 1.0     # Primary data - fully opaque
+BENCHMARK_OPACITY = 0.85    # Secondary data - slightly transparent
+FILL_OPACITY = 0.25         # Fill areas - subtle
+GRID_OPACITY = 0.2          # Grid lines - very subtle
+REFERENCE_LINE_OPACITY = 0.4  # Reference lines - moderate
+
+# Font sizes - establishes typographic hierarchy (Plotly uses px)
+TITLE_FONT_SIZE = 16        # Main chart titles
+SUBPLOT_TITLE_FONT_SIZE = 13  # Subplot titles
+AXIS_TITLE_FONT_SIZE = 12   # Axis labels
+LEGEND_FONT_SIZE = 11       # Legend text
+TICK_FONT_SIZE = 10         # Axis tick labels
+ANNOTATION_FONT_SIZE = 10   # Annotations and notes
+
+# Spacing and layout
+SUBPLOT_VERTICAL_SPACING = 0.15    # Vertical spacing between subplots (increased from 0.12)
+SUBPLOT_HORIZONTAL_SPACING = 0.12  # Horizontal spacing between subplots (increased from 0.10)
 
 # =============================================================================
 # Metric Labels
