@@ -694,7 +694,7 @@ def _calculate_dca_portfolio(
     capital: float,
     dca_amount: float,
     dca_freq: str
-) -> pd.Series:
+) -> tuple[pd.Series, pd.Series]:
     """Calculate portfolio value with Dollar-Cost Averaging (regular contributions).
 
     Args:
@@ -705,7 +705,9 @@ def _calculate_dca_portfolio(
         dca_freq: Pandas frequency string for contributions ('D', 'W', 'M', 'Q', 'Y')
 
     Returns:
-        Series with portfolio value for each date
+        Tuple of (portfolio_values, cumulative_contributions):
+            - portfolio_values: Series with portfolio market value for each date
+            - cumulative_contributions: Series with total amount invested up to each date
     """
     # Generate DCA contribution dates
     dca_dates = pd.date_range(
@@ -725,13 +727,17 @@ def _calculate_dca_portfolio(
         logger.warning(f"No DCA dates found for frequency '{dca_freq}'. Using lump sum.")
         first_prices = prices.iloc[0]
         units = (capital * weights) / first_prices
-        return (prices * units).sum(axis=1)
+        portfolio_values = (prices * units).sum(axis=1)
+        cumulative_contributions = pd.Series(capital, index=prices.index, dtype=float)
+        return portfolio_values, cumulative_contributions
 
-    # Initialize portfolio value series
+    # Initialize series
     portfolio_values = pd.Series(index=prices.index, dtype=float)
+    cumulative_contributions = pd.Series(index=prices.index, dtype=float)
 
-    # Track current units held for each ticker
+    # Track current units held for each ticker and total invested
     current_units = np.zeros(len(weights))
+    total_invested = 0.0
 
     # Process each date
     for date in prices.index:
@@ -739,6 +745,7 @@ def _calculate_dca_portfolio(
         if date in dca_dates:
             # Determine contribution amount (initial capital on first date, then DCA amount)
             contribution = capital if date == prices.index[0] else dca_amount
+            total_invested += contribution
 
             # Buy shares according to target weights at current prices
             current_prices = prices.loc[date]
@@ -747,12 +754,13 @@ def _calculate_dca_portfolio(
 
             logger.debug(
                 f"DCA contribution on {date.strftime('%Y-%m-%d')}: "
-                f"${contribution:,.2f} invested"
+                f"${contribution:,.2f} invested (total: ${total_invested:,.2f})"
             )
 
-        # Calculate portfolio value for this date
+        # Calculate portfolio value and cumulative contributions for this date
         current_value = (prices.loc[date] * current_units).sum()
         portfolio_values[date] = current_value
+        cumulative_contributions[date] = total_invested
 
     total_contributions = capital + (dca_amount * (len(dca_dates) - 1))
     logger.info(
@@ -761,7 +769,7 @@ def _calculate_dca_portfolio(
         f"{len(dca_dates) - 1} × ${dca_amount:,.2f} = ${total_contributions:,.2f} total)"
     )
 
-    return portfolio_values
+    return portfolio_values, cumulative_contributions
 
 
 def compute_metrics(
@@ -853,6 +861,7 @@ def compute_metrics(
 
     # Calculate portfolio value based on strategy
     # Priority: DCA > Rebalancing > Buy-and-hold
+    portfolio_contributions = None  # Track for DCA
     if dca_freq is not None and dca_amount is not None and dca_amount > 0:
         # DCA strategy (dollar-cost averaging with regular contributions)
         if rebalance_freq is not None:
@@ -860,42 +869,51 @@ def compute_metrics(
                 "Both DCA and rebalancing specified. Using DCA strategy only. "
                 "DCA and rebalancing are mutually exclusive."
             )
-        portfolio_value = _calculate_dca_portfolio(aligned, weights, capital, dca_amount, dca_freq)
+        portfolio_value, portfolio_contributions = _calculate_dca_portfolio(aligned, weights, capital, dca_amount, dca_freq)
     elif rebalance_freq is None:
         # Buy-and-hold strategy (lump sum, no rebalancing)
         first_prices = aligned.iloc[0]
         units = (capital * weights) / first_prices
         portfolio_value = (aligned * units).sum(axis=1)
+        portfolio_contributions = pd.Series(capital, index=aligned.index, dtype=float)
     else:
         # Rebalancing strategy (lump sum with periodic rebalancing)
         portfolio_value = _calculate_rebalanced_portfolio(aligned, weights, capital, rebalance_freq)
+        portfolio_contributions = pd.Series(capital, index=aligned.index, dtype=float)
 
-    portfolio_return = portfolio_value / capital - 1
+    # Calculate returns based on cumulative contributions (accurate for DCA)
+    portfolio_return = (portfolio_value - portfolio_contributions) / portfolio_contributions
 
     # Calculate benchmark value with same strategy as portfolio for fair comparison
+    bench_contributions = None  # Track for DCA
     if dca_freq is not None and dca_amount is not None and dca_amount > 0:
         # Apply DCA to benchmark for fair comparison
         benchmark_df = benchmark.to_frame(name='benchmark')
         bench_weights = np.array([1.0])  # 100% in benchmark
-        bench_value = _calculate_dca_portfolio(benchmark_df, bench_weights, capital, dca_amount, dca_freq)
+        bench_value, bench_contributions = _calculate_dca_portfolio(benchmark_df, bench_weights, capital, dca_amount, dca_freq)
     elif rebalance_freq is not None:
         # Apply rebalancing to benchmark (though it's a single asset, so effectively same as buy-and-hold)
         benchmark_df = benchmark.to_frame(name='benchmark')
         bench_weights = np.array([1.0])
         bench_value = _calculate_rebalanced_portfolio(benchmark_df, bench_weights, capital, rebalance_freq)
+        bench_contributions = pd.Series(capital, index=benchmark_df.index, dtype=float)
     else:
         # Buy-and-hold for benchmark
         bench_units = capital / benchmark.iloc[0]
         bench_value = benchmark * bench_units
+        bench_contributions = pd.Series(capital, index=benchmark.index, dtype=float)
 
-    bench_return = bench_value / capital - 1
+    # Calculate returns based on cumulative contributions (accurate for DCA)
+    bench_return = (bench_value - bench_contributions) / bench_contributions
 
     table = pd.DataFrame(
         {
             "portfolio_value": portfolio_value,
             "portfolio_return": portfolio_return,
+            "portfolio_contributions": portfolio_contributions,
             "benchmark_value": bench_value,
             "benchmark_return": bench_return,
+            "benchmark_contributions": bench_contributions,
             "active_return": portfolio_return - bench_return,
         }
     )
@@ -946,14 +964,35 @@ def compute_metrics(
     return table
 
 
-def summarize(series: pd.Series, capital: float) -> dict[str, float]:
+def summarize(series: pd.Series, capital: float, total_contributions: float = None) -> dict[str, float]:
+    """Calculate summary statistics for a portfolio or benchmark series.
+
+    Args:
+        series: Time series of portfolio/benchmark values
+        capital: Initial capital amount
+        total_contributions: Total amount contributed (for DCA). If None, uses capital.
+
+    Returns:
+        Dictionary of performance metrics
+
+    Note:
+        For DCA strategies, total_contributions should include all contributions.
+        Returns and CAGR are calculated based on total invested amount.
+    """
     if series.empty:
         raise ValueError("Cannot summarize an empty series")
 
+    # Use total contributions if provided (for DCA), otherwise use initial capital
+    if total_contributions is None:
+        total_contributions = capital
+
     ending_value = float(series.iloc[-1])
-    total_return = ending_value / capital - 1
+    total_return = (ending_value - total_contributions) / total_contributions
     days = max(1, (series.index[-1] - series.index[0]).days)
-    cagr = (ending_value / capital) ** (365 / days) - 1
+
+    # CAGR calculation for DCA is approximate (true metric would be IRR)
+    # This gives a reasonable approximation for comparison purposes
+    cagr = (ending_value / total_contributions) ** (365 / days) - 1
 
     # Calculate daily returns for additional metrics
     daily_returns = series.pct_change().dropna()
@@ -981,6 +1020,7 @@ def summarize(series: pd.Series, capital: float) -> dict[str, float]:
         "sharpe_ratio": sharpe_ratio,
         "sortino_ratio": sortino_ratio,
         "max_drawdown": drawdown,
+        "total_contributions": total_contributions,  # Include for reference
     }
 
 
@@ -1077,14 +1117,20 @@ def main(argv: List[str]) -> None:
         dca_freq=dca_freq
     )
 
-    portfolio_stats = summarize(table["portfolio_value"], args.capital)
-    benchmark_stats = summarize(table["benchmark_value"], args.capital)
+    # Get total contributions for accurate return calculations
+    portfolio_total_contrib = table["portfolio_contributions"].iloc[-1]
+    benchmark_total_contrib = table["benchmark_contributions"].iloc[-1]
+
+    portfolio_stats = summarize(table["portfolio_value"], args.capital, portfolio_total_contrib)
+    benchmark_stats = summarize(table["benchmark_value"], args.capital, benchmark_total_contrib)
 
     # Print results
     print("\n" + "="*70)
     print("BACKTEST RESULTS")
     print("="*70)
-    print(f"Capital: ${args.capital:,.2f}")
+    print(f"Initial Capital: ${args.capital:,.2f}")
+    if dca_freq and dca_amount:
+        print(f"Total Contributions: ${portfolio_total_contrib:,.2f} (Portfolio & Benchmark)")
     print(f"Time Span: {table.index[0].date()} → {table.index[-1].date()}")
     print(f"Portfolio: {', '.join(f'{t} ({w:.1%})' for t, w in zip(tickers, weights))}")
     print(f"Benchmark: {args.benchmark}")

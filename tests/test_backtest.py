@@ -925,15 +925,18 @@ class TestDCA:
         dca_amount = 1000
         dca_freq = "M"
 
-        portfolio_value = backtest._calculate_dca_portfolio(prices, weights, capital, dca_amount, dca_freq)
+        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(prices, weights, capital, dca_amount, dca_freq)
 
         # Check that portfolio value increases due to contributions and price appreciation
         assert portfolio_value.iloc[0] > 0
         assert portfolio_value.iloc[-1] > portfolio_value.iloc[0]
 
+        # Check cumulative contributions
+        expected_contributions = capital + (dca_amount * 5)  # 6 months total (including initial)
+        assert cumulative_contributions.iloc[-1] == expected_contributions
+
         # Portfolio value at end should be greater than total contributions
         # (assuming price appreciation)
-        expected_contributions = capital + (dca_amount * 5)  # 6 months total (including initial)
         assert portfolio_value.iloc[-1] > expected_contributions
 
     def test_dca_weekly_contributions(self):
@@ -947,12 +950,15 @@ class TestDCA:
         dca_amount = 500
         dca_freq = "W"
 
-        portfolio_value = backtest._calculate_dca_portfolio(prices, weights, capital, dca_amount, dca_freq)
+        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(prices, weights, capital, dca_amount, dca_freq)
 
         # With constant price, portfolio value should equal total contributions
         # Number of weeks in 90 days is approximately 12-13
         num_weeks = len(pd.date_range(dates[0], dates[-1], freq="W").intersection(dates))
         expected_value = capital + (dca_amount * (num_weeks - 1))  # -1 because first is initial capital
+
+        # Check contributions match expected
+        assert cumulative_contributions.iloc[-1] == expected_value
 
         # Allow small tolerance due to rounding
         assert abs(portfolio_value.iloc[-1] - expected_value) < 10
@@ -969,11 +975,12 @@ class TestDCA:
         dca_amount = 1000
         dca_freq = "M"
 
-        portfolio_value = backtest._calculate_dca_portfolio(prices, weights, capital, dca_amount, dca_freq)
+        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(prices, weights, capital, dca_amount, dca_freq)
 
         # Check that contributions are split according to weights
         assert portfolio_value.iloc[0] == capital
         assert portfolio_value.iloc[-1] > capital
+        assert cumulative_contributions.iloc[0] == capital
 
     def test_dca_with_price_decline(self):
         """Test DCA benefits when prices decline (buy more shares at lower prices)"""
@@ -987,11 +994,11 @@ class TestDCA:
         dca_amount = 1000
         dca_freq = "M"
 
-        portfolio_value = backtest._calculate_dca_portfolio(prices, weights, capital, dca_amount, dca_freq)
+        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(prices, weights, capital, dca_amount, dca_freq)
 
         # Portfolio value should decline due to price decline
-        # but DCA should accumulate more shares at lower prices
-        assert portfolio_value.iloc[-1] < capital
+        # but cumulative contributions continue to grow
+        assert portfolio_value.iloc[-1] < cumulative_contributions.iloc[-1]
 
     def test_dca_no_frequency(self):
         """Test that DCA with no frequency falls back to lump sum"""
@@ -1008,13 +1015,14 @@ class TestDCA:
         short_dates = dates[:5]  # Only 5 days
         short_prices = prices.iloc[:5]
 
-        portfolio_value = backtest._calculate_dca_portfolio(short_prices, weights, capital, dca_amount, "Q")
+        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(short_prices, weights, capital, dca_amount, "Q")
 
         # Should have at least initial investment
         assert portfolio_value.iloc[0] == capital
+        assert cumulative_contributions.iloc[0] == capital
 
     def test_compute_metrics_with_dca(self):
-        """Test compute_metrics with DCA parameters"""
+        """Test compute_metrics with DCA parameters and accurate return calculations"""
         dates = pd.date_range("2020-01-01", periods=90, freq="D")
         prices = pd.DataFrame({
             "AAPL": [100] * 90,
@@ -1031,10 +1039,12 @@ class TestDCA:
             dca_amount=dca_amount, dca_freq=dca_freq
         )
 
-        # Check that results contain expected columns
+        # Check that results contain expected columns including contributions
         assert 'portfolio_value' in results.columns
         assert 'portfolio_return' in results.columns
+        assert 'portfolio_contributions' in results.columns
         assert 'benchmark_value' in results.columns
+        assert 'benchmark_contributions' in results.columns
         assert 'active_return' in results.columns
 
         # Portfolio value should be greater than initial capital due to contributions
@@ -1043,12 +1053,19 @@ class TestDCA:
         # Benchmark should also have DCA applied for fair comparison
         assert results['benchmark_value'].iloc[-1] > capital
 
-        # With constant prices, portfolio and benchmark ending values should be equal
-        # (both have same total contributions)
+        # Check contributions are tracked correctly
         num_contributions = len(pd.date_range(dates[0], dates[-1], freq="M").intersection(dates))
         expected_total = capital + (dca_amount * (num_contributions - 1))
+        assert results['portfolio_contributions'].iloc[-1] == expected_total
+        assert results['benchmark_contributions'].iloc[-1] == expected_total
+
+        # With constant prices, portfolio and benchmark ending values should equal contributions
         assert abs(results['portfolio_value'].iloc[-1] - expected_total) < 10
         assert abs(results['benchmark_value'].iloc[-1] - expected_total) < 10
+
+        # Returns should be ~0% since prices are constant (no gains/losses)
+        assert abs(results['portfolio_return'].iloc[-1]) < 0.01  # < 1%
+        assert abs(results['benchmark_return'].iloc[-1]) < 0.01  # < 1%
 
     def test_dca_precedence_over_rebalancing(self, caplog):
         """Test that DCA takes precedence over rebalancing when both specified"""
