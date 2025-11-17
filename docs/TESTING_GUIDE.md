@@ -13,16 +13,18 @@ For AI development guidance, see [CLAUDE.md](../CLAUDE.md).
 
 ### Current Test Coverage Status
 
-**Phase 3 Complete (as of 2025-11-15)**:
-- **Total Tests**: 155 tests (68 backtest + 62 UI + 25 integration) ✅
-- **Pass Rate**: 100% (155/155 passing) ✅
+**Canonical Source (last validated via `pytest -v`):**
+- **Total Tests**: 256 (93 backtest + 71 UI + 39 state manager + 32 ticker data + 21 integration) ✅
+- **Pass Rate**: 100% (256/256 passing) ✅
 - **Test-to-Code Ratio**: ~0.90:1 ✅
 - **Overall Coverage**: ~88% ✅
 
 **Breakdown by Module**:
-- Backtest engine (`test_backtest.py`): 95% coverage, 68 tests
-- Web UI (`test_app.py`): 90% coverage, 62 tests
-- Integration (`test_integration.py`): 25 tests
+- Backtest engine (`tests/test_backtest.py`): 93 tests covering metrics, caching, validation, DCA/IRR logic
+- Streamlit UI (`tests/test_app.py`): 71 tests spanning presets, validation, downloads, rolling metrics
+- State manager (`tests/test_state_manager.py`): 39 tests covering centralized session logic
+- Ticker utilities (`tests/test_ticker_data.py`): 32 tests covering curated lists/search helpers (`tests/test_ticker_names.py` currently holds scaffolding for future scenarios)
+- Integration (`tests/test_integration.py`): 21 end-to-end scenarios
 
 **Target**: Maintain 85%+ coverage for all new code ✅ **ACHIEVED**
 
@@ -468,7 +470,7 @@ class TestPortfolioPresets:
 
 | Metric | Goal | Actual | Status |
 |--------|------|--------|--------|
-| Total tests | 70+ | 155 | ✅ +121% over goal |
+| Total tests | 200+ | 256 | ✅ Exceeded |
 | Pass rate | 100% | 100% | ✅ Perfect |
 | Test-to-code ratio | >0.80:1 | ~0.90:1 | ✅ Exceeded |
 | Coverage | 85%+ | ~88% | ✅ Achieved |
@@ -531,14 +533,14 @@ pytest --cov=backtest --cov=app --cov-report=term --cov-fail-under=85
 **Successful Test Run**:
 ```
 ============================= test session starts ==============================
-collected 155 items
+collected 256 items
 
-test_backtest.py::TestParseArgs::test_default_values PASSED           [  1%]
-test_backtest.py::TestCacheFunctions::test_cache_key_generation PASSED [  2%]
+test_backtest.py::TestParseArgs::test_default_values PASSED           [  0%]
+test_backtest.py::TestCacheFunctions::test_cache_key_generation PASSED [  0%]
 ...
 test_integration.py::TestEndToEndWorkflow::test_cli_to_csv_workflow PASSED [100%]
 
-============================= 155 passed in 4.23s ===============================
+============================= 256 passed in 2.02s ===============================
 ```
 
 **Failed Test Example**:
@@ -609,14 +611,14 @@ pytest --cov=backtest --cov=app --cov-report=html
 
 ### Current Test Statistics
 
-- **Total Tests**: 155 (68 backtest + 62 UI + 25 integration)
-- **Pass Rate**: 100% (155/155 passing)
-- **Coverage**: ~88% overall
-- **Test Files**: 3 (test_backtest.py, test_app.py, test_integration.py)
-- **Execution Time**: ~4-6 seconds for full suite
+- **Total Tests**: 256 (93 backtest + 71 UI + 39 state manager + 32 ticker data + 21 integration)
+- **Pass Rate**: 100% (last run: `pytest -v`)
+- **Coverage**: ~88% overall (see `pytest --cov` reports)
+- **Test Files**: 6 primary suites (`test_backtest.py`, `test_app.py`, `test_state_manager.py`, `test_ticker_data.py`, `test_ticker_names.py`, `test_integration.py`)
+- **Execution Time**: ~2-3 seconds on a modern laptop
 
 ---
 
-**Last Updated**: 2025-11-15
+**Last Updated**: 2025-11-17
 **For**: Portfolio Backtester v2.1.0
 **See Also**: [FILE_REFERENCE.md](FILE_REFERENCE.md), [CLAUDE.md](../CLAUDE.md), [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)

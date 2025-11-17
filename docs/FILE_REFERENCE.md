@@ -153,15 +153,15 @@ This document provides detailed information about each file in the portfolio-bac
 
 ## Test Suite
 
-### tests/test_backtest.py (92 tests)
-**Comprehensive unit test suite using pytest**
+### tests/test_backtest.py
+**Comprehensive unit test suite using pytest** (see `docs/TESTING_GUIDE.md` for live counts)
 - Covers caching, data downloads, validations, metrics, DCA logic, IRR, rolling Sharpe, and CLI integration
 - Uses mocking to isolate yfinance/network behavior
 - Includes dedicated fixtures for cache handling and error injection
 
 **Run with**: `pytest tests/test_backtest.py -v`
 
-### tests/test_app.py (63 tests)
+### tests/test_app.py
 **Comprehensive test suite for the Streamlit UI**
 - Validates metric formatting, presets, benchmarking, rolling returns, and download flows
 - Exercises error handling, caching toggles, and multiple benchmark support
@@ -169,14 +169,14 @@ This document provides detailed information about each file in the portfolio-bac
 
 **Run with**: `pytest tests/test_app.py -v`
 
-### tests/test_ticker_data.py (32 tests)
+### tests/test_ticker_data.py
 **Ticker utility tests**
 - Ensures curated lists, search helpers, and Yahoo Finance augmentation work as expected
 - Covers formatting, deduplication, caching, and resilience to malformed API responses
 
 **Run with**: `pytest tests/test_ticker_data.py -v`
 
-### tests/test_integration.py (21 tests)
+### tests/test_integration.py
 **Integration and edge-case coverage**
 - End-to-end CLI workflows
 - Edge cases (leap years, missing data, short windows)
@@ -268,19 +268,18 @@ This document provides detailed information about each file in the portfolio-bac
 
 ### Testing
 
-**Total Tests**: 208 (92 backtest + 63 UI + 32 ticker_data + 21 integration)
-**Coverage**: ~88%
-**Pass Rate**: 100%
+Refer to [`docs/TESTING_GUIDE.md`](TESTING_GUIDE.md) for authoritative counts, coverage metrics (~88%), and workflow expectations. Common commands:
 
-**Run All Tests**: `pytest -v`
-**Run Backtest Tests**: `pytest tests/test_backtest.py -v`
-**Run UI Tests**: `pytest tests/test_app.py -v`
-**Run Ticker Data Tests**: `pytest tests/test_ticker_data.py -v`
-**Run Integration Tests**: `pytest tests/test_integration.py -v`
-**Check Coverage**: `pytest --cov=backtest --cov=app --cov-report=term-missing`
+- `pytest -v`
+- `pytest tests/test_backtest.py -v`
+- `pytest tests/test_app.py -v`
+- `pytest tests/test_state_manager.py -v`
+- `pytest tests/test_ticker_data.py -v`
+- `pytest tests/test_integration.py -v`
+- `pytest --cov=backtest --cov=app --cov-report=term-missing`
 
 ---
 
-**Last Updated**: 2025-11-15  
-**For**: Portfolio Backtester v2.1.0  
+**Last Updated**: 2025-11-17  
+**For**: Portfolio Backtester v2.3.0-dev  
 **See Also**: [CLAUDE.md](../CLAUDE.md), [TESTING_GUIDE.md](TESTING_GUIDE.md), [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)

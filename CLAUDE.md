@@ -45,13 +45,14 @@ portfolio-backtester/
 │   └── main.py               # Application orchestration
 ├── backtest.py               # Core backtesting engine (830 lines - Phases 1 & 3)
 ├── plot_backtest.py          # Visualization utility (395 lines - Phases 2 & 3)
-├── tests/                    # Test suite (256 tests, ~88% coverage)
+├── tests/                    # Test suite (256 tests, ~88% coverage; see docs/TESTING_GUIDE.md)
 │   ├── conftest.py           # pytest configuration
-│   ├── test_backtest.py      # Unit tests for backtest.py (88 tests - includes DCA & IRR)
-│   ├── test_app.py           # Unit tests for app.py UI (71 tests - includes accessibility)
-│   ├── test_state_manager.py # Unit tests for state_manager.py (39 tests - NEW)
+│   ├── test_backtest.py      # Unit tests for backtest.py (93 tests)
+│   ├── test_app.py           # Unit tests for app.py UI (71 tests)
+│   ├── test_state_manager.py # Unit tests for state_manager.py (39 tests)
 │   ├── test_ticker_data.py   # Unit tests for ticker_data.py (32 tests)
-│   └── test_integration.py   # Integration tests (16 tests)
+│   ├── test_ticker_names.py  # Placeholder for upcoming ticker name scenarios
+│   └── test_integration.py   # Integration tests (21 tests)
 ├── requirements.txt          # Python dependencies (includes requests)
 ├── README.md                 # Main user documentation
 ├── CLAUDE.md                 # This file - AI assistant guide
@@ -319,9 +320,8 @@ Modular architecture (874→1,358 lines across 7 modules), zero duplication (-13
 ### ✅ Phase 3: Performance & Data Validation
 Batch download optimization, data quality validation (NaN/zero/negative/extreme), min data requirements, integration tests. **+42 tests** (113→155), ~88% coverage.
 
-### 🚧 Phase 4: Documentation & Polish (1/3 complete)
-**Completed**: README, CLAUDE.md, CHANGELOG, FILE_REFERENCE, TESTING_GUIDE, DEVELOPER_GUIDE.
-**Pending** (optional): Deployment guide, GitHub templates.
+### ✅ Phase 4: Accessibility & Documentation Hardening
+Colorblind-accessible palette, active-return overhaul, new documentation, Streamlit session-state refactor, and expanded state/ticker test suites. **+101 tests** (155→256), ~88% coverage.
 
 ---
 

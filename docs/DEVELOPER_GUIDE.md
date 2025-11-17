@@ -12,23 +12,9 @@ For AI development guidance, see [CLAUDE.md](../CLAUDE.md).
 
 ### Initial Setup
 
-```bash
-# Clone repository
-git clone https://github.com/kwaich/portfolio-backtester.git
-cd portfolio-backtester
-
-# Create virtual environment
-python3 -m venv .venv
-
-# Activate virtual environment
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install all dependencies (RECOMMENDED)
-pip install -r requirements.txt
-
-# Upgrade pip if needed
-./.venv/bin/python -m pip install --upgrade pip
-```
+1. Clone the repository (`git clone ... && cd portfolio-backtester`).
+2. Follow the **Quick Start** section in [`README.md`](../README.md#quick-start) to create/activate the virtual environment and install dependencies. Keeping those instructions in one place prevents divergence.
+3. (Optional) Upgrade pip after activation: `./.venv/bin/python -m pip install --upgrade pip`.
 
 ### Dependencies
 
@@ -43,30 +29,12 @@ Core dependencies with minimum versions:
 
 ### Testing Setup
 
+`docs/TESTING_GUIDE.md` is the single source of truth for commands, coverage targets, and suite breakdown (currently 256 tests). Use it to keep workflows in sync. Common invocations:
+
 ```bash
-# Run all tests (208 tests)
-pytest -v
-
-# Run only backtest tests (92 tests)
-pytest tests/test_backtest.py -v
-
-# Run only UI tests (63 tests)
-pytest tests/test_app.py -v
-
-# Run only ticker data tests (32 tests)
-pytest tests/test_ticker_data.py -v
-
-# Run only integration tests (21 tests)
-pytest tests/test_integration.py -v
-
-# Run with coverage report
+pytest -v                         # entire suite
+pytest tests/test_backtest.py -v  # focus on CLI/engine
 pytest --cov=backtest --cov=app --cov-report=html
-
-# Run specific test class
-pytest tests/test_backtest.py::TestSummarize -v
-
-# Run specific test function
-pytest tests/test_app.py::TestPortfolioPresets::test_tech_giants_preset_values -v
 ```
 
 ---
@@ -548,8 +516,8 @@ streamlit run app.py
 - ✅ Warnings shown for limited data
 
 **Tests**:
-- ✅ Run `pytest -v` to verify all 155 tests pass
-- ✅ Coverage remains at ~88%
+- ✅ Run `pytest -v` to verify the full suite (256 tests) passes
+- ✅ Coverage remains at ~88% (see docs/TESTING_GUIDE.md)
 
 ### Known Edge Cases
 
@@ -759,14 +727,15 @@ python backtest.py --tickers AAPL MSFT --weights 0.6 0.4 --benchmark SPY
 # Plot results (CLI)
 python plot_backtest.py --csv results/backtest.csv --output charts/test
 
-# Run ALL tests (208 tests)
+# Run ALL tests (see docs/TESTING_GUIDE.md for current counts)
 pytest -v
 
 # Run tests by module
-pytest tests/test_backtest.py -v     # 92 tests
-pytest tests/test_app.py -v          # 63 tests
-pytest tests/test_ticker_data.py -v  # 32 tests
-pytest tests/test_integration.py -v  # 21 tests
+pytest tests/test_backtest.py -v
+pytest tests/test_app.py -v
+pytest tests/test_state_manager.py -v
+pytest tests/test_ticker_data.py -v
+pytest tests/test_integration.py -v
 
 # Check test coverage
 pytest --cov=backtest --cov=app --cov-report=term-missing
