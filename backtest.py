@@ -1099,22 +1099,57 @@ def summarize(
                     irr = None
 
     # Calculate daily returns for additional metrics
-    daily_returns = series.pct_change().dropna()
+    # For DCA strategies, we need to exclude the impact of contributions
+    if contributions_series is not None:
+        # Calculate contribution-adjusted returns
+        # Daily change in value minus any new contributions
+        value_changes = series.diff()
+        contribution_changes = contributions_series.diff().fillna(0)
+        market_value_changes = value_changes - contribution_changes
+
+        # Calculate returns based on previous day's value
+        # This gives the true market return, excluding contribution impact
+        daily_returns = market_value_changes / series.shift(1)
+        daily_returns = daily_returns.dropna()
+    else:
+        # For lump sum investments, use simple percentage change
+        daily_returns = series.pct_change().dropna()
 
     # Volatility (annualized standard deviation)
     volatility = daily_returns.std() * np.sqrt(TRADING_DAYS_PER_YEAR)
 
     # Sharpe ratio (assuming 0% risk-free rate for simplicity)
-    sharpe_ratio = (cagr / volatility) if volatility > 0 else 0.0
+    # For DCA strategies, we could use IRR instead of CAGR for better accuracy
+    annualized_return = irr if (irr is not None) else cagr
+    sharpe_ratio = (annualized_return / volatility) if volatility > 0 else 0.0
 
-    # Maximum drawdown
-    cumulative = series / series.expanding().max()
-    drawdown = (cumulative - 1).min()
+    # Maximum drawdown - for DCA, calculate on the return (value - contributions)
+    if contributions_series is not None:
+        # Calculate return series (gains/losses relative to contributions)
+        return_series = series - contributions_series
+
+        # Handle edge case where returns are always non-positive
+        if (return_series <= 0).all():
+            # All losses or break-even - max drawdown is the worst loss
+            drawdown = (return_series / contributions_series).min()
+        else:
+            # Find max drawdown on the return series
+            cumulative = return_series / return_series.expanding().max()
+            # Handle case where returns start negative or have inf values
+            cumulative = cumulative.replace([np.inf, -np.inf], np.nan)
+            drawdown = (cumulative - 1).min()
+            # If no valid drawdown (all NaN), set to 0
+            if np.isnan(drawdown):
+                drawdown = 0.0
+    else:
+        # For lump sum, use traditional drawdown calculation
+        cumulative = series / series.expanding().max()
+        drawdown = (cumulative - 1).min()
 
     # Sortino ratio (downside deviation only)
     downside_returns = daily_returns[daily_returns < 0]
     downside_std = downside_returns.std() * np.sqrt(TRADING_DAYS_PER_YEAR) if len(downside_returns) > 0 else 0.0
-    sortino_ratio = (cagr / downside_std) if downside_std > 0 else 0.0
+    sortino_ratio = (annualized_return / downside_std) if downside_std > 0 else 0.0
 
     metrics = {
         "ending_value": ending_value,
