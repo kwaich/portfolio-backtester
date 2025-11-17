@@ -1102,6 +1102,166 @@ class TestDCA:
         # Portfolio should use DCA logic (value > capital due to contributions)
         assert results['portfolio_value'].iloc[-1] > capital
 
+    def test_xirr_calculation_basic(self):
+        """Test basic XIRR calculation with known cashflows"""
+        # Simple case: invest $1000, get $1100 back after 365 days = 10% return
+        cashflows = np.array([-1000.0, 1100.0])
+        days = np.array([0, 365])
+
+        irr = backtest._calculate_xirr(cashflows, days)
+
+        # Should be close to 10%
+        assert irr is not None
+        assert abs(irr - 0.10) < 0.01  # Within 1% tolerance
+
+    def test_xirr_calculation_multiple_contributions(self):
+        """Test XIRR with multiple contributions over time"""
+        # Three contributions of $1000 each (at start, day 180, day 360)
+        # Final value $3300 at day 720 (2 years)
+        # Expected IRR around 10% annually
+        cashflows = np.array([-1000.0, -1000.0, -1000.0, 3300.0])
+        days = np.array([0, 180, 360, 720])
+
+        irr = backtest._calculate_xirr(cashflows, days)
+
+        # Should be positive (growth)
+        assert irr is not None
+        assert irr > 0
+        assert irr < 1.0  # Less than 100% annual return
+
+    def test_xirr_negative_return(self):
+        """Test XIRR with negative returns (losses)"""
+        # Invest $1000, get back $900 after 365 days = -10% return
+        cashflows = np.array([-1000.0, 900.0])
+        days = np.array([0, 365])
+
+        irr = backtest._calculate_xirr(cashflows, days)
+
+        # Should be close to -10%
+        assert irr is not None
+        assert irr < 0
+        assert abs(irr - (-0.10)) < 0.01
+
+    def test_xirr_zero_return(self):
+        """Test XIRR with zero returns (break even)"""
+        # Invest $1000, get back $1000 after 365 days = 0% return
+        cashflows = np.array([-1000.0, 1000.0])
+        days = np.array([0, 365])
+
+        irr = backtest._calculate_xirr(cashflows, days)
+
+        # Should be close to 0%
+        assert irr is not None
+        assert abs(irr) < 0.01
+
+    def test_xirr_non_convergence(self):
+        """Test XIRR returns None when calculation doesn't converge"""
+        # Unrealistic cashflows that may not converge
+        cashflows = np.array([-1000.0, -1000.0, -1000.0, 10.0])  # Heavy losses
+        days = np.array([0, 30, 60, 90])
+
+        irr = backtest._calculate_xirr(cashflows, days)
+
+        # Should return None for non-converging cases
+        # (or a very negative value like -99%)
+        if irr is not None:
+            assert irr < -0.9  # Very negative return
+
+    def test_summarize_with_irr(self):
+        """Test that summarize calculates IRR when contributions_series is provided"""
+        # Create 6 months of data with monthly DCA
+        dates = pd.date_range("2020-01-01", periods=180, freq="D")
+
+        # Price grows from 100 to 110 (10% over 6 months)
+        portfolio_values = pd.Series(
+            np.linspace(10000, 15500, 180),  # Value grows due to contributions + returns
+            index=dates
+        )
+
+        # Monthly contributions: initial 10000, then 1000/month for 5 months
+        contributions = pd.Series(0.0, index=dates)
+        monthly_dates = pd.date_range(dates[0], dates[-1], freq="M").intersection(dates)
+        if dates[0] not in monthly_dates:
+            monthly_dates = monthly_dates.insert(0, dates[0])
+
+        # Set contribution values
+        contributions.iloc[0] = 10000
+        for i, date in enumerate(monthly_dates[1:], 1):
+            # Find closest index
+            idx = dates.get_loc(date)
+            contributions.iloc[idx] = 1000
+
+        # Make cumulative
+        contributions = contributions.cumsum()
+
+        capital = 10000
+        total_contributions = 15000  # 10000 + 5*1000
+
+        stats = backtest.summarize(
+            portfolio_values,
+            capital,
+            total_contributions=total_contributions,
+            contributions_series=contributions
+        )
+
+        # Should include IRR
+        assert 'irr' in stats
+        assert stats['irr'] is not None
+
+        # IRR should be reasonable (not extreme)
+        assert -0.99 < stats['irr'] < 10.0
+
+        # IRR should be different from CAGR for DCA strategies
+        # (though they should be in the same ballpark)
+        assert 'cagr' in stats
+
+    def test_summarize_without_irr(self):
+        """Test that summarize works without IRR (lump sum investment)"""
+        dates = pd.date_range("2020-01-01", periods=365, freq="D")
+
+        # Lump sum: invest 10000, grows to 11000 (10% return)
+        portfolio_values = pd.Series(
+            np.linspace(10000, 11000, 365),
+            index=dates
+        )
+
+        capital = 10000
+
+        # Don't pass contributions_series (lump sum investment)
+        stats = backtest.summarize(portfolio_values, capital)
+
+        # Should NOT include IRR (only for DCA)
+        assert 'irr' not in stats
+
+        # Should still have other metrics
+        assert 'cagr' in stats
+        assert 'sharpe_ratio' in stats
+        assert 'total_return' in stats
+
+    def test_summarize_irr_single_contribution(self):
+        """Test that IRR is not calculated for single contribution (lump sum)"""
+        dates = pd.date_range("2020-01-01", periods=180, freq="D")
+
+        portfolio_values = pd.Series(
+            np.linspace(10000, 11000, 180),
+            index=dates
+        )
+
+        # Contributions series with only initial investment (no DCA)
+        contributions = pd.Series(10000, index=dates)
+
+        capital = 10000
+
+        stats = backtest.summarize(
+            portfolio_values,
+            capital,
+            total_contributions=capital,
+            contributions_series=contributions
+        )
+
+        # Should NOT calculate IRR for single contribution
+        assert 'irr' not in stats
+
 
 class TestMain:
     """Test main function integration"""

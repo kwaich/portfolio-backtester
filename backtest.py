@@ -964,13 +964,70 @@ def compute_metrics(
     return table
 
 
-def summarize(series: pd.Series, capital: float, total_contributions: float = None) -> dict[str, float]:
+def _calculate_xirr(cashflows: np.ndarray, dates_in_days: np.ndarray, guess: float = 0.1, max_iterations: int = 100, tolerance: float = 1e-6) -> float:
+    """Calculate XIRR (time-weighted Internal Rate of Return) using Newton-Raphson method.
+
+    Args:
+        cashflows: Array of cashflows (negative for outflows, positive for inflows)
+        dates_in_days: Array of days since first cashflow
+        guess: Initial guess for annual rate
+        max_iterations: Maximum number of iterations
+        tolerance: Convergence tolerance
+
+    Returns:
+        Annualized IRR as a decimal (e.g., 0.10 for 10%)
+        Returns None if calculation fails or doesn't converge
+    """
+    rate = guess
+
+    for iteration in range(max_iterations):
+        # Calculate NPV and its derivative using actual time periods
+        npv = 0.0
+        npv_derivative = 0.0
+
+        for cf, days in zip(cashflows, dates_in_days):
+            years = days / 365.0
+            discount_factor = (1 + rate) ** years
+
+            npv += cf / discount_factor
+
+            if years > 0:
+                npv_derivative -= years * cf / (discount_factor * (1 + rate))
+
+        # Check for convergence
+        if abs(npv) < tolerance:
+            return rate
+
+        # Avoid division by zero
+        if abs(npv_derivative) < 1e-10:
+            return None
+
+        # Newton-Raphson update
+        new_rate = rate - npv / npv_derivative
+
+        # Avoid extreme values
+        if new_rate < -0.99 or new_rate > 10.0:
+            return None
+
+        rate = new_rate
+
+    # Didn't converge
+    return None
+
+
+def summarize(
+    series: pd.Series,
+    capital: float,
+    total_contributions: float = None,
+    contributions_series: pd.Series = None
+) -> dict[str, float]:
     """Calculate summary statistics for a portfolio or benchmark series.
 
     Args:
         series: Time series of portfolio/benchmark values
         capital: Initial capital amount
         total_contributions: Total amount contributed (for DCA). If None, uses capital.
+        contributions_series: Series of cumulative contributions over time (for IRR calculation)
 
     Returns:
         Dictionary of performance metrics
@@ -978,6 +1035,7 @@ def summarize(series: pd.Series, capital: float, total_contributions: float = No
     Note:
         For DCA strategies, total_contributions should include all contributions.
         Returns and CAGR are calculated based on total invested amount.
+        IRR is calculated when contributions_series is provided.
     """
     if series.empty:
         raise ValueError("Cannot summarize an empty series")
@@ -993,6 +1051,44 @@ def summarize(series: pd.Series, capital: float, total_contributions: float = No
     # CAGR calculation for DCA is approximate (true metric would be IRR)
     # This gives a reasonable approximation for comparison purposes
     cagr = (ending_value / total_contributions) ** (365 / days) - 1
+
+    # Calculate IRR for DCA strategies (more accurate than CAGR)
+    irr = None
+    if contributions_series is not None:
+        # Build cashflow array: contributions as outflows (negative), final value as inflow (positive)
+        contrib_changes = contributions_series.diff().fillna(contributions_series.iloc[0])
+
+        # Find dates where contributions occurred (non-zero changes)
+        contrib_dates = contrib_changes[contrib_changes > 0].index
+
+        if len(contrib_dates) > 1:  # Only calculate IRR if multiple contributions
+            # Build cashflows: each contribution as negative, final value as positive
+            cashflows = []
+            cashflow_days = []
+
+            for date in contrib_dates:
+                cashflows.append(-contrib_changes[date])  # Contribution as outflow (negative)
+                cashflow_days.append((date - series.index[0]).days)
+
+            # Add final value as positive inflow
+            cashflows.append(ending_value)
+            cashflow_days.append((series.index[-1] - series.index[0]).days)
+
+            # Calculate XIRR using time-weighted cashflows
+            cashflows_array = np.array(cashflows)
+            days_array = np.array(cashflow_days)
+
+            irr = _calculate_xirr(cashflows_array, days_array)
+
+            # Validate IRR result
+            if irr is not None:
+                # Sanity check: IRR should be reasonable (-99% to 1000%)
+                if irr < -0.99 or irr > 10.0:
+                    logger.warning(
+                        f"IRR calculation produced unrealistic value ({irr:.2%}). "
+                        f"Using CAGR instead."
+                    )
+                    irr = None
 
     # Calculate daily returns for additional metrics
     daily_returns = series.pct_change().dropna()
@@ -1012,7 +1108,7 @@ def summarize(series: pd.Series, capital: float, total_contributions: float = No
     downside_std = downside_returns.std() * np.sqrt(TRADING_DAYS_PER_YEAR) if len(downside_returns) > 0 else 0.0
     sortino_ratio = (cagr / downside_std) if downside_std > 0 else 0.0
 
-    return {
+    metrics = {
         "ending_value": ending_value,
         "total_return": total_return,
         "cagr": cagr,
@@ -1022,6 +1118,12 @@ def summarize(series: pd.Series, capital: float, total_contributions: float = No
         "max_drawdown": drawdown,
         "total_contributions": total_contributions,  # Include for reference
     }
+
+    # Add IRR if calculated (for DCA strategies)
+    if irr is not None:
+        metrics["irr"] = irr
+
+    return metrics
 
 
 def main(argv: List[str]) -> None:
@@ -1121,8 +1223,19 @@ def main(argv: List[str]) -> None:
     portfolio_total_contrib = table["portfolio_contributions"].iloc[-1]
     benchmark_total_contrib = table["benchmark_contributions"].iloc[-1]
 
-    portfolio_stats = summarize(table["portfolio_value"], args.capital, portfolio_total_contrib)
-    benchmark_stats = summarize(table["benchmark_value"], args.capital, benchmark_total_contrib)
+    # Pass contributions series for IRR calculation (only for DCA strategies)
+    portfolio_stats = summarize(
+        table["portfolio_value"],
+        args.capital,
+        portfolio_total_contrib,
+        contributions_series=table["portfolio_contributions"] if (dca_freq and dca_amount) else None
+    )
+    benchmark_stats = summarize(
+        table["benchmark_value"],
+        args.capital,
+        benchmark_total_contrib,
+        contributions_series=table["benchmark_contributions"] if (dca_freq and dca_amount) else None
+    )
 
     # Print results
     print("\n" + "="*70)
@@ -1153,6 +1266,8 @@ def main(argv: List[str]) -> None:
     print(f"  Ending Value:    ${portfolio_stats['ending_value']:>15,.2f}")
     print(f"  Total Return:    {portfolio_stats['total_return']:>15.2%}")
     print(f"  CAGR:            {portfolio_stats['cagr']:>15.2%}")
+    if 'irr' in portfolio_stats:
+        print(f"  IRR:             {portfolio_stats['irr']:>15.2%}")
     print(f"  Volatility:      {portfolio_stats['volatility']:>15.2%}")
     print(f"  Sharpe Ratio:    {portfolio_stats['sharpe_ratio']:>15.2f}")
     print(f"  Sortino Ratio:   {portfolio_stats['sortino_ratio']:>15.2f}")
@@ -1162,6 +1277,8 @@ def main(argv: List[str]) -> None:
     print(f"  Ending Value:    ${benchmark_stats['ending_value']:>15,.2f}")
     print(f"  Total Return:    {benchmark_stats['total_return']:>15.2%}")
     print(f"  CAGR:            {benchmark_stats['cagr']:>15.2%}")
+    if 'irr' in benchmark_stats:
+        print(f"  IRR:             {benchmark_stats['irr']:>15.2%}")
     print(f"  Volatility:      {benchmark_stats['volatility']:>15.2%}")
     print(f"  Sharpe Ratio:    {benchmark_stats['sharpe_ratio']:>15.2f}")
     print(f"  Sortino Ratio:   {benchmark_stats['sortino_ratio']:>15.2f}")
