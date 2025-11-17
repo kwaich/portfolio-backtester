@@ -424,11 +424,11 @@ portfolio-backtester/
 │   └── main.py             # Main application orchestration
 ├── backtest.py             # Core backtesting engine
 ├── plot_backtest.py        # Visualization utility
-├── tests/                  # Test suite (204 tests, ~88% coverage)
-│   ├── test_backtest.py    # Unit tests for backtest.py (88 tests - includes DCA & IRR)
-│   ├── test_app.py         # Unit tests for app.py UI (63 tests - includes DCA metrics)
+├── tests/                  # Test suite (208 tests, ~88% coverage)
+│   ├── test_backtest.py    # Unit tests for backtest.py (92 tests)
+│   ├── test_app.py         # Unit tests for app.py UI (63 tests)
 │   ├── test_ticker_data.py # Unit tests for ticker_data.py (32 tests)
-│   └── test_integration.py # Integration tests (16 tests)
+│   └── test_integration.py # Integration tests (21 tests)
 ├── requirements.txt        # Python dependencies
 ├── README.md               # This file
 ├── CLAUDE.md               # AI assistant guide
@@ -461,7 +461,7 @@ The Streamlit web UI has been refactored into a clean, modular architecture:
 - `config.py` (121 lines): All configuration constants, colors, labels
 - `presets.py` (110 lines): Portfolio and date range presets
 - `validation.py` (162 lines): Input validation, session state management
-- `ui_components.py` (184 lines): Reusable metric and table rendering
+- `ui_components.py` (306 lines): Reusable metric and table rendering
 - `charts.py` (306 lines): Plotly chart generation functions
 - `main.py` (459 lines): Application orchestration and workflow
 - `app.py` (43 lines): Backward compatibility wrapper
@@ -470,19 +470,22 @@ The Streamlit web UI has been refactored into a clean, modular architecture:
 
 ### Running Tests
 
-The project has comprehensive test coverage with **204 tests** achieving **100% pass rate**.
+The project has comprehensive test coverage with **208 tests** achieving **100% pass rate**.
 
 ```bash
-# Run all tests (204 tests: 88 backtest + 63 UI + 32 ticker_data + 16 integration)
+# Run all tests (208 tests: 92 backtest + 63 UI + 32 ticker_data + 21 integration)
 pytest -v
 
-# Run only backtest tests (88 tests - includes DCA & IRR)
+# Run only backtest tests (92 tests)
 pytest tests/test_backtest.py -v
 
-# Run only UI tests (63 tests - includes DCA metrics)
+# Run only UI tests (63 tests)
 pytest tests/test_app.py -v
 
-# Run only integration tests (16 tests)
+# Run only ticker data tests (32 tests)
+pytest tests/test_ticker_data.py -v
+
+# Run only integration tests (21 tests)
 pytest tests/test_integration.py -v
 
 # Run with coverage report
@@ -504,40 +507,40 @@ pytest tests/test_integration.py::TestEndToEndWorkflow -v
 
 | Component | Tests | Coverage | Status |
 |-----------|-------|----------|--------|
-| backtest.py | 68 tests | 95% | ✅ Excellent |
-| app.py | 62 tests | 82% | ✅ Good |
-| Integration | 25 tests | - | ✅ Comprehensive |
-| **Total** | **155 tests** | **~88%** | **✅ Production-ready** |
+| backtest.py | 92 tests | 95% | ✅ Excellent |
+| app package | 63 tests | 82% | ✅ Good |
+| ticker_data.py | 32 tests | - | ✅ Covered |
+| Integration | 21 tests | - | ✅ Comprehensive |
+| **Total** | **208 tests** | **~88%** | **✅ Production-ready** |
 
 **Test Breakdown**:
 
-**Backtest Engine** (68 tests):
-- CLI argument parsing (7 tests)
-- Cache functions with TTL (6 tests)
-- Performance metrics calculation (4 tests)
-- Portfolio computation (4 tests)
-- Retry logic (4 tests)
-- Ticker validation (11 tests)
-- Date validation (7 tests)
-- Price downloads (4 tests)
-- **NEW: Batch downloads** (5 tests)
-- **NEW: Data validation** (10 tests)
-- Main integration (6 tests)
+**Backtest Engine** (92 tests):
+- CLI argument parsing
+- Cache functions with TTL
+- Performance metrics (returns, drawdown, risk measures)
+- Portfolio computation (buy & hold, rebalancing, DCA)
+- Retry logic and caching
+- Ticker/date validation and data downloads
+- Rolling Sharpe, drawdown, and IRR edge cases
 
-**Web UI** (62 tests):
-- Integration and formatting (23 tests)
-- Portfolio Presets (8 tests)
-- Date Range Presets (7 tests)
-- Multiple Benchmarks (9 tests)
-- Delta Indicators (7 tests)
-- Rolling Returns (8 tests)
+**Web UI** (63 tests):
+- Metric formatting and validation flows
+- Portfolio & date presets
+- Multiple benchmarks and delta indicators
+- Rolling returns widgets and chart data
+- File downloads, caching toggle, and error paths
 
-**Integration Tests** (25 tests):
-- End-to-end workflows (3 tests)
-- Edge cases (8 tests)
-- Data quality validation (5 tests)
-- Input validation (5 tests)
-- Statistical edge cases (4 tests)
+**Ticker Data Utilities** (32 tests):
+- Curated ticker lists and formatting helpers
+- Search capabilities with/without Yahoo Finance
+- Edge cases for duplicate handling and malformed input
+
+**Integration Tests** (21 tests):
+- End-to-end CLI workflows
+- Data quality validation
+- Input validation edge cases
+- Statistical sanity checks for Sharpe, Sortino, drawdown, etc.
 
 All tests pass with **100% success rate**.
 

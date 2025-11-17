@@ -49,7 +49,7 @@ This document provides detailed information about each file in the portfolio-bac
 - `normalize_weights()`: Auto-normalizes portfolio weights to sum to 1.0
 - Input validation for all user inputs (tickers, dates, capital)
 
-### app/ui_components.py (184 lines)
+### app/ui_components.py (306 lines)
 **Reusable UI rendering functions** (DRY principle)
 - `format_metric_value()`: Format values based on metric type (currency, percentage, ratio)
 - `render_metric()`: Render single metric with proper formatting
@@ -153,71 +153,38 @@ This document provides detailed information about each file in the portfolio-bac
 
 ## Test Suite
 
-### tests/test_backtest.py (72 tests)
+### tests/test_backtest.py (92 tests)
 **Comprehensive unit test suite using pytest**
-- Tests all major functions and edge cases
-- Mocks external dependencies (yfinance) for isolation
-- Covers caching, error handling, calculations, validation, and CLI
-
-**Phase 1 Tests** (28 tests):
-- Cache expiration and TTL (6 tests)
-- Retry logic with exponential backoff (4 tests)
-- Ticker validation for multiple formats (11 tests)
-- Date validation and normalization (7 tests)
-
-**Phase 3 Tests** (15 tests):
-- Batch download optimization (5 tests)
-- Data quality validation (10 tests)
-
-**Rolling Sharpe Tests** (5 new tests):
-- Rolling 12-month Sharpe ratio column creation
-- NaN handling for first 252 days
-- Calculation accuracy with realistic volatility
-- Zero volatility edge case
-- Insufficient data handling
-
-**Test Classes** (11 total):
-- `TestParseArgs`: CLI argument parsing (7 tests)
-- `TestCacheFunctions`: Cache with TTL and migration (6 tests)
-- `TestSummarize`: Statistics calculation (4 tests)
-- `TestComputeMetrics`: Backtest computation (9 tests, +5 for rolling Sharpe)
-- `TestRetryLogic`: Exponential backoff decorator (4 tests)
-- `TestTickerValidation`: Ticker format validation (11 tests)
-- `TestDateValidation`: Date parsing and ranges (7 tests)
-- `TestDownloadPrices`: Price fetching with batch caching (9 tests)
-- `TestDataValidation`: Data quality checks (10 tests)
-- `TestMain`: Integration tests (2 tests)
+- Covers caching, data downloads, validations, metrics, DCA logic, IRR, rolling Sharpe, and CLI integration
+- Uses mocking to isolate yfinance/network behavior
+- Includes dedicated fixtures for cache handling and error injection
 
 **Run with**: `pytest tests/test_backtest.py -v`
 
-### tests/test_app.py (64 tests)
-**Comprehensive test suite for Streamlit UI**
-- Tests UI workflow integration with backtest module
-- Validates metric formatting and display logic
-- Tests error handling and input validation
-- Covers portfolio composition, chart data, and export functionality
-- Complete coverage of all UI enhancements
-- Mocks Streamlit components for isolated testing
-
-**Test Classes** (14 total):
-- `TestMetricLabels`: Metric display formatting
-- `TestBacktestIntegration`: UI workflow with backtest.py
-- `TestMetricFormatting`: Currency, percentage, ratio formatting
-- `TestErrorHandling`: Invalid input scenarios
-- `TestPortfolioComposition`: Table generation
-- `TestChartData`: Drawdown and active return calculations
-- `TestDownloadFunctionality`: CSV and PNG export
-- `TestCacheToggle`: Cache enable/disable behavior
-- `TestInputValidation`: Form input validation
-- `TestPortfolioPresets`: Portfolio preset validation (8 tests)
-- `TestDateRangePresets`: Date preset calculations (7 tests)
-- `TestMultipleBenchmarks`: Multi-benchmark logic (9 tests)
-- `TestDeltaIndicators`: Delta calculation and formatting (7 tests)
-- `TestRollingReturns`: Rolling returns windows (8 tests)
+### tests/test_app.py (63 tests)
+**Comprehensive test suite for the Streamlit UI**
+- Validates metric formatting, presets, benchmarking, rolling returns, and download flows
+- Exercises error handling, caching toggles, and multiple benchmark support
+- Mocks Streamlit and backtest interactions for deterministic tests
 
 **Run with**: `pytest tests/test_app.py -v`
 
-### tests/test_integration.py (16 tests)
+### tests/test_ticker_data.py (32 tests)
+**Ticker utility tests**
+- Ensures curated lists, search helpers, and Yahoo Finance augmentation work as expected
+- Covers formatting, deduplication, caching, and resilience to malformed API responses
+
+**Run with**: `pytest tests/test_ticker_data.py -v`
+
+### tests/test_integration.py (21 tests)
+**Integration and edge-case coverage**
+- End-to-end CLI workflows
+- Edge cases (leap years, missing data, short windows)
+- Data quality validation and error messaging
+- Date/ticker validation stress tests
+- Statistical sanity checks (Sharpe/Sortino/drawdown)
+
+**Run with**: `pytest tests/test_integration.py -v`
 **Comprehensive integration test suite**
 - Tests system integration and real-world scenarios
 - Mocks yfinance for isolated, reproducible tests
@@ -301,7 +268,7 @@ This document provides detailed information about each file in the portfolio-bac
 
 ### Testing
 
-**Total Tests**: 184 (72 backtest + 64 UI + 32 ticker_data + 16 integration)
+**Total Tests**: 208 (92 backtest + 63 UI + 32 ticker_data + 21 integration)
 **Coverage**: ~88%
 **Pass Rate**: 100%
 

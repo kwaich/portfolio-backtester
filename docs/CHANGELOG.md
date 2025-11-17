@@ -112,9 +112,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Enhanced validation in `plot_backtest.py`
 
 #### Integration Testing
-- **NEW: `test_integration.py`** - Comprehensive integration test suite (420 lines, 25 tests)
-  - End-to-end workflow tests (3 tests)
-  - Edge case tests (8 tests: leap years, extreme drawdowns, zero volatility, etc.)
+- **NEW: `test_integration.py`** - Comprehensive integration test suite (420 lines, 21 tests)
+  - End-to-end workflow tests (1 test)
+  - Edge case tests (6 tests: leap years, extreme drawdowns, zero volatility, etc.)
   - Data quality validation tests (5 tests)
   - Input validation tests (5 tests)
   - Statistical edge cases (4 tests)
