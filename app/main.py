@@ -421,12 +421,27 @@ def main() -> None:
         st.subheader("Summary Statistics")
         
         # Compute summaries
-        portfolio_summary = summarize(results["portfolio_value"], capital)
-        
+        # Get total contributions for accurate return calculations
+        portfolio_total_contrib = results["portfolio_contributions"].iloc[-1]
+
+        # Pass contributions series for IRR calculation (only for DCA strategies)
+        portfolio_summary = summarize(
+            results["portfolio_value"],
+            capital,
+            total_contributions=portfolio_total_contrib,
+            contributions_series=results["portfolio_contributions"] if (dca_freq and dca_amount) else None
+        )
+
         # Compute summaries for all benchmarks
         all_benchmark_summaries = {}
         for bench_name, bench_result in all_benchmark_results.items():
-            all_benchmark_summaries[bench_name] = summarize(bench_result['benchmark_value'], capital)
+            benchmark_total_contrib = bench_result["benchmark_contributions"].iloc[-1]
+            all_benchmark_summaries[bench_name] = summarize(
+                bench_result['benchmark_value'],
+                capital,
+                total_contributions=benchmark_total_contrib,
+                contributions_series=bench_result["benchmark_contributions"] if (dca_freq and dca_amount) else None
+            )
         
         # Display in columns
         col1, col2, col3 = st.columns(3)

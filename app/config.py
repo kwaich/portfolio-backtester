@@ -115,10 +115,12 @@ METRIC_LABELS = {
     "ending_value": "Ending Value",
     "total_return": "Total Return",
     "cagr": "CAGR",
+    "irr": "IRR",
     "volatility": "Volatility",
     "sharpe_ratio": "Sharpe Ratio",
     "sortino_ratio": "Sortino Ratio",
-    "max_drawdown": "Max Drawdown"
+    "max_drawdown": "Max Drawdown",
+    "total_contributions": "Total Contributions"
 }
 
 # =============================================================================

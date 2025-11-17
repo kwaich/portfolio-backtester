@@ -32,6 +32,7 @@ class TestMetricLabels:
             "ending_value": "Ending Value",
             "total_return": "Total Return",
             "cagr": "CAGR",
+            "irr": "IRR",  # Optional metric for DCA strategies
             "volatility": "Volatility",
             "sharpe_ratio": "Sharpe Ratio",
             "sortino_ratio": "Sortino Ratio",
