@@ -953,9 +953,14 @@ class TestDCA:
         portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(prices, weights, capital, dca_amount, dca_freq)
 
         # With constant price, portfolio value should equal total contributions
-        # Number of weeks in 90 days is approximately 12-13
-        num_weeks = len(pd.date_range(dates[0], dates[-1], freq="W").intersection(dates))
-        expected_value = capital + (dca_amount * (num_weeks - 1))  # -1 because first is initial capital
+        # DCA dates include first date + weekly dates (first date is added if not in weekly schedule)
+        weekly_dates = pd.date_range(dates[0], dates[-1], freq="W").intersection(dates)
+        if dates[0] not in weekly_dates:
+            num_dca_dates = len(weekly_dates) + 1  # Add 1 for initial date
+        else:
+            num_dca_dates = len(weekly_dates)
+
+        expected_value = capital + (dca_amount * (num_dca_dates - 1))  # -1 because first is initial capital
 
         # Check contributions match expected
         assert cumulative_contributions.iloc[-1] == expected_value
@@ -1054,8 +1059,14 @@ class TestDCA:
         assert results['benchmark_value'].iloc[-1] > capital
 
         # Check contributions are tracked correctly
-        num_contributions = len(pd.date_range(dates[0], dates[-1], freq="M").intersection(dates))
-        expected_total = capital + (dca_amount * (num_contributions - 1))
+        # DCA dates include first date + monthly dates (first date is added if not in monthly schedule)
+        monthly_dates = pd.date_range(dates[0], dates[-1], freq="M").intersection(dates)
+        if dates[0] not in monthly_dates:
+            num_dca_dates = len(monthly_dates) + 1  # Add 1 for initial date
+        else:
+            num_dca_dates = len(monthly_dates)
+
+        expected_total = capital + (dca_amount * (num_dca_dates - 1))
         assert results['portfolio_contributions'].iloc[-1] == expected_total
         assert results['benchmark_contributions'].iloc[-1] == expected_total
 
@@ -1108,8 +1119,10 @@ class TestMain:
                         {
                             "portfolio_value": [100_000] * 10,
                             "portfolio_return": [0.0] * 10,
+                            "portfolio_contributions": [100_000] * 10,
                             "benchmark_value": [100_000] * 10,
                             "benchmark_return": [0.0] * 10,
+                            "benchmark_contributions": [100_000] * 10,
                             "active_return": [0.0] * 10,
                         },
                         index=dates,
