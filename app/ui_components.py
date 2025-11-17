@@ -1,4 +1,4 @@
-"""Reusable UI components for the ETF Backtester.
+"""Reusable UI components for the Portfolio Backtester.
 
 This module provides functions for rendering metrics, tables, and other
 UI elements consistently throughout the application.

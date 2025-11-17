@@ -1,4 +1,4 @@
-"""Results display functions for the ETF Backtester.
+"""Results display functions for the Portfolio Backtester.
 
 This module contains functions for rendering backtest results,
 including metrics, charts, and download options.

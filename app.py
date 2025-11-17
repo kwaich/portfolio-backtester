@@ -1,5 +1,5 @@
 """
-Backward compatibility wrapper for the ETF Backtester Streamlit app.
+Backward compatibility wrapper for the Portfolio Backtester Streamlit app.
 
 The main application has been refactored into the app/ package for better
 code organization. This file maintains backward compatibility so that

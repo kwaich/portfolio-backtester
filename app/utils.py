@@ -1,4 +1,4 @@
-"""Utility functions for the ETF Backtester Streamlit app.
+"""Utility functions for the Portfolio Backtester Streamlit app.
 
 This module provides helper functions for:
 - URL parameter parsing and state synchronization

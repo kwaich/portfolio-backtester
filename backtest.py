@@ -1,4 +1,4 @@
-"""Simple ETF backtest for VDCP.L/VHYD.L versus VWRA.L.
+"""Simple Portfolio Backtest for VDCP.L/VHYD.L versus VWRA.L.
 
 Typical workflow:
 
@@ -204,7 +204,7 @@ def validate_date_string(date_str: str) -> str:
 
 
 def parse_args(argv: List[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="ETF backtest helper")
+    parser = argparse.ArgumentParser(description="Portfolio Backtest helper")
     parser.add_argument(
         "--tickers",
         nargs="+",

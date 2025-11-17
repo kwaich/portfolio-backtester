@@ -11,7 +11,7 @@
 
 ## Project Overview
 
-This is a lightweight Python-based ETF backtesting utility that allows users to:
+This is a lightweight Python-based Portfolio Backtesting utility that allows users to:
 - Compare portfolio performance against benchmarks
 - Download historical price data from Yahoo Finance via yfinance
 - Calculate buy-and-hold returns with static weights

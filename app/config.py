@@ -1,4 +1,4 @@
-"""Configuration constants for the ETF Backtester UI.
+"""Configuration constants for the Portfolio Backtester UI.
 
 This module centralizes all configuration values, including:
 - Page settings
@@ -16,7 +16,7 @@ from datetime import datetime
 # Page Configuration
 # =============================================================================
 
-PAGE_TITLE = "ETF Backtester"
+PAGE_TITLE = "Portfolio Backtester"
 PAGE_ICON = "📈"
 PAGE_LAYOUT = "wide"
 SIDEBAR_STATE = "expanded"
@@ -193,6 +193,6 @@ CUSTOM_CSS = """
 # UI Text
 # =============================================================================
 
-MAIN_TITLE = "📈 ETF Backtester"
+MAIN_TITLE = "📈 Portfolio Backtester"
 SUBTITLE = "Compare portfolio performance against benchmarks"
 SIDEBAR_HEADER = "Backtest Configuration"

@@ -1,4 +1,4 @@
-"""Portfolio and date range presets for the ETF Backtester.
+"""Portfolio and date range presets for the Portfolio Backtester.
 
 This module provides pre-configured portfolios and date range shortcuts
 to make backtesting easier for common scenarios.

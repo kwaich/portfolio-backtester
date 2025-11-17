@@ -1,4 +1,4 @@
-"""Main Streamlit application entry point for the ETF Backtester.
+"""Main Streamlit application entry point for the Portfolio Backtester.
 
 This module orchestrates the entire application workflow using modular components:
 - Sidebar configuration with forms for better performance

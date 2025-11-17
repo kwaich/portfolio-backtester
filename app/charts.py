@@ -1,4 +1,4 @@
-"""Chart generation functions for the ETF Backtester.
+"""Chart generation functions for the Portfolio Backtester.
 
 This module provides Plotly chart generation for:
 - 2x2 dashboard with portfolio value, returns, active return, and drawdown

@@ -1,7 +1,7 @@
 """
-ETF Backtester Streamlit Application
+Portfolio Backtester Streamlit Application
 
-This package contains the refactored Streamlit application for ETF backtesting.
+This package contains the refactored Streamlit application for Portfolio Backtesting.
 
 Modules:
 - config: Configuration constants and styling

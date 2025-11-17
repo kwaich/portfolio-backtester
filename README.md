@@ -1,6 +1,6 @@
 # Portfolio Backtester
 
-A lightweight, flexible Python utility for backtesting ETF portfolio strategies against benchmarks. Download historical price data, calculate performance metrics, and visualize results with ease.
+A lightweight, flexible Python utility for backtesting portfolio strategies against benchmarks. Download historical price data, calculate performance metrics, and visualize results with ease.
 
 ## Features
 

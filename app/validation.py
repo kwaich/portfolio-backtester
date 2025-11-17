@@ -1,4 +1,4 @@
-"""Input validation and session state management for the ETF Backtester.
+"""Input validation and session state management for the Portfolio Backtester.
 
 This module handles:
 - Session state initialization (delegated to StateManager)

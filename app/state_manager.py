@@ -1,4 +1,4 @@
-"""Centralized session state management for the ETF Backtester.
+"""Centralized session state management for the Portfolio Backtester.
 
 This module provides a single source of truth for all Streamlit session state
 operations, eliminating scattered state access across components.

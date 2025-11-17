@@ -1,4 +1,4 @@
-"""Ticker data and search functionality for the ETF Backtester.
+"""Ticker data and search functionality for the Portfolio Backtester.
 
 This module provides a curated list of popular tickers (ETFs and stocks)
 and search functionality for ticker selection in the UI, including

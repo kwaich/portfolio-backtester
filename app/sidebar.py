@@ -1,4 +1,4 @@
-"""Sidebar rendering functions for the ETF Backtester.
+"""Sidebar rendering functions for the Portfolio Backtester.
 
 This module contains functions for rendering the sidebar configuration UI,
 organized into logical sections for better maintainability.
