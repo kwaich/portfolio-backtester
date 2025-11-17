@@ -105,6 +105,8 @@ python plot_backtest.py --csv results/my_backtest.csv
 
 ## Web UI (Interactive Dashboard)
 
+Try the hosted Streamlit experience at [backtestlabs.streamlit.app](https://backtestlabs.streamlit.app) or run it locally:
+
 For a more user-friendly experience, launch the Streamlit web interface:
 
 ```bash
