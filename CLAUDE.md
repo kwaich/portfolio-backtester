@@ -63,8 +63,7 @@ portfolio-backtester/
     ├── FILE_REFERENCE.md             # Detailed file documentation
     ├── TESTING_GUIDE.md              # TDD rules and test patterns
     ├── DEVELOPER_GUIDE.md            # Development workflows
-    ├── BEST_PRACTICES_IMPROVEMENTS.md # Streamlit best practices guide (NEW)
-    ├── CHANGELOG.md                  # Version history with rolling Sharpe feature
+    ├── CHANGELOG.md                  # Version history (v2.4.0: Streamlit best practices)
     └── PROJECT_SUMMARY.md            # Additional project documentation
 ```
 
