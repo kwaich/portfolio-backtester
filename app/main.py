@@ -50,7 +50,9 @@ try:
         DEFAULT_TICKER_1, DEFAULT_TICKER_2, DEFAULT_BENCHMARK,
         MAX_TICKERS, MIN_BENCHMARKS, MAX_BENCHMARKS,
         DEFAULT_CAPITAL, MIN_CAPITAL, MAX_CAPITAL,
-        REBALANCE_OPTIONS, DEFAULT_REBALANCE_STRATEGY
+        REBALANCE_OPTIONS, DEFAULT_REBALANCE_STRATEGY,
+        DCA_FREQUENCY_OPTIONS, DEFAULT_DCA_FREQUENCY,
+        DEFAULT_DCA_AMOUNT, MIN_DCA_AMOUNT, MAX_DCA_AMOUNT
     )
     from .presets import get_portfolio_presets, get_date_presets
     from .validation import (
@@ -250,6 +252,33 @@ def main() -> None:
     )
     rebalance_freq = REBALANCE_OPTIONS[rebalance_strategy]
 
+    # DCA (Dollar-Cost Averaging) strategy
+    st.sidebar.subheader("Dollar-Cost Averaging (DCA)")
+    dca_frequency = st.sidebar.selectbox(
+        "DCA Contribution Frequency",
+        options=list(DCA_FREQUENCY_OPTIONS.keys()),
+        index=0,
+        help="How often to make regular contributions (mutually exclusive with rebalancing)"
+    )
+    dca_freq = DCA_FREQUENCY_OPTIONS[dca_frequency]
+
+    # Only show DCA amount if DCA is enabled
+    dca_amount = None
+    if dca_freq is not None:
+        dca_amount = st.sidebar.number_input(
+            "DCA Contribution Amount ($)",
+            min_value=float(MIN_DCA_AMOUNT),
+            max_value=float(MAX_DCA_AMOUNT),
+            value=float(DEFAULT_DCA_AMOUNT),
+            step=100.0,
+            format="%0.2f",
+            help="Amount to contribute at each DCA interval"
+        )
+
+        # Show warning if both DCA and rebalancing are enabled
+        if rebalance_freq is not None:
+            st.sidebar.warning("⚠️ DCA and rebalancing are mutually exclusive. DCA will take precedence.")
+
     # Cache option
     st.sidebar.subheader("Options")
     use_cache = st.sidebar.checkbox(
@@ -322,12 +351,28 @@ def main() -> None:
         with st.spinner("Computing backtest metrics..."):
             try:
                 # Compute metrics for primary benchmark
-                results = compute_metrics(portfolio_prices, weights_array, benchmark_prices, capital, rebalance_freq=rebalance_freq)
+                results = compute_metrics(
+                    portfolio_prices,
+                    weights_array,
+                    benchmark_prices,
+                    capital,
+                    rebalance_freq=rebalance_freq,
+                    dca_amount=dca_amount,
+                    dca_freq=dca_freq
+                )
 
                 # Compute metrics for additional benchmarks
                 all_benchmark_results = {}
                 for bench_name, bench_prices in all_benchmark_prices.items():
-                    bench_result = compute_metrics(portfolio_prices, weights_array, bench_prices, capital, rebalance_freq=rebalance_freq)
+                    bench_result = compute_metrics(
+                        portfolio_prices,
+                        weights_array,
+                        bench_prices,
+                        capital,
+                        rebalance_freq=rebalance_freq,
+                        dca_amount=dca_amount,
+                        dca_freq=dca_freq
+                    )
                     all_benchmark_results[bench_name] = bench_result
 
                 # Store results in session state
@@ -339,7 +384,10 @@ def main() -> None:
                     'weights_array': weights_array,
                     'capital': capital,
                     'rebalance_strategy': rebalance_strategy,
-                    'rebalance_freq': rebalance_freq
+                    'rebalance_freq': rebalance_freq,
+                    'dca_frequency': dca_frequency,
+                    'dca_freq': dca_freq,
+                    'dca_amount': dca_amount
                 }
                 st.session_state.backtest_completed = True
 
@@ -361,6 +409,9 @@ def main() -> None:
         capital = stored['capital']
         rebalance_strategy = stored['rebalance_strategy']
         rebalance_freq = stored['rebalance_freq']
+        dca_frequency = stored.get('dca_frequency')
+        dca_freq = stored.get('dca_freq')
+        dca_amount = stored.get('dca_amount')
 
         # Display results
         st.divider()
@@ -370,12 +421,27 @@ def main() -> None:
         st.subheader("Summary Statistics")
         
         # Compute summaries
-        portfolio_summary = summarize(results["portfolio_value"], capital)
-        
+        # Get total contributions for accurate return calculations
+        portfolio_total_contrib = results["portfolio_contributions"].iloc[-1]
+
+        # Pass contributions series for IRR calculation (only for DCA strategies)
+        portfolio_summary = summarize(
+            results["portfolio_value"],
+            capital,
+            total_contributions=portfolio_total_contrib,
+            contributions_series=results["portfolio_contributions"] if (dca_freq and dca_amount) else None
+        )
+
         # Compute summaries for all benchmarks
         all_benchmark_summaries = {}
         for bench_name, bench_result in all_benchmark_results.items():
-            all_benchmark_summaries[bench_name] = summarize(bench_result['benchmark_value'], capital)
+            benchmark_total_contrib = bench_result["benchmark_contributions"].iloc[-1]
+            all_benchmark_summaries[bench_name] = summarize(
+                bench_result['benchmark_value'],
+                capital,
+                total_contributions=benchmark_total_contrib,
+                contributions_series=bench_result["benchmark_contributions"] if (dca_freq and dca_amount) else None
+            )
         
         # Display in columns
         col1, col2, col3 = st.columns(3)
@@ -408,8 +474,10 @@ def main() -> None:
         st.divider()
         render_portfolio_composition(tickers, weights_array)
 
-        # Display rebalancing strategy
-        if rebalance_freq:
+        # Display investment strategy
+        if dca_freq and dca_amount:
+            st.info(f"📊 **Strategy**: Dollar-Cost Averaging ({dca_frequency}, ${dca_amount:,.2f}/contribution)")
+        elif rebalance_freq:
             st.info(f"📊 **Strategy**: {rebalance_strategy}")
         else:
             st.info(f"📊 **Strategy**: {rebalance_strategy}")

@@ -5,7 +5,9 @@ A lightweight, flexible Python utility for backtesting ETF portfolio strategies 
 ## Features
 
 - **Portfolio Backtesting**: Test buy-and-hold strategies with customizable weights
-- **Comprehensive Metrics**: Returns, CAGR, Sharpe ratio, Sortino ratio, volatility, and maximum drawdown
+- **Dollar-Cost Averaging (DCA)**: Simulate regular contributions at configurable intervals (daily, weekly, monthly, quarterly, yearly)
+- **Rebalancing Strategies**: Test periodic rebalancing at various frequencies
+- **Comprehensive Metrics**: Returns, CAGR, IRR (for DCA), Sharpe ratio, Sortino ratio, volatility, and maximum drawdown
 - **Smart Data Caching**: Automatic caching with configurable TTL (time-to-live) for fresh data
 - **Resilient API Calls**: Automatic retry logic with exponential backoff for network reliability
 - **Input Validation**: Comprehensive validation for tickers, dates, and parameters before execution
@@ -14,7 +16,7 @@ A lightweight, flexible Python utility for backtesting ETF portfolio strategies 
 - **Easy CLI**: Simple command-line interface with sensible defaults
 - **Data Quality Validation**: Automatic detection of data issues (missing values, invalid prices, extreme changes)
 - **Optimized Performance**: Batch downloads with per-ticker caching for faster multi-ticker operations
-- **Well-Tested**: Comprehensive test coverage with 177 tests (100% pass rate)
+- **Well-Tested**: Comprehensive test coverage with 208 tests (100% pass rate)
 
 ## Quick Start
 
@@ -51,6 +53,26 @@ python backtest.py \
   --capital 100000 \
   --output results/my_backtest.csv
 ```
+
+### Dollar-Cost Averaging (DCA)
+
+Test a DCA strategy with regular monthly contributions:
+
+```bash
+python backtest.py \
+  --tickers AAPL MSFT \
+  --weights 0.6 0.4 \
+  --benchmark SPY \
+  --start 2018-01-01 \
+  --capital 10000 \
+  --dca-amount 1000 \
+  --dca-freq M \
+  --output results/dca_backtest.csv
+```
+
+This simulates starting with $10,000 and contributing $1,000 every month, with purchases split according to the target weights (60% AAPL, 40% MSFT).
+
+**Note**: DCA and rebalancing are mutually exclusive. If both are specified, DCA takes precedence.
 
 ### Visualization
 
@@ -188,6 +210,9 @@ The web UI includes a powerful ticker search feature:
 | `--output` | None | CSV file path for detailed results |
 | `--cache-ttl` | 24 | Cache time-to-live in hours (configurable freshness) |
 | `--no-cache` | False | Disable data caching entirely |
+| `--rebalance` | None | Rebalancing frequency: D/daily, W/weekly, M/monthly, Q/quarterly, Y/yearly |
+| `--dca-amount` | None | Dollar-cost averaging: amount to contribute at each interval |
+| `--dca-freq` | None | DCA frequency: D/daily, W/weekly, M/monthly, Q/quarterly, Y/yearly (requires --dca-amount) |
 
 ### plot_backtest.py
 
@@ -204,13 +229,25 @@ The web UI includes a powerful ticker search feature:
 The backtester calculates the following metrics:
 
 - **Ending Value**: Final portfolio/benchmark value
-- **Total Return**: Overall return over the period
-- **CAGR**: Compound Annual Growth Rate
-- **Volatility**: Annualized standard deviation of returns (252 trading days)
-- **Sharpe Ratio**: Risk-adjusted return (assuming 0% risk-free rate)
+- **Total Return**: Overall return over the period (calculated as (value - total_contributions) / total_contributions for DCA)
+- **CAGR**: Compound Annual Growth Rate (approximation for DCA strategies)
+- **IRR**: Internal Rate of Return (calculated for DCA strategies with multiple contributions, using time-weighted cashflows for accuracy)
+- **Volatility**: Annualized standard deviation of returns (252 trading days; for DCA, contribution impacts are excluded)
+- **Sharpe Ratio**: Risk-adjusted return (assuming 0% risk-free rate; uses IRR for DCA when available)
 - **Sortino Ratio**: Return relative to downside deviation only
-- **Max Drawdown**: Largest peak-to-trough decline
+- **Max Drawdown**: Largest peak-to-trough decline (for DCA, calculated on return percentage from peak)
 - **Active Return**: Portfolio return minus benchmark return
+
+### DCA Metrics (Special Handling)
+
+For Dollar-Cost Averaging strategies, metrics are calculated with special considerations:
+
+1. **Returns**: Based on total invested amount, not just initial capital
+2. **Volatility**: Excludes the artificial "returns" from new contributions
+3. **Sharpe/Sortino**: Uses true market volatility and IRR (when available)
+4. **Max Drawdown**: Calculated on return percentage (gains/losses vs. contributions), not absolute value
+5. **IRR**: Time-weighted internal rate of return, more accurate than CAGR for irregular cashflows
+6. **Weekend/Holiday Handling**: DCA contributions scheduled for non-trading days execute on the next available trading day
 
 ## Example Output
 
@@ -387,11 +424,11 @@ portfolio-backtester/
 │   └── main.py             # Main application orchestration
 ├── backtest.py             # Core backtesting engine
 ├── plot_backtest.py        # Visualization utility
-├── tests/                  # Test suite (184 tests, ~88% coverage)
-│   ├── test_backtest.py    # Unit tests for backtest.py (72 tests)
-│   ├── test_app.py         # Unit tests for app.py UI (64 tests)
+├── tests/                  # Test suite (208 tests, ~88% coverage)
+│   ├── test_backtest.py    # Unit tests for backtest.py (92 tests)
+│   ├── test_app.py         # Unit tests for app.py UI (63 tests)
 │   ├── test_ticker_data.py # Unit tests for ticker_data.py (32 tests)
-│   └── test_integration.py # Integration tests (16 tests)
+│   └── test_integration.py # Integration tests (21 tests)
 ├── requirements.txt        # Python dependencies
 ├── README.md               # This file
 ├── CLAUDE.md               # AI assistant guide
@@ -424,7 +461,7 @@ The Streamlit web UI has been refactored into a clean, modular architecture:
 - `config.py` (121 lines): All configuration constants, colors, labels
 - `presets.py` (110 lines): Portfolio and date range presets
 - `validation.py` (162 lines): Input validation, session state management
-- `ui_components.py` (184 lines): Reusable metric and table rendering
+- `ui_components.py` (306 lines): Reusable metric and table rendering
 - `charts.py` (306 lines): Plotly chart generation functions
 - `main.py` (459 lines): Application orchestration and workflow
 - `app.py` (43 lines): Backward compatibility wrapper
@@ -433,19 +470,22 @@ The Streamlit web UI has been refactored into a clean, modular architecture:
 
 ### Running Tests
 
-The project has comprehensive test coverage with **184 tests** achieving **100% pass rate**.
+The project has comprehensive test coverage with **208 tests** achieving **100% pass rate**.
 
 ```bash
-# Run all tests (184 tests: 72 backtest + 64 UI + 32 ticker_data + 16 integration)
+# Run all tests (208 tests: 92 backtest + 63 UI + 32 ticker_data + 21 integration)
 pytest -v
 
-# Run only backtest tests (72 tests)
+# Run only backtest tests (92 tests)
 pytest tests/test_backtest.py -v
 
-# Run only UI tests (64 tests)
+# Run only UI tests (63 tests)
 pytest tests/test_app.py -v
 
-# Run only integration tests (16 tests)
+# Run only ticker data tests (32 tests)
+pytest tests/test_ticker_data.py -v
+
+# Run only integration tests (21 tests)
 pytest tests/test_integration.py -v
 
 # Run with coverage report
@@ -467,40 +507,40 @@ pytest tests/test_integration.py::TestEndToEndWorkflow -v
 
 | Component | Tests | Coverage | Status |
 |-----------|-------|----------|--------|
-| backtest.py | 68 tests | 95% | ✅ Excellent |
-| app.py | 62 tests | 82% | ✅ Good |
-| Integration | 25 tests | - | ✅ Comprehensive |
-| **Total** | **155 tests** | **~88%** | **✅ Production-ready** |
+| backtest.py | 92 tests | 95% | ✅ Excellent |
+| app package | 63 tests | 82% | ✅ Good |
+| ticker_data.py | 32 tests | - | ✅ Covered |
+| Integration | 21 tests | - | ✅ Comprehensive |
+| **Total** | **208 tests** | **~88%** | **✅ Production-ready** |
 
 **Test Breakdown**:
 
-**Backtest Engine** (68 tests):
-- CLI argument parsing (7 tests)
-- Cache functions with TTL (6 tests)
-- Performance metrics calculation (4 tests)
-- Portfolio computation (4 tests)
-- Retry logic (4 tests)
-- Ticker validation (11 tests)
-- Date validation (7 tests)
-- Price downloads (4 tests)
-- **NEW: Batch downloads** (5 tests)
-- **NEW: Data validation** (10 tests)
-- Main integration (6 tests)
+**Backtest Engine** (92 tests):
+- CLI argument parsing
+- Cache functions with TTL
+- Performance metrics (returns, drawdown, risk measures)
+- Portfolio computation (buy & hold, rebalancing, DCA)
+- Retry logic and caching
+- Ticker/date validation and data downloads
+- Rolling Sharpe, drawdown, and IRR edge cases
 
-**Web UI** (62 tests):
-- Integration and formatting (23 tests)
-- Portfolio Presets (8 tests)
-- Date Range Presets (7 tests)
-- Multiple Benchmarks (9 tests)
-- Delta Indicators (7 tests)
-- Rolling Returns (8 tests)
+**Web UI** (63 tests):
+- Metric formatting and validation flows
+- Portfolio & date presets
+- Multiple benchmarks and delta indicators
+- Rolling returns widgets and chart data
+- File downloads, caching toggle, and error paths
 
-**Integration Tests** (25 tests):
-- End-to-end workflows (3 tests)
-- Edge cases (8 tests)
-- Data quality validation (5 tests)
-- Input validation (5 tests)
-- Statistical edge cases (4 tests)
+**Ticker Data Utilities** (32 tests):
+- Curated ticker lists and formatting helpers
+- Search capabilities with/without Yahoo Finance
+- Edge cases for duplicate handling and malformed input
+
+**Integration Tests** (21 tests):
+- End-to-end CLI workflows
+- Data quality validation
+- Input validation edge cases
+- Statistical sanity checks for Sharpe, Sortino, drawdown, etc.
 
 All tests pass with **100% success rate**.
 

@@ -69,6 +69,25 @@ REBALANCE_OPTIONS = {
 DEFAULT_REBALANCE_STRATEGY = "Buy-and-Hold (No Rebalancing)"
 
 # =============================================================================
+# DCA (Dollar-Cost Averaging) Configuration
+# =============================================================================
+
+# DCA frequency options (same as rebalancing)
+DCA_FREQUENCY_OPTIONS = {
+    "None (Lump Sum)": None,
+    "Daily": "D",
+    "Weekly": "W",
+    "Monthly": "M",
+    "Quarterly": "Q",
+    "Yearly": "Y"
+}
+
+DEFAULT_DCA_FREQUENCY = "None (Lump Sum)"
+DEFAULT_DCA_AMOUNT = 1000.0
+MIN_DCA_AMOUNT = 100.0
+MAX_DCA_AMOUNT = 100_000.0
+
+# =============================================================================
 # Chart Configuration
 # =============================================================================
 
@@ -96,10 +115,12 @@ METRIC_LABELS = {
     "ending_value": "Ending Value",
     "total_return": "Total Return",
     "cagr": "CAGR",
+    "irr": "IRR",
     "volatility": "Volatility",
     "sharpe_ratio": "Sharpe Ratio",
     "sortino_ratio": "Sortino Ratio",
-    "max_drawdown": "Max Drawdown"
+    "max_drawdown": "Max Drawdown",
+    "total_contributions": "Total Contributions"
 }
 
 # =============================================================================

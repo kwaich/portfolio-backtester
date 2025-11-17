@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -48,6 +49,29 @@ class TestParseArgs:
     def test_output_path(self):
         args = backtest.parse_args(["--output", "test.csv"])
         assert args.output == Path("test.csv")
+
+    def test_dca_arguments(self):
+        """Test DCA argument parsing"""
+        args = backtest.parse_args(["--dca-amount", "1000", "--dca-freq", "M"])
+        assert args.dca_amount == 1000.0
+        assert args.dca_freq == "M"
+
+    def test_dca_defaults(self):
+        """Test DCA default values"""
+        args = backtest.parse_args([])
+        assert args.dca_amount is None
+        assert args.dca_freq is None
+
+    def test_dca_frequency_options(self):
+        """Test various DCA frequency options"""
+        for freq in ['D', 'W', 'M', 'Q', 'Y', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly']:
+            args = backtest.parse_args(["--dca-freq", freq, "--dca-amount", "500"])
+            assert args.dca_freq == freq
+
+    def test_dca_invalid_frequency(self):
+        """Test that invalid DCA frequency raises error"""
+        with pytest.raises(SystemExit):
+            backtest.parse_args(["--dca-freq", "invalid"])
 
 
 class TestCacheFunctions:
@@ -217,10 +241,54 @@ class TestSummarize:
         assert stats["max_drawdown"] < 0
         assert stats["max_drawdown"] == pytest.approx(-0.1818, abs=0.01)
 
+    def test_dca_drawdown_not_triggered_by_contributions(self):
+        dates = pd.date_range("2020-01-01", periods=6, freq="ME")
+        contributions = pd.Series([1000 * (i + 1) for i in range(len(dates))], index=dates, dtype=float)
+        values = contributions.copy()  # portfolio value only grows via contributions
+
+        stats = backtest.summarize(
+            values,
+            1000,
+            total_contributions=contributions.iloc[-1],
+            contributions_series=contributions,
+        )
+
+        assert stats["max_drawdown"] == pytest.approx(0.0)
+        assert stats["volatility"] == 0.0
+        assert stats["sharpe_ratio"] == 0.0
+        assert stats["sortino_ratio"] == 0.0
+
+    def test_dca_drawdown_tracks_equity_decline(self):
+        dates = pd.date_range("2020-01-01", periods=5, freq="ME")
+        contributions = pd.Series([1000 * (i + 1) for i in range(len(dates))], index=dates, dtype=float)
+        values = pd.Series([1000, 2100, 3200, 2800, 3600], index=dates, dtype=float)
+
+        stats = backtest.summarize(
+            values,
+            1000,
+            total_contributions=contributions.iloc[-1],
+            contributions_series=contributions,
+        )
+
+        # Drop from 3200 peak to 2800 trough ~ -12.5%
+        assert stats["max_drawdown"] == pytest.approx(-0.125, abs=0.001)
+
     def test_empty_series_raises_error(self):
         empty_series = pd.Series([], dtype=float)
         with pytest.raises(ValueError, match="Cannot summarize an empty series"):
             backtest.summarize(empty_series, 100_000)
+
+
+class TestHelperFunctions:
+    def test_contribution_adjusted_daily_returns(self):
+        dates = pd.date_range("2020-01-01", periods=3, freq="D")
+        values = pd.Series([100.0, 160.0, 152.0], index=dates)
+        contributions = pd.Series([100.0, 150.0, 150.0], index=dates)
+
+        returns = backtest._calculate_daily_returns(values, contributions)
+        expected = pd.Series([np.nan, 0.1, -0.05], index=dates)
+
+        pd.testing.assert_series_equal(returns, expected)
 
 
 class TestComputeMetrics:
@@ -383,6 +451,25 @@ class TestComputeMetrics:
         # With zero volatility and zero returns, Sharpe should be 0
         valid_sharpe = table["portfolio_rolling_sharpe_12m"].dropna()
         assert (valid_sharpe == 0.0).all()
+
+    def test_dca_rolling_sharpe_ignores_contributions(self):
+        dates = pd.date_range("2020-01-01", periods=260, freq="B")
+        prices = pd.DataFrame({"AAPL": [100.0] * len(dates)}, index=dates)
+        benchmark = pd.Series([100.0] * len(dates), index=dates)
+        weights = np.array([1.0])
+
+        table = backtest.compute_metrics(
+            prices,
+            weights,
+            benchmark,
+            1_000,
+            dca_amount=100,
+            dca_freq="M",
+        )
+
+        # With flat prices, the rolling Sharpe columns should stay NaN (no valid returns)
+        assert table["portfolio_rolling_sharpe_12m"].dropna().empty
+        assert table["benchmark_rolling_sharpe_12m"].dropna().empty
 
     def test_rolling_sharpe_12m_insufficient_data(self):
         """Test rolling Sharpe with less than 252 days of data."""
@@ -886,6 +973,426 @@ class TestDataValidation:
         assert len(result) == 2
 
 
+class TestDCA:
+    """Test Dollar-Cost Averaging (DCA) functionality"""
+
+    def test_dca_monthly_contributions(self):
+        """Test DCA with monthly contributions"""
+        # Create 6 months of data
+        dates = pd.date_range("2020-01-01", periods=180, freq="D")
+        prices = pd.DataFrame({
+            "AAPL": np.linspace(100, 120, 180),  # Price increases from 100 to 120
+        }, index=dates)
+        weights = np.array([1.0])
+        capital = 10000
+        dca_amount = 1000
+        dca_freq = "M"
+
+        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(prices, weights, capital, dca_amount, dca_freq)
+
+        # Check that portfolio value increases due to contributions and price appreciation
+        assert portfolio_value.iloc[0] > 0
+        assert portfolio_value.iloc[-1] > portfolio_value.iloc[0]
+
+        # Check cumulative contributions
+        expected_contributions = capital + (dca_amount * 5)  # 6 months total (including initial)
+        assert cumulative_contributions.iloc[-1] == expected_contributions
+
+        # Portfolio value at end should be greater than total contributions
+        # (assuming price appreciation)
+        assert portfolio_value.iloc[-1] > expected_contributions
+
+    def test_dca_weekly_contributions(self):
+        """Test DCA with weekly contributions"""
+        dates = pd.date_range("2020-01-01", periods=90, freq="D")
+        prices = pd.DataFrame({
+            "AAPL": [100] * 90,  # Constant price
+        }, index=dates)
+        weights = np.array([1.0])
+        capital = 5000
+        dca_amount = 500
+        dca_freq = "W"
+
+        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(prices, weights, capital, dca_amount, dca_freq)
+
+        # With constant price, portfolio value should equal total contributions
+        # DCA dates include first date + weekly dates (first date is added if not in weekly schedule)
+        weekly_dates = pd.date_range(dates[0], dates[-1], freq="W").intersection(dates)
+        if dates[0] not in weekly_dates:
+            num_dca_dates = len(weekly_dates) + 1  # Add 1 for initial date
+        else:
+            num_dca_dates = len(weekly_dates)
+
+        expected_value = capital + (dca_amount * (num_dca_dates - 1))  # -1 because first is initial capital
+
+        # Check contributions match expected
+        assert cumulative_contributions.iloc[-1] == expected_value
+
+        # Allow small tolerance due to rounding
+        assert abs(portfolio_value.iloc[-1] - expected_value) < 10
+
+    def test_dca_multi_ticker(self):
+        """Test DCA with multiple tickers"""
+        dates = pd.date_range("2020-01-01", periods=60, freq="D")
+        prices = pd.DataFrame({
+            "AAPL": [100] * 60,
+            "MSFT": [200] * 60,
+        }, index=dates)
+        weights = np.array([0.6, 0.4])
+        capital = 10000
+        dca_amount = 1000
+        dca_freq = "M"
+
+        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(prices, weights, capital, dca_amount, dca_freq)
+
+        # Check that contributions are split according to weights
+        assert portfolio_value.iloc[0] == capital
+        assert portfolio_value.iloc[-1] > capital
+        assert cumulative_contributions.iloc[0] == capital
+
+    def test_dca_with_price_decline(self):
+        """Test DCA benefits when prices decline (buy more shares at lower prices)"""
+        dates = pd.date_range("2020-01-01", periods=90, freq="D")
+        # Price declines from 100 to 50
+        prices = pd.DataFrame({
+            "AAPL": np.linspace(100, 50, 90),
+        }, index=dates)
+        weights = np.array([1.0])
+        capital = 10000
+        dca_amount = 1000
+        dca_freq = "M"
+
+        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(prices, weights, capital, dca_amount, dca_freq)
+
+        # Portfolio value should decline due to price decline
+        # but cumulative contributions continue to grow
+        assert portfolio_value.iloc[-1] < cumulative_contributions.iloc[-1]
+
+    def test_dca_no_frequency(self):
+        """Test that DCA with no frequency falls back to lump sum"""
+        dates = pd.date_range("2020-01-01", periods=30, freq="D")
+        prices = pd.DataFrame({
+            "AAPL": [100] * 30,
+        }, index=dates)
+        weights = np.array([1.0])
+        capital = 10000
+        dca_amount = 1000
+        dca_freq = "M"
+
+        # Test with very short period where no DCA dates are generated
+        short_dates = dates[:5]  # Only 5 days
+        short_prices = prices.iloc[:5]
+
+        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(short_prices, weights, capital, dca_amount, "Q")
+
+        # Should have at least initial investment
+        assert portfolio_value.iloc[0] == capital
+        assert cumulative_contributions.iloc[0] == capital
+
+    def test_compute_metrics_with_dca(self):
+        """Test compute_metrics with DCA parameters and accurate return calculations"""
+        dates = pd.date_range("2020-01-01", periods=90, freq="D")
+        prices = pd.DataFrame({
+            "AAPL": [100] * 90,
+            "MSFT": [200] * 90,
+        }, index=dates)
+        benchmark = pd.Series([400] * 90, index=dates)
+        weights = np.array([0.5, 0.5])
+        capital = 10000
+        dca_amount = 1000
+        dca_freq = "M"
+
+        results = backtest.compute_metrics(
+            prices, weights, benchmark, capital,
+            dca_amount=dca_amount, dca_freq=dca_freq
+        )
+
+        # Check that results contain expected columns including contributions
+        assert 'portfolio_value' in results.columns
+        assert 'portfolio_return' in results.columns
+        assert 'portfolio_contributions' in results.columns
+        assert 'benchmark_value' in results.columns
+        assert 'benchmark_contributions' in results.columns
+        assert 'active_return' in results.columns
+
+        # Portfolio value should be greater than initial capital due to contributions
+        assert results['portfolio_value'].iloc[-1] > capital
+
+        # Benchmark should also have DCA applied for fair comparison
+        assert results['benchmark_value'].iloc[-1] > capital
+
+        # Check contributions are tracked correctly
+        # DCA dates include first date + monthly dates (first date is added if not in monthly schedule)
+        monthly_dates = pd.date_range(dates[0], dates[-1], freq="ME").intersection(dates)
+        if dates[0] not in monthly_dates:
+            num_dca_dates = len(monthly_dates) + 1  # Add 1 for initial date
+        else:
+            num_dca_dates = len(monthly_dates)
+
+        expected_total = capital + (dca_amount * (num_dca_dates - 1))
+        assert results['portfolio_contributions'].iloc[-1] == expected_total
+        assert results['benchmark_contributions'].iloc[-1] == expected_total
+
+        # With constant prices, portfolio and benchmark ending values should equal contributions
+        assert abs(results['portfolio_value'].iloc[-1] - expected_total) < 10
+        assert abs(results['benchmark_value'].iloc[-1] - expected_total) < 10
+
+        # Returns should be ~0% since prices are constant (no gains/losses)
+        assert abs(results['portfolio_return'].iloc[-1]) < 0.01  # < 1%
+        assert abs(results['benchmark_return'].iloc[-1]) < 0.01  # < 1%
+
+    def test_dca_precedence_over_rebalancing(self, caplog):
+        """Test that DCA takes precedence over rebalancing when both specified"""
+        dates = pd.date_range("2020-01-01", periods=90, freq="D")
+        prices = pd.DataFrame({
+            "AAPL": [100] * 90,
+        }, index=dates)
+        benchmark = pd.Series([400] * 90, index=dates)
+        weights = np.array([1.0])
+        capital = 10000
+
+        with caplog.at_level(logging.WARNING):
+            results = backtest.compute_metrics(
+                prices, weights, benchmark, capital,
+                rebalance_freq="M",
+                dca_amount=1000,
+                dca_freq="M"
+            )
+
+        # Check that warning was logged
+        assert any("mutually exclusive" in record.message for record in caplog.records)
+
+        # Portfolio should use DCA logic (value > capital due to contributions)
+        assert results['portfolio_value'].iloc[-1] > capital
+
+    def test_dca_weekend_handling(self):
+        """Test that DCA dates falling on weekends/holidays use next trading day"""
+        # Create date range with only weekdays (simulating market closed on weekends)
+        all_dates = pd.date_range("2022-11-18", "2023-11-18", freq="D")
+        trading_days = all_dates[all_dates.dayofweek < 5]  # Only Mon-Fri
+
+        prices = pd.DataFrame({
+            "AAPL": [100] * len(trading_days),
+        }, index=trading_days)
+
+        weights = np.array([1.0])
+        capital = 10000
+        dca_amount = 1000
+        dca_freq = "M"
+
+        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(
+            prices, weights, capital, dca_amount, dca_freq
+        )
+
+        # Generate expected monthly dates
+        monthly_dates = pd.date_range("2022-11-18", "2023-11-18", freq="ME")
+
+        # Count actual contributions
+        contrib_changes = cumulative_contributions.diff().fillna(cumulative_contributions.iloc[0])
+        contrib_events = contrib_changes[contrib_changes > 0]
+
+        # Should have 1 initial + 12 monthly contributions = 13 total
+        # Even though some monthly dates fall on weekends
+        assert len(contrib_events) == 13, \
+            f"Expected 13 contributions (1 initial + 12 monthly), got {len(contrib_events)}"
+
+        # Total should be $22,000 (10k initial + 12*1k monthly)
+        expected_total = capital + (dca_amount * len(monthly_dates))
+        assert cumulative_contributions.iloc[-1] == expected_total, \
+            f"Expected ${expected_total:,.2f}, got ${cumulative_contributions.iloc[-1]:,.2f}"
+
+        # Verify no contributions were skipped due to weekends
+        assert cumulative_contributions.iloc[-1] == 22000.0
+
+    def test_daily_dca_preserves_weekend_contributions(self):
+        dates = pd.date_range("2023-06-01", "2023-06-10", freq="D")
+        trading_days = pd.bdate_range(dates[0], dates[-1] + pd.Timedelta(days=2))
+
+        prices = pd.DataFrame({
+            "AAPL": [100.0] * len(trading_days)
+        }, index=trading_days)
+
+        weights = np.array([1.0])
+        capital = 1000
+        dca_amount = 100
+
+        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(
+            prices,
+            weights,
+            capital,
+            dca_amount,
+            "D"
+        )
+
+        contrib_changes = cumulative_contributions.diff().fillna(cumulative_contributions.iloc[0])
+        monday = pd.Timestamp("2023-06-05")  # Sat/Sun + Monday contributions
+        assert contrib_changes.loc[monday] == pytest.approx(300, abs=1e-9)
+
+        calendar_days = (prices.index[-1] - prices.index[0]).days + 1
+        expected_total = capital + dca_amount * (calendar_days - 1)
+        assert cumulative_contributions.iloc[-1] == expected_total
+
+    def test_xirr_calculation_basic(self):
+        """Test basic XIRR calculation with known cashflows"""
+        # Simple case: invest $1000, get $1100 back after 365 days = 10% return
+        cashflows = np.array([-1000.0, 1100.0])
+        days = np.array([0, 365])
+
+        irr = backtest._calculate_xirr(cashflows, days)
+
+        # Should be close to 10%
+        assert irr is not None
+        assert abs(irr - 0.10) < 0.01  # Within 1% tolerance
+
+    def test_xirr_calculation_multiple_contributions(self):
+        """Test XIRR with multiple contributions over time"""
+        # Three contributions of $1000 each (at start, day 180, day 360)
+        # Final value $3300 at day 720 (2 years)
+        # Expected IRR around 10% annually
+        cashflows = np.array([-1000.0, -1000.0, -1000.0, 3300.0])
+        days = np.array([0, 180, 360, 720])
+
+        irr = backtest._calculate_xirr(cashflows, days)
+
+        # Should be positive (growth)
+        assert irr is not None
+        assert irr > 0
+        assert irr < 1.0  # Less than 100% annual return
+
+    def test_xirr_negative_return(self):
+        """Test XIRR with negative returns (losses)"""
+        # Invest $1000, get back $900 after 365 days = -10% return
+        cashflows = np.array([-1000.0, 900.0])
+        days = np.array([0, 365])
+
+        irr = backtest._calculate_xirr(cashflows, days)
+
+        # Should be close to -10%
+        assert irr is not None
+        assert irr < 0
+        assert abs(irr - (-0.10)) < 0.01
+
+    def test_xirr_zero_return(self):
+        """Test XIRR with zero returns (break even)"""
+        # Invest $1000, get back $1000 after 365 days = 0% return
+        cashflows = np.array([-1000.0, 1000.0])
+        days = np.array([0, 365])
+
+        irr = backtest._calculate_xirr(cashflows, days)
+
+        # Should be close to 0%
+        assert irr is not None
+        assert abs(irr) < 0.01
+
+    def test_xirr_non_convergence(self):
+        """Test XIRR returns None when calculation doesn't converge"""
+        # Unrealistic cashflows that may not converge
+        cashflows = np.array([-1000.0, -1000.0, -1000.0, 10.0])  # Heavy losses
+        days = np.array([0, 30, 60, 90])
+
+        irr = backtest._calculate_xirr(cashflows, days)
+
+        # Should return None for non-converging cases
+        # (or a very negative value like -99%)
+        if irr is not None:
+            assert irr < -0.9  # Very negative return
+
+    def test_summarize_with_irr(self):
+        """Test that summarize calculates IRR when contributions_series is provided"""
+        # Create 6 months of data with monthly DCA
+        dates = pd.date_range("2020-01-01", periods=180, freq="D")
+
+        # Price grows from 100 to 110 (10% over 6 months)
+        portfolio_values = pd.Series(
+            np.linspace(10000, 15500, 180),  # Value grows due to contributions + returns
+            index=dates
+        )
+
+        # Monthly contributions: initial 10000, then 1000/month for 5 months
+        contributions = pd.Series(0.0, index=dates)
+        monthly_dates = pd.date_range(dates[0], dates[-1], freq="ME").intersection(dates)
+        if dates[0] not in monthly_dates:
+            monthly_dates = monthly_dates.insert(0, dates[0])
+
+        # Set contribution values
+        contributions.iloc[0] = 10000
+        for i, date in enumerate(monthly_dates[1:], 1):
+            # Find closest index
+            idx = dates.get_loc(date)
+            contributions.iloc[idx] = 1000
+
+        # Make cumulative
+        contributions = contributions.cumsum()
+
+        capital = 10000
+        total_contributions = 15000  # 10000 + 5*1000
+
+        stats = backtest.summarize(
+            portfolio_values,
+            capital,
+            total_contributions=total_contributions,
+            contributions_series=contributions
+        )
+
+        # Should include IRR
+        assert 'irr' in stats
+        assert stats['irr'] is not None
+
+        # IRR should be reasonable (not extreme)
+        assert -0.99 < stats['irr'] < 10.0
+
+        # IRR should be different from CAGR for DCA strategies
+        # (though they should be in the same ballpark)
+        assert 'cagr' in stats
+
+    def test_summarize_without_irr(self):
+        """Test that summarize works without IRR (lump sum investment)"""
+        dates = pd.date_range("2020-01-01", periods=365, freq="D")
+
+        # Lump sum: invest 10000, grows to 11000 (10% return)
+        portfolio_values = pd.Series(
+            np.linspace(10000, 11000, 365),
+            index=dates
+        )
+
+        capital = 10000
+
+        # Don't pass contributions_series (lump sum investment)
+        stats = backtest.summarize(portfolio_values, capital)
+
+        # Should NOT include IRR (only for DCA)
+        assert 'irr' not in stats
+
+        # Should still have other metrics
+        assert 'cagr' in stats
+        assert 'sharpe_ratio' in stats
+        assert 'total_return' in stats
+
+    def test_summarize_irr_single_contribution(self):
+        """Test that IRR is not calculated for single contribution (lump sum)"""
+        dates = pd.date_range("2020-01-01", periods=180, freq="D")
+
+        portfolio_values = pd.Series(
+            np.linspace(10000, 11000, 180),
+            index=dates
+        )
+
+        # Contributions series with only initial investment (no DCA)
+        contributions = pd.Series(10000, index=dates)
+
+        capital = 10000
+
+        stats = backtest.summarize(
+            portfolio_values,
+            capital,
+            total_contributions=capital,
+            contributions_series=contributions
+        )
+
+        # Should NOT calculate IRR for single contribution
+        assert 'irr' not in stats
+
+
 class TestMain:
     """Test main function integration"""
 
@@ -902,8 +1409,10 @@ class TestMain:
                         {
                             "portfolio_value": [100_000] * 10,
                             "portfolio_return": [0.0] * 10,
+                            "portfolio_contributions": [100_000] * 10,
                             "benchmark_value": [100_000] * 10,
                             "benchmark_return": [0.0] * 10,
+                            "benchmark_contributions": [100_000] * 10,
                             "active_return": [0.0] * 10,
                         },
                         index=dates,

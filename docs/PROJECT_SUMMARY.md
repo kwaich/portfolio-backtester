@@ -32,7 +32,7 @@ The system includes `backtest.py` (core engine), `app.py` (Streamlit web UI), an
   - `config.py` (121 lines): 32 configuration constants (colors, limits, labels)
   - `presets.py` (110 lines): Portfolio and date range presets
   - `validation.py` (162 lines): Input validation and centralized session state
-  - `ui_components.py` (184 lines): Reusable UI rendering functions (DRY principle)
+  - `ui_components.py` (306 lines): Reusable UI rendering functions (DRY principle)
   - `charts.py` (306 lines): Plotly chart generation functions
   - `main.py` (459 lines): Application orchestration and workflow
   - `__init__.py` (16 lines): Package initialization
@@ -131,52 +131,35 @@ The system includes `backtest.py` (core engine), `app.py` (Streamlit web UI), an
   - Dashboard: `--output charts/run --dashboard` creates single dashboard PNG
   - Interactive: omit `--output` to show plots interactively
 
-- `test_backtest.py` — Comprehensive unit test suite for backtest.py using pytest (~550 lines).
-  Tests all major functions including caching, error handling, calculations, and CLI parsing.
-  **Expanded with 28 new Phase 1 tests** for retry logic, validation, and TTL caching.
-  Mocks external dependencies (yfinance) for reliable testing. 10 test classes with **51 tests**
-  achieving 95% code coverage. Run with `pytest test_backtest.py -v`.
+- `tests/test_backtest.py` — Comprehensive pytest suite (~1,400 lines) for caching, data downloads,
+  portfolio construction (buy & hold, rebalancing, DCA), IRR calculations, rolling Sharpe, and CLI flows.
+  Includes 92 tests across argument parsing, validation, retry logic, metrics, and integration helpers.
+  Run with `pytest tests/test_backtest.py -v`.
 
-  **Phase 1 Test Additions:**
-  - Cache expiration and TTL validation (6 tests)
-  - Retry decorator with exponential backoff timing (4 tests)
-  - Ticker validation for multiple formats (11 tests: AAPL, VWRA.L, ^GSPC, EURUSD=X, BRK-B, invalid chars)
-  - Date validation and normalization (7 tests: formats, ranges, edge cases)
+- `tests/test_app.py` — Streamlit UI regression suite (~1,000 lines) with 63 tests across 14 classes
+  covering presets, validation, multiple benchmarks, rolling returns, downloads, and delta indicators.
+  Uses extensive mocking to isolate UI logic. Run with `pytest tests/test_app.py -v`.
 
-- `test_app.py` — Comprehensive unit test suite for Streamlit web UI (~933 lines). **62 tests**
-  across **14 test classes** covering UI workflow integration, metric formatting, error handling,
-  portfolio composition, chart data, download functionality, cache toggle, input validation,
-  **and all 5 new UI features** (portfolio presets, date presets, multiple benchmarks, delta
-  indicators, rolling returns). Mocks Streamlit components for isolated testing. Run with
-  `pytest test_app.py -v`.
+- `tests/test_ticker_data.py` — 32 tests validating curated ticker lists, formatting helpers, and
+  Yahoo Finance search fallbacks. Run with `pytest tests/test_ticker_data.py -v`.
+
+- `tests/test_integration.py` — 21 black-box tests exercising full CLI workflows, edge cases, and
+  statistical sanity checks. Run with `pytest tests/test_integration.py -v`.
 
 ## Test Coverage
 
-**Overall Coverage**: **~88%** with comprehensive test suite ✅
+**Overall Coverage**: **~88%** with comprehensive automated tests ✅
 
 **Test Suite Statistics**:
-- Total tests: **113** (51 backtest + 62 UI) ✅
-- Pass rate: **100%** (113/113 tests passing) ✅
-- Test runtime: ~3 seconds
-- Test-to-code ratio: ~0.85:1 (improved from 0.79:1)
-- **Phase 1**: +28 tests for reliability and validation
+- Total tests: **208** (92 backtest + 63 UI + 32 ticker_data + 21 integration)
+- Pass rate: **100%** (208/208 tests passing)
+- Typical runtime: ~4 seconds on a modern laptop
 
 **Coverage by Component**:
-- backtest.py: 95% coverage (~450 lines) ✅
-- app.py: 82% coverage (~700 lines) ✅
-
-**Phase 1 Test Additions** (28 tests):
-- Cache Expiration & TTL: 6 tests ✅
-- Retry Logic with Exponential Backoff: 4 tests ✅
-- Ticker Validation (multiple formats): 11 tests ✅
-- Date Validation & Normalization: 7 tests ✅
-
-**UI Feature Test Coverage** (39 tests):
-- Portfolio Presets: 8 tests ✅
-- Date Range Presets: 7 tests ✅
-- Multiple Benchmarks: 9 tests ✅
-- Delta Indicators: 7 tests ✅
-- Rolling Returns: 8 tests ✅
+- `backtest.py`: 95% coverage (metrics, caching, DCA, IRR, rolling Sharpe)
+- `app/` package: 82% coverage (presets, benchmarks, rolling returns, downloads)
+- `tests/test_ticker_data.py`: exhaustive coverage of search & formatting utilities
+- Integration suite: regression safety net for CLI workflows and validation flows
 
 ## Performance Metrics
 
@@ -205,11 +188,14 @@ Price data is automatically cached in `.cache/` for faster repeated backtests:
 
 ```
 portfolio-backtester/
-├── app.py                # Streamlit web UI (~700 lines, ENHANCED)
-├── backtest.py           # Main backtesting engine (~450 lines, Phase 1 ENHANCED)
-├── plot_backtest.py      # Visualization helper (~354 lines, ENHANCED)
-├── test_app.py           # UI test suite (~933 lines, 62 tests) ✅
-├── test_backtest.py      # Engine test suite (~550 lines, 51 tests) ✅ Phase 1
+├── app.py                # Streamlit web UI wrapper
+├── backtest.py           # Main backtesting engine
+├── plot_backtest.py      # Visualization helper
+├── tests/                # Automated tests (208 total)
+│   ├── test_backtest.py      # Engine suite (92 tests)
+│   ├── test_app.py           # UI suite (63 tests)
+│   ├── test_ticker_data.py   # Ticker helper suite (32 tests)
+│   └── test_integration.py   # Integration suite (21 tests)
 ├── requirements.txt      # Python dependencies (includes streamlit, plotly)
 ├── README.md             # Comprehensive user documentation
 ├── PROJECT_SUMMARY.md    # This file
@@ -228,7 +214,7 @@ portfolio-backtester/
 - **Network access**: Required for initial data downloads via yfinance; cached data can be used offline.
 - **Output folders**: CSVs go to `results/`, charts to `charts/` (both gitignored).
 - **Cache folder**: Downloaded data cached in `.cache/` (gitignored).
-- **Testing**: Run `pytest -v` to verify all functionality (113 tests: 51 backtest + 62 UI, 100% passing, ~88% coverage).
+- **Testing**: Run `pytest -v` to verify all functionality (208 tests across backtest, UI, ticker data, and integration suites; 100% passing, ~88% coverage).
 - **Web UI**: Run `streamlit run app.py` for browser-based interface.
 - **Logging**: Diagnostic messages use Python's logging module with timestamps.
 - **Error messages**: Detailed, contextual error messages with actionable guidance.
@@ -255,9 +241,9 @@ This backtester has been significantly enhanced with:
    - Interactive Plotly Charts (hover tooltips for exact values)
    - Session state management for smooth UX
 
-7. **Comprehensive Test Suite**: **113 tests total, ~88% coverage** ✅
-   - UI test suite: 933 lines, 62 tests across 14 test classes
-   - Engine test suite: 550 lines, 51 tests across 10 test classes (**+28 Phase 1 tests**)
+7. **Comprehensive Test Suite**: **208 tests total, ~88% coverage** ✅
+   - UI test suite: ~1,000 lines, 63 tests across 14 test classes
+   - Engine test suite: ~1,400 lines, 92 tests across a dozen test classes
    - 100% pass rate, ~2 second runtime
    - Complete coverage of all 5 new UI features
 

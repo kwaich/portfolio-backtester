@@ -44,19 +44,19 @@ Core dependencies with minimum versions:
 ### Testing Setup
 
 ```bash
-# Run all tests (184 tests)
+# Run all tests (208 tests)
 pytest -v
 
-# Run only backtest tests (72 tests)
+# Run only backtest tests (92 tests)
 pytest tests/test_backtest.py -v
 
-# Run only UI tests (64 tests)
+# Run only UI tests (63 tests)
 pytest tests/test_app.py -v
 
 # Run only ticker data tests (32 tests)
 pytest tests/test_ticker_data.py -v
 
-# Run only integration tests (16 tests)
+# Run only integration tests (21 tests)
 pytest tests/test_integration.py -v
 
 # Run with coverage report
@@ -759,14 +759,14 @@ python backtest.py --tickers AAPL MSFT --weights 0.6 0.4 --benchmark SPY
 # Plot results (CLI)
 python plot_backtest.py --csv results/backtest.csv --output charts/test
 
-# Run ALL tests (184 tests)
+# Run ALL tests (208 tests)
 pytest -v
 
 # Run tests by module
-pytest tests/test_backtest.py -v     # 72 tests
-pytest tests/test_app.py -v          # 64 tests
+pytest tests/test_backtest.py -v     # 92 tests
+pytest tests/test_app.py -v          # 63 tests
 pytest tests/test_ticker_data.py -v  # 32 tests
-pytest tests/test_integration.py -v  # 16 tests
+pytest tests/test_integration.py -v  # 21 tests
 
 # Check test coverage
 pytest --cov=backtest --cov=app --cov-report=term-missing

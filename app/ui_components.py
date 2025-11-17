@@ -33,9 +33,9 @@ def format_metric_value(key: str, value: float) -> str:
         >>> format_metric_value("sharpe_ratio", 1.234)
         '1.234'
     """
-    if key == "ending_value":
+    if key == "ending_value" or key == "total_contributions":
         return f"${value:,.2f}"
-    elif key in ["total_return", "cagr", "volatility", "max_drawdown"]:
+    elif key in ["total_return", "cagr", "irr", "volatility", "max_drawdown"]:
         return f"{value:.2%}"
     elif key in ["sharpe_ratio", "sortino_ratio"]:
         return f"{value:.3f}"
@@ -131,7 +131,17 @@ def render_relative_metrics(
         delta=f"{excess_cagr:.2%}",
         delta_color="normal"
     )
-    
+
+    # Excess IRR (only if both have IRR - for DCA strategies)
+    if "irr" in portfolio_summary and "irr" in benchmark_summary:
+        excess_irr = portfolio_summary["irr"] - benchmark_summary["irr"]
+        st.metric(
+            "Excess IRR",
+            f"{excess_irr:.2%}",
+            delta=f"{excess_irr:.2%}",
+            delta_color="normal"
+        )
+
     # Volatility Difference (inverse - lower is better)
     vol_diff = portfolio_summary["volatility"] - benchmark_summary["volatility"]
     st.metric(

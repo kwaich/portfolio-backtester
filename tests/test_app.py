@@ -32,10 +32,12 @@ class TestMetricLabels:
             "ending_value": "Ending Value",
             "total_return": "Total Return",
             "cagr": "CAGR",
+            "irr": "IRR",  # Optional metric for DCA strategies
             "volatility": "Volatility",
             "sharpe_ratio": "Sharpe Ratio",
             "sortino_ratio": "Sortino Ratio",
-            "max_drawdown": "Max Drawdown"
+            "max_drawdown": "Max Drawdown",
+            "total_contributions": "Total Contributions"  # Internal metric for DCA tracking
         }
 
         # Ensure all summary keys have labels
@@ -99,7 +101,8 @@ class TestBacktestIntegration:
         # Verify all expected keys exist (using lowercase underscore format)
         expected_keys = {
             'ending_value', 'total_return', 'cagr',
-            'volatility', 'sharpe_ratio', 'sortino_ratio', 'max_drawdown'
+            'volatility', 'sharpe_ratio', 'sortino_ratio', 'max_drawdown',
+            'total_contributions'  # Added for DCA tracking
         }
         assert set(portfolio_summary.keys()) == expected_keys
         assert set(benchmark_summary.keys()) == expected_keys

@@ -20,10 +20,10 @@ This is a lightweight Python-based ETF backtesting utility that allows users to:
 **Primary Use Case**: Testing portfolio allocations (default: VDCP.L/VHYD.L vs VWRA.L benchmark)
 
 **Current Status**:
-- **Version**: v2.2.0-dev (Unreleased - 2025-11-15)
-- **Test Coverage**: ~88% (184 tests, 100% passing)
-- **Progress**: 87.5% complete (14/16 tasks)
-- **Branch**: claude/make-ticker-searchable-01Nb4CzjMJBJ9y2PugkUtCW7
+- **Version**: v2.3.0-dev (Unreleased - 2025-11-17)
+- **Test Coverage**: ~88% (204 tests, 100% passing)
+- **Progress**: DCA feature complete with IRR, weekend handling, and corrected metrics
+- **Branch**: claude/add-dca-backtest-011xDT3WNDnDov3hKvDZa8cA
 
 ---
 
@@ -43,10 +43,10 @@ portfolio-backtester/
 │   └── main.py               # Application orchestration
 ├── backtest.py               # Core backtesting engine (830 lines - Phases 1 & 3)
 ├── plot_backtest.py          # Visualization utility (395 lines - Phases 2 & 3)
-├── tests/                    # Test suite (184 tests, ~88% coverage)
+├── tests/                    # Test suite (204 tests, ~88% coverage)
 │   ├── conftest.py           # pytest configuration
-│   ├── test_backtest.py      # Unit tests for backtest.py (72 tests)
-│   ├── test_app.py           # Unit tests for app.py UI (64 tests)
+│   ├── test_backtest.py      # Unit tests for backtest.py (88 tests - includes DCA & IRR)
+│   ├── test_app.py           # Unit tests for app.py UI (63 tests - includes DCA metrics)
 │   ├── test_ticker_data.py   # Unit tests for ticker_data.py (32 tests)
 │   └── test_integration.py   # Integration tests (16 tests)
 ├── requirements.txt          # Python dependencies (includes requests)
@@ -77,22 +77,27 @@ portfolio-backtester/
 **Purpose**: Download prices, compute metrics, calculate statistics
 
 **Key Functions**:
-- `parse_args()`: CLI argument parsing with validation
+- `parse_args()`: CLI argument parsing with validation (includes DCA arguments)
 - `download_prices()`: Fetch prices with batch caching & retry logic (Phase 1 & 3)
 - `validate_price_data()`: Data quality validation (Phase 3)
-- `compute_metrics()`: Calculate portfolio vs benchmark metrics with minimum data checks
-- `summarize()`: Generate comprehensive statistics (Sharpe, Sortino, drawdown, etc.)
-- `main()`: Orchestrate the backtest workflow
+- `compute_metrics()`: Calculate portfolio vs benchmark metrics with minimum data checks (DCA-aware)
+- `_calculate_dca_portfolio()`: DCA contribution logic with weekend/holiday handling
+- `summarize()`: Generate comprehensive statistics (Sharpe, Sortino, drawdown, IRR for DCA, etc.)
+- `_calculate_xirr()`: Time-weighted IRR calculation using Newton-Raphson method
+- `main()`: Orchestrate the backtest workflow (DCA-aware)
 
 **Phase Enhancements**:
 - **Phase 1**: Cache expiration (TTL), retry logic (exponential backoff), ticker/date validation
 - **Phase 3**: Batch download optimization (per-ticker caching), data quality validation
+- **DCA Phase**: Dollar-Cost Averaging support, IRR calculation, weekend/holiday handling, contribution-adjusted metrics
 
 **Key Patterns**:
 - Weight normalization (always sum to 1.0)
 - Date alignment (common start date across all series)
 - Forward-fill for missing data
 - MD5-based caching (tickers + date range)
+- DCA weekend handling: next available trading day
+- Contribution-adjusted returns: `(value_change - contribution_change) / previous_value`
 
 #### 2. Web UI (app/ package - 8 modules, 1,695 lines)
 
@@ -118,6 +123,7 @@ portfolio-backtester/
 - Rolling returns (30/90/180-day windows)
 - Rolling 12-month Sharpe ratio chart (252-day window for risk-adjusted performance tracking)
 - Rebalancing strategies (buy-and-hold, daily, weekly, monthly, quarterly, yearly)
+- **Dollar-Cost Averaging (DCA)**: Regular contributions at configurable intervals (daily, weekly, monthly, quarterly, yearly)
 - Logarithmic scale toggle for portfolio value charts
 - CSV & HTML export
 
@@ -155,21 +161,24 @@ portfolio-backtester/
 - **Phase 2**: Logging instead of print statements
 - **Phase 3**: Data quality validation (min 2 rows, NaN checks)
 
-#### 4. Testing Infrastructure (4 test files, 184 tests)
+#### 4. Testing Infrastructure (4 test files, 204 tests)
 
 **Test Coverage**: ~88% overall, 100% pass rate
 
 **Test Files** (in `tests/` directory):
-- **tests/test_backtest.py** (72 tests): Unit tests for backtest engine
+- **tests/test_backtest.py** (88 tests): Unit tests for backtest engine
   - Cache expiration, retry logic, ticker/date validation
   - Batch downloads, data quality validation
   - Rolling 12-month Sharpe ratio calculation and edge cases
-  - 11 test classes covering all major functions
+  - **DCA tests**: Monthly/weekly contributions, multi-ticker, price decline, precedence, weekend handling
+  - **IRR/XIRR tests**: Basic calculation, multiple contributions, negative/zero returns, convergence
+  - 13 test classes covering all major functions
 
-- **tests/test_app.py** (64 tests): Unit tests for web UI
+- **tests/test_app.py** (63 tests): Unit tests for web UI
   - Portfolio presets, date presets, multiple benchmarks
   - Delta indicators, rolling returns, metric formatting
   - Portfolio composition with ticker names (fetched from yfinance)
+  - **DCA metrics**: IRR and total_contributions display
   - 14 test classes with comprehensive coverage
 
 - **tests/test_ticker_data.py** (32 tests): Unit tests for ticker search and name fetching
@@ -319,7 +328,7 @@ python backtest.py --tickers AAPL MSFT --weights 0.6 0.4 --benchmark SPY
 # Plot results
 python plot_backtest.py --csv results/backtest.csv --output charts/test
 
-# Run all tests (184 tests)
+# Run all tests (204 tests)
 pytest -v
 
 # Run with coverage
@@ -466,8 +475,8 @@ git commit -m "feat: add new_metric calculation"
 
 ---
 
-**Last Updated**: 2025-11-15
-**Version**: v2.2.0-dev (Unreleased)
-**Current Branch**: claude/make-ticker-searchable-01Nb4CzjMJBJ9y2PugkUtCW7
-**Test Coverage**: ~88% (179 tests, 100% passing)
-**Progress**: 87.5% complete (14/16 tasks, Phase 4 in progress)
+**Last Updated**: 2025-11-17
+**Version**: v2.3.0-dev (Unreleased)
+**Current Branch**: claude/add-dca-backtest-011xDT3WNDnDov3hKvDZa8cA
+**Test Coverage**: ~88% (204 tests, 100% passing)
+**Progress**: DCA feature complete with IRR, weekend handling, and corrected metrics
