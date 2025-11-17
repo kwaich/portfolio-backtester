@@ -2,6 +2,9 @@
 
 This module provides functions for rendering metrics, tables, and other
 UI elements consistently throughout the application.
+
+Widget state management has been simplified to use StateManager's
+centralized widget state API, reducing complexity.
 """
 
 from __future__ import annotations
@@ -13,6 +16,7 @@ import pandas as pd
 
 from .config import METRIC_LABELS
 from .ticker_data import get_all_tickers, format_ticker_option, search_tickers_with_yahoo, get_ticker_name
+from .state_manager import StateManager
 
 
 def format_metric_value(key: str, value: float) -> str:
@@ -217,6 +221,8 @@ def render_searchable_ticker_input(
     - Click 🔍 Search button to find matching tickers
     - Click any result to populate the field
 
+    Uses StateManager for simplified widget state (single key instead of 3).
+
     Args:
         label: Label for the input field
         default_value: Default ticker value
@@ -230,22 +236,32 @@ def render_searchable_ticker_input(
         >>> ticker = render_searchable_ticker_input("Portfolio Ticker 1", "AAPL")
         # User can type "AAPL" directly or "apple" then search
     """
-    # Create unique keys for widgets
-    input_key = f"{key}_input" if key else None
-    search_key = f"{key}_search" if key else None
-    pending_key = f"{key}_pending" if key else None
+    if not key:
+        # If no key provided, fall back to simple text input
+        return st.text_input(
+            label,
+            value=default_value,
+            help=help_text or "Enter ticker symbol",
+            placeholder="e.g., AAPL"
+        ).strip().upper()
 
-    # Check for pending ticker selection (from previous run)
-    if key and pending_key and pending_key in st.session_state:
-        pending_ticker = st.session_state[pending_key]
-        del st.session_state[pending_key]
-        # Set the value BEFORE creating the widget
-        if input_key:
-            st.session_state[input_key] = pending_ticker
+    # Get widget state from StateManager (single dict instead of 3 separate keys)
+    widget_state = StateManager.get_widget_state(key, {
+        'value': default_value,
+        'show_search': False,
+        'pending_value': None
+    })
 
-    # Initialize the text input's session state if needed
-    if key and input_key and input_key not in st.session_state:
-        st.session_state[input_key] = default_value
+    # Handle pending ticker selection (from previous run)
+    if widget_state.get('pending_value'):
+        widget_state['value'] = widget_state['pending_value']
+        widget_state['pending_value'] = None
+        widget_state['show_search'] = False
+        StateManager.set_widget_state(key, widget_state)
+
+    # Create unique keys for Streamlit widgets
+    input_key = f"{key}_input"
+    search_key = f"{key}_search"
 
     # Text input for ticker
     col1, col2 = st.columns([3, 1])
@@ -253,6 +269,7 @@ def render_searchable_ticker_input(
     with col1:
         ticker_input = st.text_input(
             label,
+            value=widget_state['value'],
             key=input_key,
             help=help_text or "Enter ticker symbol or company name, then click 🔍 to search",
             placeholder="e.g., AAPL, apple, vanguard"
@@ -264,9 +281,9 @@ def render_searchable_ticker_input(
         search_clicked = st.button("🔍 Search", key=search_key, use_container_width=True)
 
     # If search button clicked, show search interface
-    if search_clicked or (key and st.session_state.get(f"{key}_show_search", False)):
-        if key:
-            st.session_state[f"{key}_show_search"] = True
+    if search_clicked or widget_state.get('show_search', False):
+        widget_state['show_search'] = True
+        StateManager.set_widget_state(key, widget_state)
 
         # Use the ticker input value as the search query
         search_query = ticker_input.strip()
@@ -281,14 +298,14 @@ def render_searchable_ticker_input(
                 # Display results as clickable buttons
                 for idx, (ticker, name) in enumerate(results):
                     # Use index to ensure unique keys even if ticker appears multiple times
-                    button_key = f"{key}_result_{idx}_{ticker}" if key else None
+                    button_key = f"{key}_result_{idx}_{ticker}"
                     display_text = f"{ticker} - {name}"
 
                     if st.button(display_text, key=button_key, use_container_width=True):
-                        # Store ticker in pending state for next run
-                        if key and pending_key:
-                            st.session_state[pending_key] = ticker
-                            st.session_state[f"{key}_show_search"] = False
+                        # Store ticker in widget state for next run
+                        widget_state['pending_value'] = ticker
+                        widget_state['show_search'] = False
+                        StateManager.set_widget_state(key, widget_state)
                         st.rerun()
             else:
                 st.warning(f"No results found for '{search_query}'. Try a different search term.")
@@ -298,9 +315,9 @@ def render_searchable_ticker_input(
             st.info("Enter at least 2 characters to search")
 
         # Close search button
-        if st.button("✕ Close Search", key=f"{key}_close" if key else None):
-            if key:
-                st.session_state[f"{key}_show_search"] = False
+        if st.button("✕ Close Search", key=f"{key}_close"):
+            widget_state['show_search'] = False
+            StateManager.set_widget_state(key, widget_state)
             st.rerun()
 
     return ticker_input.strip().upper() if ticker_input else ""
