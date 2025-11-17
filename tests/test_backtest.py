@@ -831,8 +831,8 @@ class TestDownloadPrices:
         original_get_cache_path = backtest.get_cache_path
         def get_cache_path_wrapper(tickers, *args, **kwargs):
             result = original_get_cache_path(tickers, *args, **kwargs)
-            # Store ticker info in path name for identification
-            result = Path(str(result).replace('.pkl', f'_{tickers[0]}.pkl'))
+            # Store ticker info in path name for identification (Parquet format uses no extension)
+            result = Path(f"{result}_{tickers[0]}")
             return result
 
         with patch("backtest.get_cache_path", side_effect=get_cache_path_wrapper):
@@ -865,7 +865,8 @@ class TestDownloadPrices:
         original_get_cache_path = backtest.get_cache_path
         def get_cache_path_wrapper(tickers, *args, **kwargs):
             result = original_get_cache_path(tickers, *args, **kwargs)
-            result = Path(str(result).replace('.pkl', f'_{tickers[0]}.pkl'))
+            # Store ticker info in path name for identification (Parquet format uses no extension)
+            result = Path(f"{result}_{tickers[0]}")
             return result
 
         # Mock yfinance download for uncached ticker
