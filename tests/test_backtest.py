@@ -1204,6 +1204,34 @@ class TestDCA:
         # Verify no contributions were skipped due to weekends
         assert cumulative_contributions.iloc[-1] == 22000.0
 
+    def test_daily_dca_preserves_weekend_contributions(self):
+        dates = pd.date_range("2023-06-01", "2023-06-10", freq="D")
+        trading_days = pd.bdate_range(dates[0], dates[-1] + pd.Timedelta(days=2))
+
+        prices = pd.DataFrame({
+            "AAPL": [100.0] * len(trading_days)
+        }, index=trading_days)
+
+        weights = np.array([1.0])
+        capital = 1000
+        dca_amount = 100
+
+        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(
+            prices,
+            weights,
+            capital,
+            dca_amount,
+            "D"
+        )
+
+        contrib_changes = cumulative_contributions.diff().fillna(cumulative_contributions.iloc[0])
+        monday = pd.Timestamp("2023-06-05")  # Sat/Sun + Monday contributions
+        assert contrib_changes.loc[monday] == pytest.approx(300, abs=1e-9)
+
+        calendar_days = (prices.index[-1] - prices.index[0]).days + 1
+        expected_total = capital + dca_amount * (calendar_days - 1)
+        assert cumulative_contributions.iloc[-1] == expected_total
+
     def test_xirr_calculation_basic(self):
         """Test basic XIRR calculation with known cashflows"""
         # Simple case: invest $1000, get $1100 back after 365 days = 10% return

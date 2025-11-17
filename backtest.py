@@ -724,16 +724,23 @@ def _calculate_dca_portfolio(
     if prices.index[0] not in dca_dates:
         dca_dates = dca_dates.insert(0, prices.index[0])
 
-    # Map DCA dates to actual trading days (handle weekends/holidays)
-    # If a DCA date falls on a weekend/holiday, use the next available trading day
-    actual_dca_dates = []
-    for dca_date in dca_dates:
-        # Find the next available trading day on or after the DCA date
-        available_dates = prices.index[prices.index >= dca_date]
-        if len(available_dates) > 0:
-            actual_dca_dates.append(available_dates[0])
+    dca_dates_raw = pd.DatetimeIndex(dca_dates)
 
-    dca_dates = pd.DatetimeIndex(actual_dca_dates).unique()  # Remove duplicates
+    # Map DCA dates to actual trading days (handle weekends/holidays) and preserve frequency
+    # Aggregate contributions that fall on the same trading session so no scheduled
+    # contribution is lost (e.g., weekend contributions both hit Monday)
+    contribution_schedule: dict[pd.Timestamp, float] = {}
+    for dca_date in dca_dates_raw:
+        contribution = capital if dca_date == prices.index[0] else dca_amount
+
+        available_dates = prices.index[prices.index >= dca_date]
+        if len(available_dates) == 0:
+            continue
+
+        actual_date = available_dates[0]
+        contribution_schedule[actual_date] = contribution_schedule.get(actual_date, 0.0) + contribution
+
+    dca_dates = pd.DatetimeIndex(sorted(contribution_schedule.keys()))
 
     if len(dca_dates) == 0:
         logger.warning(f"No DCA dates found for frequency '{dca_freq}'. Using lump sum.")
@@ -754,9 +761,8 @@ def _calculate_dca_portfolio(
     # Process each date
     for date in prices.index:
         # Check if we have a contribution on this date
-        if date in dca_dates:
-            # Determine contribution amount (initial capital on first date, then DCA amount)
-            contribution = capital if date == prices.index[0] else dca_amount
+        contribution = contribution_schedule.get(date)
+        if contribution is not None:
             total_invested += contribution
 
             # Buy shares according to target weights at current prices
@@ -774,11 +780,13 @@ def _calculate_dca_portfolio(
         portfolio_values[date] = current_value
         cumulative_contributions[date] = total_invested
 
-    total_contributions = capital + (dca_amount * (len(dca_dates) - 1))
+    total_contributions = sum(contribution_schedule.values())
+    num_calendar_events = len(dca_dates_raw)
+    num_trading_days = len(dca_dates)
     logger.info(
         f"DCA strategy '{dca_freq}': "
-        f"{len(dca_dates)} contributions (initial ${capital:,.2f} + "
-        f"{len(dca_dates) - 1} × ${dca_amount:,.2f} = ${total_contributions:,.2f} total)"
+        f"{num_calendar_events} scheduled contributions mapped to {num_trading_days} trading days "
+        f"= ${total_contributions:,.2f} total"
     )
 
     return portfolio_values, cumulative_contributions
