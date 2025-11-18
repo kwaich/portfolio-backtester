@@ -540,6 +540,7 @@ The codebase follows professional conventions and best practices:
 - pytest >= 7.0.0 (for testing)
 - streamlit >= 1.28.0 (for web UI)
 - plotly >= 5.14.0 (for interactive charts)
+- pyarrow >= 10.0.0 (for secure Parquet cache storage)
 
 ## Data Source
 

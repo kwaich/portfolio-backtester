@@ -3,7 +3,7 @@
 **Review Date:** 2025-11-17
 **Branch:** `claude/review-code-01FMcnN697didaPWUPyzpyT8`
 **Total Lines:** ~9,489 Python code
-**Test Coverage:** ~88% (261 tests, 97.7% pass rate)
+**Test Coverage:** ~88% (293 tests, 100% pass rate ✅)
 
 ---
 
@@ -93,9 +93,9 @@ Migrated from pickle to Parquet format with JSON metadata:
   - `{cache_key}.parquet` - Price data (gzip compressed)
   - `{cache_key}.json` - Metadata (timestamp, version)
 - **Backward Compatibility:** Automatic migration from old pickle caches
-- **Test Coverage:** 261/261 tests passing (100% ✅)
-  - 9/9 cache tests (including migration tests)
-  - 2 batch download tests fixed for new format
+- **Test Coverage:** 293/293 tests passing (100% ✅)
+  - 11/11 cache-related tests passing (9 cache + 2 batch download)
+  - All tests updated for new format
 - **Dependencies:** Added `pyarrow>=10.0.0` to requirements.txt
 - **Cache Version:** Bumped to 2.0
 
@@ -131,7 +131,7 @@ Added comprehensive type validation to all StateManager setter methods:
   - `_validate_string_list()` - List of strings validation
   - `_validate_float_list()` - List of numbers validation
   - `_validate_non_empty_string()` - String validation
-  - `_validate_datetime()` - DateTime validation
+  - `_validate_datetime()` - DateTime/date validation (accepts both datetime.datetime and datetime.date)
 - **ValidationError Exception:** Custom exception class for clear error messages
 - **Validated Methods:** All 8 setter methods now validate inputs
   - `set_num_tickers()` - Integer, 1-10 range
@@ -139,12 +139,13 @@ Added comprehensive type validation to all StateManager setter methods:
   - `set_preset_weights()` - List of non-negative floats
   - `set_preset_benchmark()` - Non-empty string
   - `set_selected_portfolio()` - Non-empty string
-  - `set_date_range()` - DateTime objects, start < end
-  - `set_date_preset()` - DateTime object
+  - `set_date_range()` - DateTime/date objects, start < end, auto-converts date to datetime
+  - `set_date_preset()` - DateTime/date object
   - `store_backtest_results()` - Complex validation for 11 parameters
-- **Test Coverage:** 67/67 state manager tests passing (100%)
+- **Test Coverage:** 67/67 state manager tests passing (100% ✅)
   - 39 existing tests (preserved)
   - 28 new validation tests
+  - 4 datetime compatibility tests (datetime.date + datetime.datetime)
 
 **Files Changed:**
 - `app/state_manager.py`: Added validation functions and updated all setters

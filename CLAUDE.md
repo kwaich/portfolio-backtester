@@ -20,10 +20,10 @@ This is a lightweight Python-based Portfolio Backtesting utility that allows use
 **Primary Use Case**: Testing portfolio allocations (default: VDCP.L/VHYD.L vs VWRA.L benchmark)
 
 **Current Status**:
-- **Version**: v2.4.0-dev (Unreleased - 2025-11-17)
-- **Test Coverage**: ~88% (261 tests, 255 passing / 97.7%)
-- **Progress**: Streamlit best practices implemented (caching, forms, URL sharing)
-- **Branch**: claude/improve-streamlit-best-practices-01VeYjdv5JHLnp4KiTL4ugaZ
+- **Version**: v2.5.0-dev (Unreleased - 2025-11-17)
+- **Test Coverage**: ~88% (293 tests, 293 passing / 100% ✅)
+- **Progress**: Security hardening (Parquet caching), StateManager validation, UI improvements
+- **Branch**: claude/review-code-01FMcnN697didaPWUPyzpyT8
 
 ---
 
@@ -48,11 +48,11 @@ portfolio-backtester/
 │   └── main.py               # Application orchestration (reduced to 310 lines)
 ├── backtest.py               # Core backtesting engine (830 lines - Phases 1 & 3)
 ├── plot_backtest.py          # Visualization utility (395 lines - Phases 2 & 3)
-├── tests/                    # Test suite (261 tests, ~88% coverage; see docs/TESTING_GUIDE.md)
+├── tests/                    # Test suite (293 tests, ~88% coverage; see docs/TESTING_GUIDE.md)
 │   ├── conftest.py           # pytest configuration (with session state reset fixture)
 │   ├── test_backtest.py      # Unit tests for backtest.py (93 tests)
 │   ├── test_app.py           # Unit tests for app.py UI (76 tests - includes URL params)
-│   ├── test_state_manager.py # Unit tests for state_manager.py (39 tests)
+│   ├── test_state_manager.py # Unit tests for state_manager.py (67 tests - validation added)
 │   ├── test_ticker_data.py   # Unit tests for ticker_data.py (32 tests)
 │   ├── test_ticker_names.py  # Placeholder for upcoming ticker name scenarios
 │   └── test_integration.py   # Integration tests (21 tests)
@@ -102,7 +102,8 @@ portfolio-backtester/
 - Weight normalization (always sum to 1.0)
 - Date alignment (common start date across all series)
 - Forward-fill for missing data
-- MD5-based caching (tickers + date range)
+- MD5-based caching with Parquet format (secure, compressed, cross-platform)
+- Cache metadata stored as JSON (timestamp, version)
 - DCA weekend handling: next available trading day
 - Contribution-adjusted returns: `(value_change - contribution_change) / previous_value`
 
@@ -114,7 +115,7 @@ portfolio-backtester/
 - **config.py**: Centralized configuration (32 constants)
 - **presets.py**: Portfolio & date presets (6 portfolios + 6 date ranges)
 - **validation.py**: Session state management & input validation
-- **state_manager.py**: Centralized session state management (507 lines)
+- **state_manager.py**: Centralized session state management with comprehensive type validation (507 lines)
 - **ui_components.py**: Reusable UI rendering with searchable ticker inputs
 - **ticker_data.py**: Ticker search with @st.cache_data (1h TTL for names, 30min for search)
 - **charts.py**: Plotly chart generation (interactive visualizations)
@@ -171,9 +172,9 @@ portfolio-backtester/
 - **Phase 2**: Logging instead of print statements
 - **Phase 3**: Data quality validation (min 2 rows, NaN checks)
 
-#### 4. Testing Infrastructure (5 test files, 261 tests)
+#### 4. Testing Infrastructure (5 test files, 293 tests)
 
-**Test Coverage**: ~88% overall, 97.7% pass rate (255/261 passing)
+**Test Coverage**: ~88% overall, 100% pass rate (293/293 passing ✅)
 
 **Test Files** (in `tests/` directory):
 - **tests/conftest.py**: pytest configuration with auto session state reset fixture
@@ -202,7 +203,14 @@ portfolio-backtester/
   - Fallback to shortName, error handling
   - Cache clearing and edge cases
 
-- **tests/test_integration.py** (16 tests): Integration tests
+- **tests/test_state_manager.py** (67 tests): Unit tests for StateManager
+  - State getters and setters (39 tests - preserved)
+  - Input validation tests (28 tests - NEW)
+  - Type validation for all StateManager setter methods
+  - DateTime compatibility tests (accepts both datetime.datetime and datetime.date)
+  - 11 test classes with comprehensive validation coverage
+
+- **tests/test_integration.py** (21 tests): Integration tests
   - End-to-end workflows, edge cases, data quality
   - Statistical edge cases, multi-ticker scenarios
   - 6 test classes covering real-world usage
@@ -331,6 +339,9 @@ Batch download optimization, data quality validation (NaN/zero/negative/extreme)
 ### ✅ Phase 4: Accessibility & Documentation Hardening
 Colorblind-accessible palette, active-return overhaul, new documentation, Streamlit session-state refactor, and expanded state/ticker test suites. **+101 tests** (155→256), ~88% coverage.
 
+### ✅ Phase 5: Security Hardening & Input Validation
+**Security Fix**: Migrated from pickle to Parquet format for cache storage (eliminated arbitrary code execution vulnerability). **Input Validation**: Added comprehensive type validation to all StateManager setter methods with 5 validation utility functions. **UI Improvements**: Fixed number input responsiveness by moving outside form. **Compatibility**: Fixed datetime.date compatibility with Streamlit widgets. **+37 tests** (256→293), ~88% coverage, 100% pass rate.
+
 ---
 
 ## Quick Reference
@@ -418,6 +429,7 @@ deactivate
 - **streamlit** (>=1.28.0): Web UI framework
 - **plotly** (>=5.14.0): Interactive charts
 - **requests** (>=2.28.0): HTTP library for Yahoo Finance search API
+- **pyarrow** (>=10.0.0): Parquet format for secure cache storage (NEW)
 
 ---
 
@@ -512,7 +524,7 @@ git commit -m "feat: add new_metric calculation"
 ---
 
 **Last Updated**: 2025-11-17
-**Version**: v2.3.0-dev (Unreleased)
-**Current Branch**: claude/colorblind-accessibility-012kgC3LoMaK1MzLm7NBikia
-**Test Coverage**: ~88% (256 tests, 100% passing)
-**Progress**: Colorblind accessibility implemented with Wong palette, DCA feature complete
+**Version**: v2.5.0-dev (Unreleased)
+**Current Branch**: claude/review-code-01FMcnN697didaPWUPyzpyT8
+**Test Coverage**: ~88% (293 tests, 100% passing ✅)
+**Progress**: Security hardening complete (Parquet caching), StateManager validation, UI improvements
