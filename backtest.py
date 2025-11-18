@@ -16,8 +16,8 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import logging
-import pickle
 import re
 import sys
 import time
@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 # Constants
 TRADING_DAYS_PER_YEAR = 252
 DEFAULT_CACHE_TTL_HOURS = 24
-CACHE_VERSION = "1.0"
+CACHE_VERSION = "2.0"  # v2.0: Parquet format (was pickle in v1.0)
 
 
 def retry_with_backoff(
@@ -287,51 +287,102 @@ def get_cache_key(tickers: List[str], start: str, end: str) -> str:
 
 
 def get_cache_path(tickers: List[str], start: str, end: str) -> Path:
-    """Get the cache file path for the given parameters."""
+    """Get the cache file path for the given parameters.
+
+    Returns the base path (without extension). Actual files will be:
+    - {cache_path}.parquet - Price data
+    - {cache_path}.json - Metadata (timestamp, version)
+    """
     cache_dir = Path(".cache")
     cache_dir.mkdir(exist_ok=True)
     cache_key = get_cache_key(tickers, start, end)
-    return cache_dir / f"{cache_key}.pkl"
+    return cache_dir / cache_key
 
 
 def load_cached_prices(cache_path: Path, max_age_hours: int = DEFAULT_CACHE_TTL_HOURS) -> pd.DataFrame | None:
     """Load cached price data if it exists and is not stale.
 
+    Uses Parquet format for data and JSON for metadata (more secure than pickle).
+
     Args:
-        cache_path: Path to cache file
+        cache_path: Base path to cache files (without extension)
         max_age_hours: Maximum age of cache in hours (default: 24)
 
     Returns:
         DataFrame if cache is valid and fresh, None otherwise
     """
-    if not cache_path.exists():
+    parquet_path = cache_path.with_suffix('.parquet')
+    metadata_path = cache_path.with_suffix('.json')
+    old_pickle_path = cache_path.with_suffix('.pkl')
+
+    # Handle migration from old pickle format
+    if old_pickle_path.exists() and not parquet_path.exists():
+        logger.warning(f"Old pickle cache detected at {old_pickle_path}, migrating to Parquet")
+        try:
+            # Load old pickle cache
+            with open(old_pickle_path, "rb") as f:
+                import pickle
+                cache_data = pickle.load(f)
+
+            # Extract data (handle both dict and DataFrame formats)
+            if isinstance(cache_data, dict) and "data" in cache_data:
+                df = cache_data["data"]
+                timestamp = cache_data.get("timestamp", time.time())
+            elif isinstance(cache_data, pd.DataFrame):
+                df = cache_data
+                timestamp = time.time()
+            else:
+                raise ValueError("Unknown pickle cache format")
+
+            # Save in new format
+            df.to_parquet(parquet_path, compression='gzip', index=True)
+            metadata = {"timestamp": timestamp, "version": CACHE_VERSION}
+            with open(metadata_path, 'w') as f:
+                json.dump(metadata, f)
+
+            # Delete old pickle cache
+            old_pickle_path.unlink()
+            logger.info(f"Migrated pickle cache to Parquet: {parquet_path}")
+
+        except Exception as e:
+            logger.warning(f"Failed to migrate old cache: {e}")
+            try:
+                old_pickle_path.unlink()
+            except:
+                pass
+            return None
+
+    # Check if Parquet cache exists
+    if not parquet_path.exists() or not metadata_path.exists():
         return None
 
     try:
-        with open(cache_path, "rb") as f:
-            cache_data = pickle.load(f)
-
-        # Handle old cache format (migration from plain DataFrame)
-        if isinstance(cache_data, pd.DataFrame):
-            logger.warning(f"Old cache format detected at {cache_path}, will re-download")
-            cache_path.unlink()  # Delete old format cache
-            return None
+        # Load metadata
+        with open(metadata_path, 'r') as f:
+            metadata = json.load(f)
 
         # Check cache age
-        cache_age_hours = (time.time() - cache_data["timestamp"]) / 3600
+        cache_age_hours = (time.time() - metadata["timestamp"]) / 3600
         if cache_age_hours > max_age_hours:
             logger.info(f"Cache expired (age: {cache_age_hours:.1f}h, max: {max_age_hours}h)")
-            cache_path.unlink()  # Delete stale cache
+            parquet_path.unlink()
+            metadata_path.unlink()
             return None
 
-        logger.info(f"Loaded cached data (age: {cache_age_hours:.1f}h from {cache_path})")
-        return cache_data["data"]
+        # Load price data
+        df = pd.read_parquet(parquet_path)
+
+        logger.info(f"Loaded cached data (age: {cache_age_hours:.1f}h from {parquet_path})")
+        return df
 
     except Exception as e:
         logger.warning(f"Failed to load cache: {e}")
-        # Try to clean up corrupted cache file
+        # Try to clean up corrupted cache files
         try:
-            cache_path.unlink()
+            if parquet_path.exists():
+                parquet_path.unlink()
+            if metadata_path.exists():
+                metadata_path.unlink()
         except:
             pass
         return None
@@ -340,21 +391,38 @@ def load_cached_prices(cache_path: Path, max_age_hours: int = DEFAULT_CACHE_TTL_
 def save_cached_prices(cache_path: Path, prices: pd.DataFrame) -> None:
     """Save price data to cache with metadata.
 
+    Uses Parquet format for data and JSON for metadata (more secure than pickle).
+
     Args:
-        cache_path: Path where cache file will be saved
+        cache_path: Base path where cache files will be saved (without extension)
         prices: DataFrame containing price data to cache
     """
+    parquet_path = cache_path.with_suffix('.parquet')
+    metadata_path = cache_path.with_suffix('.json')
+
     try:
-        cache_data = {
-            "data": prices,
+        # Save price data as Parquet (compressed)
+        prices.to_parquet(parquet_path, compression='gzip', index=True)
+
+        # Save metadata as JSON
+        metadata = {
             "timestamp": time.time(),
             "version": CACHE_VERSION
         }
-        with open(cache_path, "wb") as f:
-            pickle.dump(cache_data, f, protocol=pickle.HIGHEST_PROTOCOL)
-        logger.info(f"Saved data to cache: {cache_path}")
+        with open(metadata_path, 'w') as f:
+            json.dump(metadata, f)
+
+        logger.info(f"Saved data to cache: {parquet_path}")
     except Exception as e:
         logger.warning(f"Failed to save cache: {e}")
+        # Clean up partial saves
+        try:
+            if parquet_path.exists():
+                parquet_path.unlink()
+            if metadata_path.exists():
+                metadata_path.unlink()
+        except:
+            pass
 
 
 @retry_with_backoff(max_retries=3, base_delay=2.0)

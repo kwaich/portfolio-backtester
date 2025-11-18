@@ -39,7 +39,7 @@ streamlit_mock.query_params = {}
 streamlit_mock.session_state = {}
 sys.modules['streamlit'] = streamlit_mock
 
-from app.state_manager import StateManager, StateKeys
+from app.state_manager import StateManager, StateKeys, ValidationError
 
 
 class TestStateKeys:
@@ -553,3 +553,300 @@ class TestStateManagerEdgeCases:
         assert 'QQQ' in stored['all_benchmark_results']
         assert len(stored['tickers']) == 3
         assert len(stored['benchmarks']) == 3
+
+
+class TestStateManagerValidation:
+    """Test input validation for StateManager setters."""
+
+    def setup_method(self):
+        """Set up mock session state before each test."""
+        import streamlit as st
+        st.session_state = {}
+        StateManager.initialize()
+
+    def test_set_num_tickers_valid(self):
+        """set_num_tickers should accept valid positive integers."""
+        StateManager.set_num_tickers(5)
+        assert StateManager.get_num_tickers() == 5
+
+    def test_set_num_tickers_rejects_non_integer(self):
+        """set_num_tickers should reject non-integer values."""
+        with pytest.raises(ValidationError, match="must be an integer"):
+            StateManager.set_num_tickers("5")
+
+        with pytest.raises(ValidationError, match="must be an integer"):
+            StateManager.set_num_tickers(5.5)
+
+    def test_set_num_tickers_rejects_zero_or_negative(self):
+        """set_num_tickers should reject zero or negative values."""
+        with pytest.raises(ValidationError, match="must be at least 1"):
+            StateManager.set_num_tickers(0)
+
+        with pytest.raises(ValidationError, match="must be at least 1"):
+            StateManager.set_num_tickers(-1)
+
+    def test_set_num_tickers_rejects_too_large(self):
+        """set_num_tickers should reject values > 10."""
+        with pytest.raises(ValidationError, match="must be at most 10"):
+            StateManager.set_num_tickers(11)
+
+    def test_set_preset_tickers_valid(self):
+        """set_preset_tickers should accept valid list of strings."""
+        StateManager.set_preset_tickers(["AAPL", "MSFT", "GOOGL"])
+        assert StateManager.get_preset_tickers() == ["AAPL", "MSFT", "GOOGL"]
+
+    def test_set_preset_tickers_accepts_empty_list(self):
+        """set_preset_tickers should accept empty list."""
+        StateManager.set_preset_tickers([])
+        assert StateManager.get_preset_tickers() == []
+
+    def test_set_preset_tickers_rejects_non_list(self):
+        """set_preset_tickers should reject non-list values."""
+        with pytest.raises(ValidationError, match="must be a list"):
+            StateManager.set_preset_tickers("AAPL")
+
+        with pytest.raises(ValidationError, match="must be a list"):
+            StateManager.set_preset_tickers(("AAPL", "MSFT"))
+
+    def test_set_preset_tickers_rejects_non_string_elements(self):
+        """set_preset_tickers should reject lists with non-string elements."""
+        with pytest.raises(ValidationError, match="must be a string"):
+            StateManager.set_preset_tickers(["AAPL", 123, "GOOGL"])
+
+    def test_set_preset_tickers_rejects_empty_strings(self):
+        """set_preset_tickers should reject empty or whitespace-only strings."""
+        with pytest.raises(ValidationError, match="cannot be an empty string"):
+            StateManager.set_preset_tickers(["AAPL", "", "GOOGL"])
+
+        with pytest.raises(ValidationError, match="cannot be an empty string"):
+            StateManager.set_preset_tickers(["AAPL", "   ", "GOOGL"])
+
+    def test_set_preset_weights_valid(self):
+        """set_preset_weights should accept valid list of floats."""
+        StateManager.set_preset_weights([0.5, 0.3, 0.2])
+        assert StateManager.get_preset_weights() == [0.5, 0.3, 0.2]
+
+    def test_set_preset_weights_accepts_ints(self):
+        """set_preset_weights should accept integers."""
+        StateManager.set_preset_weights([1, 2, 3])
+        assert StateManager.get_preset_weights() == [1, 2, 3]
+
+    def test_set_preset_weights_rejects_non_list(self):
+        """set_preset_weights should reject non-list values."""
+        with pytest.raises(ValidationError, match="must be a list"):
+            StateManager.set_preset_weights(0.5)
+
+    def test_set_preset_weights_rejects_non_numeric(self):
+        """set_preset_weights should reject non-numeric elements."""
+        with pytest.raises(ValidationError, match="must be a number"):
+            StateManager.set_preset_weights([0.5, "0.3", 0.2])
+
+    def test_set_preset_weights_rejects_negative(self):
+        """set_preset_weights should reject negative weights."""
+        with pytest.raises(ValidationError, match="must be non-negative"):
+            StateManager.set_preset_weights([0.5, -0.3, 0.2])
+
+    def test_set_preset_benchmark_valid(self):
+        """set_preset_benchmark should accept valid ticker strings."""
+        StateManager.set_preset_benchmark("SPY")
+        assert StateManager.get_preset_benchmark() == "SPY"
+
+    def test_set_preset_benchmark_rejects_non_string(self):
+        """set_preset_benchmark should reject non-string values."""
+        with pytest.raises(ValidationError, match="must be a string"):
+            StateManager.set_preset_benchmark(123)
+
+    def test_set_preset_benchmark_rejects_empty(self):
+        """set_preset_benchmark should reject empty strings."""
+        with pytest.raises(ValidationError, match="cannot be empty"):
+            StateManager.set_preset_benchmark("")
+
+        with pytest.raises(ValidationError, match="cannot be empty"):
+            StateManager.set_preset_benchmark("   ")
+
+    def test_set_date_range_valid(self):
+        """set_date_range should accept valid date pairs."""
+        start = datetime(2020, 1, 1)
+        end = datetime(2021, 1, 1)
+        StateManager.set_date_range(start, end)
+        assert StateManager.get_start_date() == start
+        assert StateManager.get_end_date() == end
+
+    def test_set_date_range_rejects_non_datetime(self):
+        """set_date_range should reject non-datetime values."""
+        with pytest.raises(ValidationError, match="must be a datetime or date object"):
+            StateManager.set_date_range("2020-01-01", datetime(2021, 1, 1))
+
+        with pytest.raises(ValidationError, match="must be a datetime or date object"):
+            StateManager.set_date_range(datetime(2020, 1, 1), "2021-01-01")
+
+    def test_set_date_range_rejects_start_after_end(self):
+        """set_date_range should reject start_date >= end_date."""
+        with pytest.raises(ValidationError, match="must be before"):
+            StateManager.set_date_range(datetime(2021, 1, 1), datetime(2020, 1, 1))
+
+        with pytest.raises(ValidationError, match="must be before"):
+            StateManager.set_date_range(datetime(2020, 1, 1), datetime(2020, 1, 1))
+
+    def test_set_selected_portfolio_valid(self):
+        """set_selected_portfolio should accept valid portfolio names."""
+        StateManager.set_selected_portfolio("Tech Giants")
+        assert StateManager.get_selected_portfolio() == "Tech Giants"
+
+    def test_set_selected_portfolio_rejects_non_string(self):
+        """set_selected_portfolio should reject non-string values."""
+        with pytest.raises(ValidationError, match="must be a string"):
+            StateManager.set_selected_portfolio(123)
+
+    def test_set_selected_portfolio_rejects_empty(self):
+        """set_selected_portfolio should reject empty strings."""
+        with pytest.raises(ValidationError, match="cannot be empty"):
+            StateManager.set_selected_portfolio("")
+
+    def test_store_backtest_results_valid(self):
+        """store_backtest_results should accept valid parameters."""
+        results = pd.DataFrame({'value': [100, 110, 120]})
+        all_benchmark_results = {'SPY': pd.DataFrame({'value': [100, 105, 110]})}
+
+        StateManager.store_backtest_results(
+            results=results,
+            all_benchmark_results=all_benchmark_results,
+            tickers=['AAPL', 'MSFT'],
+            benchmarks=['SPY'],
+            weights_array=np.array([0.6, 0.4]),
+            capital=100000.0,
+            rebalance_strategy="Buy-and-Hold",
+            rebalance_freq=None
+        )
+
+        assert StateManager.is_backtest_completed()
+
+    def test_store_backtest_results_rejects_non_dataframe(self):
+        """store_backtest_results should reject non-DataFrame results."""
+        with pytest.raises(ValidationError, match="must be a DataFrame"):
+            StateManager.store_backtest_results(
+                results=[1, 2, 3],
+                all_benchmark_results={},
+                tickers=['AAPL'],
+                benchmarks=['SPY'],
+                weights_array=np.array([1.0]),
+                capital=100000.0,
+                rebalance_strategy="Buy-and-Hold",
+                rebalance_freq=None
+            )
+
+    def test_store_backtest_results_rejects_invalid_tickers(self):
+        """store_backtest_results should reject invalid ticker lists."""
+        results = pd.DataFrame({'value': [100, 110, 120]})
+
+        with pytest.raises(ValidationError, match="must be a list"):
+            StateManager.store_backtest_results(
+                results=results,
+                all_benchmark_results={},
+                tickers="AAPL",
+                benchmarks=['SPY'],
+                weights_array=np.array([1.0]),
+                capital=100000.0,
+                rebalance_strategy="Buy-and-Hold",
+                rebalance_freq=None
+            )
+
+    def test_store_backtest_results_rejects_negative_capital(self):
+        """store_backtest_results should reject negative or zero capital."""
+        results = pd.DataFrame({'value': [100, 110, 120]})
+
+        with pytest.raises(ValidationError, match="must be a positive number"):
+            StateManager.store_backtest_results(
+                results=results,
+                all_benchmark_results={},
+                tickers=['AAPL'],
+                benchmarks=['SPY'],
+                weights_array=np.array([1.0]),
+                capital=-100000.0,
+                rebalance_strategy="Buy-and-Hold",
+                rebalance_freq=None
+            )
+
+        with pytest.raises(ValidationError, match="must be a positive number"):
+            StateManager.store_backtest_results(
+                results=results,
+                all_benchmark_results={},
+                tickers=['AAPL'],
+                benchmarks=['SPY'],
+                weights_array=np.array([1.0]),
+                capital=0,
+                rebalance_strategy="Buy-and-Hold",
+                rebalance_freq=None
+            )
+
+    def test_store_backtest_results_rejects_non_numpy_weights(self):
+        """store_backtest_results should reject non-numpy array weights."""
+        results = pd.DataFrame({'value': [100, 110, 120]})
+
+        with pytest.raises(ValidationError, match="must be a numpy array"):
+            StateManager.store_backtest_results(
+                results=results,
+                all_benchmark_results={},
+                tickers=['AAPL'],
+                benchmarks=['SPY'],
+                weights_array=[0.6, 0.4],
+                capital=100000.0,
+                rebalance_strategy="Buy-and-Hold",
+                rebalance_freq=None
+            )
+
+    def test_set_date_range_accepts_date_objects(self):
+        """set_date_range should accept datetime.date objects from st.date_input."""
+        from datetime import date
+
+        start = date(2020, 1, 1)
+        end = date(2021, 1, 1)
+
+        StateManager.set_date_range(start, end)
+
+        # Should convert to datetime
+        stored_start = StateManager.get_start_date()
+        stored_end = StateManager.get_end_date()
+
+        assert isinstance(stored_start, datetime)
+        assert isinstance(stored_end, datetime)
+        assert stored_start.year == 2020
+        assert stored_start.month == 1
+        assert stored_start.day == 1
+        assert stored_end.year == 2021
+        assert stored_end.month == 1
+        assert stored_end.day == 1
+
+    def test_set_date_range_accepts_mixed_types(self):
+        """set_date_range should accept mix of datetime and date objects."""
+        from datetime import date
+
+        start = date(2020, 1, 1)
+        end = datetime(2021, 1, 1)
+
+        StateManager.set_date_range(start, end)
+
+        stored_start = StateManager.get_start_date()
+        stored_end = StateManager.get_end_date()
+
+        assert isinstance(stored_start, datetime)
+        assert isinstance(stored_end, datetime)
+
+    def test_set_date_preset_accepts_date_object(self):
+        """set_date_preset should accept datetime.date objects."""
+        from datetime import date
+
+        preset = date(2020, 1, 1)
+        StateManager.set_date_preset(preset)
+
+        stored_start = StateManager.get_start_date()
+        assert isinstance(stored_start, datetime)
+        assert stored_start.year == 2020
+
+    def test_set_date_range_rejects_invalid_types(self):
+        """set_date_range should still reject non-date types."""
+        with pytest.raises(ValidationError, match="must be a datetime or date object"):
+            StateManager.set_date_range("2020-01-01", datetime(2021, 1, 1))
+
+        with pytest.raises(ValidationError, match="must be a datetime or date object"):
+            StateManager.set_date_range(datetime(2020, 1, 1), "2021-01-01")

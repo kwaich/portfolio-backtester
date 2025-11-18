@@ -217,34 +217,34 @@ def render_sidebar_form() -> Dict[str, Any]:
             portfolio_config = portfolio_presets[selected_portfolio]
             StateManager.update_portfolio_preset(selected_portfolio, portfolio_config)
 
+    # Number of tickers and benchmarks (outside form for immediate UI updates)
+    st.sidebar.subheader("Portfolio Size")
+
+    num_tickers = st.sidebar.number_input(
+        "Number of Portfolio Tickers",
+        min_value=1,
+        max_value=MAX_TICKERS,
+        value=StateManager.get_num_tickers(),
+        step=1,
+        help="How many different assets in your portfolio?",
+        key="num_tickers_input"
+    )
+
+    # Use URL benchmarks count if available, otherwise default to 1
+    url_benchmarks = st.session_state.get('url_benchmarks', [])
+    default_num_benchmarks = len(url_benchmarks) if url_benchmarks else 1
+    num_benchmarks = st.sidebar.number_input(
+        "Number of Benchmarks",
+        min_value=MIN_BENCHMARKS,
+        max_value=MAX_BENCHMARKS,
+        value=default_num_benchmarks,
+        step=1,
+        help="Compare against multiple benchmarks",
+        key="num_benchmarks_input"
+    )
+
     # Form for main inputs (reduces reruns)
     with st.sidebar.form(key="backtest_config_form"):
-        # Number of tickers
-        num_tickers = st.number_input(
-            "Number of Portfolio Tickers",
-            min_value=1,
-            max_value=MAX_TICKERS,
-            value=StateManager.get_num_tickers(),
-            step=1,
-            help="How many different assets in your portfolio?",
-            key="num_tickers_input"
-        )
-
-        # Number of benchmarks
-        # Use URL benchmarks count if available, otherwise default to 1
-        url_benchmarks = st.session_state.get('url_benchmarks', [])
-        default_num_benchmarks = len(url_benchmarks) if url_benchmarks else 1
-        num_benchmarks = st.number_input(
-            "Number of Benchmarks",
-            min_value=MIN_BENCHMARKS,
-            max_value=MAX_BENCHMARKS,
-            value=default_num_benchmarks,
-            step=1,
-            help="Compare against multiple benchmarks",
-            key="num_benchmarks_input"
-        )
-
-        # Capital
         st.subheader("Initial Capital")
         # Use URL parameter if available, otherwise use default
         default_capital = st.session_state.get('url_capital', DEFAULT_CAPITAL)

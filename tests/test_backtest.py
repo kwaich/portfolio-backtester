@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import logging
 import tempfile
+import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -100,13 +101,13 @@ class TestCacheFunctions:
 
     def test_load_cached_prices_nonexistent(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            cache_path = Path(tmpdir) / "nonexistent.pkl"
+            cache_path = Path(tmpdir) / "nonexistent"
             result = backtest.load_cached_prices(cache_path)
             assert result is None
 
     def test_save_and_load_cached_prices(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            cache_path = Path(tmpdir) / "test_cache.pkl"
+            cache_path = Path(tmpdir) / "test_cache"
             test_data = pd.DataFrame(
                 {"AAPL": [100, 101, 102], "MSFT": [200, 201, 202]},
                 index=pd.date_range("2020-01-01", periods=3),
@@ -116,14 +117,20 @@ class TestCacheFunctions:
             loaded_data = backtest.load_cached_prices(cache_path)
 
             assert loaded_data is not None
-            pd.testing.assert_frame_equal(loaded_data, test_data)
+            # Note: Parquet doesn't preserve DatetimeIndex.freq, so check_freq=False
+            pd.testing.assert_frame_equal(loaded_data, test_data, check_freq=False)
+
+            # Verify Parquet and JSON files were created
+            assert cache_path.with_suffix('.parquet').exists()
+            assert cache_path.with_suffix('.json').exists()
 
     def test_cache_expiration(self):
         """Test that stale cache is rejected and deleted."""
         import time
+        import json
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            cache_path = Path(tmpdir) / "test_cache.pkl"
+            cache_path = Path(tmpdir) / "test_cache"
             test_data = pd.DataFrame(
                 {"AAPL": [100, 101, 102]},
                 index=pd.date_range("2020-01-01", periods=3),
@@ -132,25 +139,26 @@ class TestCacheFunctions:
             # Save cache
             backtest.save_cached_prices(cache_path, test_data)
 
-            # Modify timestamp to simulate old cache (25 hours old)
-            import pickle
-            with open(cache_path, "rb") as f:
-                cache_data = pickle.load(f)
-            cache_data["timestamp"] = time.time() - (25 * 3600)  # 25 hours ago
-            with open(cache_path, "wb") as f:
-                pickle.dump(cache_data, f)
+            # Modify timestamp in JSON metadata to simulate old cache (25 hours old)
+            metadata_path = cache_path.with_suffix('.json')
+            with open(metadata_path, 'r') as f:
+                metadata = json.load(f)
+            metadata["timestamp"] = time.time() - (25 * 3600)  # 25 hours ago
+            with open(metadata_path, 'w') as f:
+                json.dump(metadata, f)
 
             # Try to load with default TTL (24 hours)
             loaded_data = backtest.load_cached_prices(cache_path, max_age_hours=24)
 
-            # Should return None and delete the file
+            # Should return None and delete both files
             assert loaded_data is None
-            assert not cache_path.exists()
+            assert not cache_path.with_suffix('.parquet').exists()
+            assert not cache_path.with_suffix('.json').exists()
 
     def test_cache_within_ttl(self):
         """Test that fresh cache is loaded successfully."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            cache_path = Path(tmpdir) / "test_cache.pkl"
+            cache_path = Path(tmpdir) / "test_cache"
             test_data = pd.DataFrame(
                 {"AAPL": [100, 101, 102]},
                 index=pd.date_range("2020-01-01", periods=3),
@@ -163,42 +171,61 @@ class TestCacheFunctions:
             loaded_data = backtest.load_cached_prices(cache_path, max_age_hours=48)
 
             assert loaded_data is not None
-            pd.testing.assert_frame_equal(loaded_data, test_data)
+            pd.testing.assert_frame_equal(loaded_data, test_data, check_freq=False)
 
     def test_old_cache_format_migration(self):
-        """Test migration from old cache format (plain DataFrame)."""
+        """Test migration from old pickle cache format to Parquet."""
         import pickle
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            cache_path = Path(tmpdir) / "old_cache.pkl"
+            cache_path = Path(tmpdir) / "old_cache"
+            old_pickle_path = cache_path.with_suffix('.pkl')
             test_data = pd.DataFrame(
                 {"AAPL": [100, 101, 102]},
                 index=pd.date_range("2020-01-01", periods=3),
             )
 
-            # Save old format (plain DataFrame)
-            with open(cache_path, "wb") as f:
-                pickle.dump(test_data, f)
+            # Save old format (dict with data and timestamp)
+            old_cache_data = {
+                "data": test_data,
+                "timestamp": time.time(),
+                "version": "1.0"
+            }
+            with open(old_pickle_path, "wb") as f:
+                pickle.dump(old_cache_data, f)
 
-            # Try to load (should detect old format and return None)
+            # Try to load (should migrate to Parquet)
             loaded_data = backtest.load_cached_prices(cache_path)
 
-            assert loaded_data is None
-            assert not cache_path.exists()  # Old cache should be deleted
+            # Should successfully load the migrated data
+            assert loaded_data is not None
+            pd.testing.assert_frame_equal(loaded_data, test_data, check_freq=False)
+
+            # Old pickle should be deleted, new Parquet files should exist
+            assert not old_pickle_path.exists()
+            assert cache_path.with_suffix('.parquet').exists()
+            assert cache_path.with_suffix('.json').exists()
 
     def test_corrupted_cache_handling(self):
         """Test that corrupted cache is handled gracefully."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            cache_path = Path(tmpdir) / "corrupted.pkl"
+            cache_path = Path(tmpdir) / "corrupted"
+            parquet_path = cache_path.with_suffix('.parquet')
+            json_path = cache_path.with_suffix('.json')
 
-            # Write corrupted data
-            with open(cache_path, "wb") as f:
+            # Write corrupted Parquet file
+            with open(parquet_path, "wb") as f:
                 f.write(b"corrupted data")
 
-            # Should return None and clean up
+            # Write valid JSON metadata
+            with open(json_path, "w") as f:
+                f.write('{"timestamp": 123456, "version": "2.0"}')
+
+            # Should return None and clean up both files
             result = backtest.load_cached_prices(cache_path)
             assert result is None
-            assert not cache_path.exists()
+            assert not parquet_path.exists()
+            assert not json_path.exists()
 
 
 class TestSummarize:
@@ -804,8 +831,8 @@ class TestDownloadPrices:
         original_get_cache_path = backtest.get_cache_path
         def get_cache_path_wrapper(tickers, *args, **kwargs):
             result = original_get_cache_path(tickers, *args, **kwargs)
-            # Store ticker info in path name for identification
-            result = Path(str(result).replace('.pkl', f'_{tickers[0]}.pkl'))
+            # Store ticker info in path name for identification (Parquet format uses no extension)
+            result = Path(f"{result}_{tickers[0]}")
             return result
 
         with patch("backtest.get_cache_path", side_effect=get_cache_path_wrapper):
@@ -838,7 +865,8 @@ class TestDownloadPrices:
         original_get_cache_path = backtest.get_cache_path
         def get_cache_path_wrapper(tickers, *args, **kwargs):
             result = original_get_cache_path(tickers, *args, **kwargs)
-            result = Path(str(result).replace('.pkl', f'_{tickers[0]}.pkl'))
+            # Store ticker info in path name for identification (Parquet format uses no extension)
+            result = Path(f"{result}_{tickers[0]}")
             return result
 
         # Mock yfinance download for uncached ticker
