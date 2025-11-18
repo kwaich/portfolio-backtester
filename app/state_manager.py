@@ -22,6 +22,107 @@ import pandas as pd
 from .config import DEFAULT_NUM_TICKERS, DEFAULT_START_DATE, DEFAULT_BENCHMARK
 
 
+# =============================================================================
+# Validation Utilities
+# =============================================================================
+
+class ValidationError(ValueError):
+    """Raised when state validation fails."""
+    pass
+
+
+def _validate_positive_int(value: Any, name: str, min_value: int = 1, max_value: Optional[int] = None) -> None:
+    """Validate that a value is a positive integer within bounds.
+
+    Args:
+        value: Value to validate
+        name: Name of the parameter (for error messages)
+        min_value: Minimum allowed value (default: 1)
+        max_value: Maximum allowed value (optional)
+
+    Raises:
+        ValidationError: If validation fails
+    """
+    if not isinstance(value, int):
+        raise ValidationError(f"{name} must be an integer, got {type(value).__name__}")
+    if value < min_value:
+        raise ValidationError(f"{name} must be at least {min_value}, got {value}")
+    if max_value is not None and value > max_value:
+        raise ValidationError(f"{name} must be at most {max_value}, got {value}")
+
+
+def _validate_string_list(value: Any, name: str, allow_empty_list: bool = False) -> None:
+    """Validate that a value is a list of non-empty strings.
+
+    Args:
+        value: Value to validate
+        name: Name of the parameter (for error messages)
+        allow_empty_list: Whether to allow empty lists (default: False)
+
+    Raises:
+        ValidationError: If validation fails
+    """
+    if not isinstance(value, list):
+        raise ValidationError(f"{name} must be a list, got {type(value).__name__}")
+    if not allow_empty_list and len(value) == 0:
+        raise ValidationError(f"{name} cannot be empty")
+    for i, item in enumerate(value):
+        if not isinstance(item, str):
+            raise ValidationError(f"{name}[{i}] must be a string, got {type(item).__name__}")
+        if not item.strip():
+            raise ValidationError(f"{name}[{i}] cannot be an empty string")
+
+
+def _validate_float_list(value: Any, name: str, allow_negative: bool = False) -> None:
+    """Validate that a value is a list of floats.
+
+    Args:
+        value: Value to validate
+        name: Name of the parameter (for error messages)
+        allow_negative: Whether to allow negative values (default: False)
+
+    Raises:
+        ValidationError: If validation fails
+    """
+    if not isinstance(value, list):
+        raise ValidationError(f"{name} must be a list, got {type(value).__name__}")
+    for i, item in enumerate(value):
+        if not isinstance(item, (int, float)):
+            raise ValidationError(f"{name}[{i}] must be a number, got {type(item).__name__}")
+        if not allow_negative and item < 0:
+            raise ValidationError(f"{name}[{i}] must be non-negative, got {item}")
+
+
+def _validate_non_empty_string(value: Any, name: str) -> None:
+    """Validate that a value is a non-empty string.
+
+    Args:
+        value: Value to validate
+        name: Name of the parameter (for error messages)
+
+    Raises:
+        ValidationError: If validation fails
+    """
+    if not isinstance(value, str):
+        raise ValidationError(f"{name} must be a string, got {type(value).__name__}")
+    if not value.strip():
+        raise ValidationError(f"{name} cannot be empty")
+
+
+def _validate_datetime(value: Any, name: str) -> None:
+    """Validate that a value is a datetime object.
+
+    Args:
+        value: Value to validate
+        name: Name of the parameter (for error messages)
+
+    Raises:
+        ValidationError: If validation fails
+    """
+    if not isinstance(value, datetime):
+        raise ValidationError(f"{name} must be a datetime object, got {type(value).__name__}")
+
+
 def _session_state() -> MutableMapping[str, Any]:
     """Return the active Streamlit session_state mapping.
 
@@ -104,7 +205,15 @@ class StateManager:
 
     @staticmethod
     def set_selected_portfolio(name: str) -> None:
-        """Set the selected portfolio preset name."""
+        """Set the selected portfolio preset name.
+
+        Args:
+            name: Portfolio preset name (non-empty string)
+
+        Raises:
+            ValidationError: If name is not a valid string
+        """
+        _validate_non_empty_string(name, "portfolio name")
         _session_state()[StateKeys.SELECTED_PORTFOLIO] = name
 
     @staticmethod
@@ -114,7 +223,15 @@ class StateManager:
 
     @staticmethod
     def set_num_tickers(num: int) -> None:
-        """Set the number of tickers in the portfolio."""
+        """Set the number of tickers in the portfolio.
+
+        Args:
+            num: Number of tickers (must be positive integer, max 10)
+
+        Raises:
+            ValidationError: If num is not a valid positive integer
+        """
+        _validate_positive_int(num, "num_tickers", min_value=1, max_value=10)
         _session_state()[StateKeys.NUM_TICKERS] = num
 
     @staticmethod
@@ -124,7 +241,15 @@ class StateManager:
 
     @staticmethod
     def set_preset_tickers(tickers: List[str]) -> None:
-        """Set the preset ticker symbols."""
+        """Set the preset ticker symbols.
+
+        Args:
+            tickers: List of ticker symbols (all non-empty strings)
+
+        Raises:
+            ValidationError: If tickers is not a valid list of strings
+        """
+        _validate_string_list(tickers, "tickers", allow_empty_list=True)
         _session_state()[StateKeys.PRESET_TICKERS] = tickers
 
     @staticmethod
@@ -134,7 +259,15 @@ class StateManager:
 
     @staticmethod
     def set_preset_weights(weights: List[float]) -> None:
-        """Set the preset portfolio weights."""
+        """Set the preset portfolio weights.
+
+        Args:
+            weights: List of portfolio weights (all non-negative floats)
+
+        Raises:
+            ValidationError: If weights is not a valid list of floats
+        """
+        _validate_float_list(weights, "weights", allow_negative=False)
         _session_state()[StateKeys.PRESET_WEIGHTS] = weights
 
     @staticmethod
@@ -144,7 +277,15 @@ class StateManager:
 
     @staticmethod
     def set_preset_benchmark(benchmark: str) -> None:
-        """Set the preset benchmark ticker."""
+        """Set the preset benchmark ticker.
+
+        Args:
+            benchmark: Benchmark ticker symbol (non-empty string)
+
+        Raises:
+            ValidationError: If benchmark is not a valid string
+        """
+        _validate_non_empty_string(benchmark, "benchmark")
         _session_state()[StateKeys.PRESET_BENCHMARK] = benchmark
 
     @staticmethod
@@ -195,8 +336,11 @@ class StateManager:
         """Set the backtest date range atomically.
 
         Args:
-            start_date: Backtest start date
-            end_date: Backtest end date
+            start_date: Backtest start date (datetime object)
+            end_date: Backtest end date (datetime object)
+
+        Raises:
+            ValidationError: If dates are invalid or start >= end
 
         Examples:
             >>> StateManager.set_date_range(
@@ -204,6 +348,10 @@ class StateManager:
             ...     datetime.today()
             ... )
         """
+        _validate_datetime(start_date, "start_date")
+        _validate_datetime(end_date, "end_date")
+        if start_date >= end_date:
+            raise ValidationError(f"start_date must be before end_date (got {start_date} >= {end_date})")
         _session_state()[StateKeys.START_DATE] = start_date
         _session_state()[StateKeys.END_DATE] = end_date
 
@@ -212,12 +360,16 @@ class StateManager:
         """Set date range from a preset (start_date = preset, end_date = today).
 
         Args:
-            preset_date: The preset start date
+            preset_date: The preset start date (datetime object)
+
+        Raises:
+            ValidationError: If preset_date is invalid
 
         Examples:
             >>> StateManager.set_date_preset(datetime(2020, 1, 1))
             # Sets start to 2020-01-01, end to today
         """
+        _validate_datetime(preset_date, "preset_date")
         StateManager.set_date_range(preset_date, datetime.today())
 
     # =========================================================================
@@ -293,7 +445,32 @@ class StateManager:
             ...     rebalance_strategy="Buy-and-Hold",
             ...     rebalance_freq=None
             ... )
+
+        Raises:
+            ValidationError: If any parameter has an invalid type or value
         """
+        # Validate required parameters
+        if not isinstance(results, pd.DataFrame):
+            raise ValidationError(f"results must be a DataFrame, got {type(results).__name__}")
+        if not isinstance(all_benchmark_results, dict):
+            raise ValidationError(f"all_benchmark_results must be a dict, got {type(all_benchmark_results).__name__}")
+        _validate_string_list(tickers, "tickers")
+        _validate_string_list(benchmarks, "benchmarks")
+        if not isinstance(weights_array, np.ndarray):
+            raise ValidationError(f"weights_array must be a numpy array, got {type(weights_array).__name__}")
+        if not isinstance(capital, (int, float)) or capital <= 0:
+            raise ValidationError(f"capital must be a positive number, got {capital}")
+        _validate_non_empty_string(rebalance_strategy, "rebalance_strategy")
+
+        # Validate optional string parameters
+        if dca_frequency is not None:
+            _validate_non_empty_string(dca_frequency, "dca_frequency")
+        if dca_freq is not None and not isinstance(dca_freq, str):
+            raise ValidationError(f"dca_freq must be a string or None, got {type(dca_freq).__name__}")
+        if dca_amount is not None:
+            if not isinstance(dca_amount, (int, float)) or dca_amount <= 0:
+                raise ValidationError(f"dca_amount must be a positive number or None, got {dca_amount}")
+
         _session_state()[StateKeys.BACKTEST_RESULTS] = {
             'results': results,
             'all_benchmark_results': all_benchmark_results,
