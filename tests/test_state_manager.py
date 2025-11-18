@@ -674,10 +674,10 @@ class TestStateManagerValidation:
 
     def test_set_date_range_rejects_non_datetime(self):
         """set_date_range should reject non-datetime values."""
-        with pytest.raises(ValidationError, match="must be a datetime object"):
+        with pytest.raises(ValidationError, match="must be a datetime or date object"):
             StateManager.set_date_range("2020-01-01", datetime(2021, 1, 1))
 
-        with pytest.raises(ValidationError, match="must be a datetime object"):
+        with pytest.raises(ValidationError, match="must be a datetime or date object"):
             StateManager.set_date_range(datetime(2020, 1, 1), "2021-01-01")
 
     def test_set_date_range_rejects_start_after_end(self):
@@ -794,3 +794,59 @@ class TestStateManagerValidation:
                 rebalance_strategy="Buy-and-Hold",
                 rebalance_freq=None
             )
+
+    def test_set_date_range_accepts_date_objects(self):
+        """set_date_range should accept datetime.date objects from st.date_input."""
+        from datetime import date
+
+        start = date(2020, 1, 1)
+        end = date(2021, 1, 1)
+
+        StateManager.set_date_range(start, end)
+
+        # Should convert to datetime
+        stored_start = StateManager.get_start_date()
+        stored_end = StateManager.get_end_date()
+
+        assert isinstance(stored_start, datetime)
+        assert isinstance(stored_end, datetime)
+        assert stored_start.year == 2020
+        assert stored_start.month == 1
+        assert stored_start.day == 1
+        assert stored_end.year == 2021
+        assert stored_end.month == 1
+        assert stored_end.day == 1
+
+    def test_set_date_range_accepts_mixed_types(self):
+        """set_date_range should accept mix of datetime and date objects."""
+        from datetime import date
+
+        start = date(2020, 1, 1)
+        end = datetime(2021, 1, 1)
+
+        StateManager.set_date_range(start, end)
+
+        stored_start = StateManager.get_start_date()
+        stored_end = StateManager.get_end_date()
+
+        assert isinstance(stored_start, datetime)
+        assert isinstance(stored_end, datetime)
+
+    def test_set_date_preset_accepts_date_object(self):
+        """set_date_preset should accept datetime.date objects."""
+        from datetime import date
+
+        preset = date(2020, 1, 1)
+        StateManager.set_date_preset(preset)
+
+        stored_start = StateManager.get_start_date()
+        assert isinstance(stored_start, datetime)
+        assert stored_start.year == 2020
+
+    def test_set_date_range_rejects_invalid_types(self):
+        """set_date_range should still reject non-date types."""
+        with pytest.raises(ValidationError, match="must be a datetime or date object"):
+            StateManager.set_date_range("2020-01-01", datetime(2021, 1, 1))
+
+        with pytest.raises(ValidationError, match="must be a datetime or date object"):
+            StateManager.set_date_range(datetime(2020, 1, 1), "2021-01-01")

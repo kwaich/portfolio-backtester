@@ -110,7 +110,7 @@ def _validate_non_empty_string(value: Any, name: str) -> None:
 
 
 def _validate_datetime(value: Any, name: str) -> None:
-    """Validate that a value is a datetime object.
+    """Validate that a value is a datetime or date object.
 
     Args:
         value: Value to validate
@@ -118,9 +118,14 @@ def _validate_datetime(value: Any, name: str) -> None:
 
     Raises:
         ValidationError: If validation fails
+
+    Note:
+        Accepts both datetime.datetime and datetime.date objects since
+        Streamlit's date_input returns datetime.date.
     """
-    if not isinstance(value, datetime):
-        raise ValidationError(f"{name} must be a datetime object, got {type(value).__name__}")
+    from datetime import date
+    if not isinstance(value, (datetime, date)):
+        raise ValidationError(f"{name} must be a datetime or date object, got {type(value).__name__}")
 
 
 def _session_state() -> MutableMapping[str, Any]:
@@ -336,22 +341,41 @@ class StateManager:
         """Set the backtest date range atomically.
 
         Args:
-            start_date: Backtest start date (datetime object)
-            end_date: Backtest end date (datetime object)
+            start_date: Backtest start date (datetime or date object)
+            end_date: Backtest end date (datetime or date object)
 
         Raises:
             ValidationError: If dates are invalid or start >= end
+
+        Note:
+            Accepts both datetime.datetime and datetime.date objects.
+            Date objects are converted to datetime at midnight for consistency.
 
         Examples:
             >>> StateManager.set_date_range(
             ...     datetime(2020, 1, 1),
             ...     datetime.today()
             ... )
+            >>> # Also works with date objects from st.date_input
+            >>> StateManager.set_date_range(
+            ...     date(2020, 1, 1),
+            ...     date.today()
+            ... )
         """
+        from datetime import date as date_type
+
         _validate_datetime(start_date, "start_date")
         _validate_datetime(end_date, "end_date")
+
+        # Convert date to datetime if needed (at midnight)
+        if isinstance(start_date, date_type) and not isinstance(start_date, datetime):
+            start_date = datetime.combine(start_date, datetime.min.time())
+        if isinstance(end_date, date_type) and not isinstance(end_date, datetime):
+            end_date = datetime.combine(end_date, datetime.min.time())
+
         if start_date >= end_date:
             raise ValidationError(f"start_date must be before end_date (got {start_date} >= {end_date})")
+
         _session_state()[StateKeys.START_DATE] = start_date
         _session_state()[StateKeys.END_DATE] = end_date
 
@@ -360,10 +384,13 @@ class StateManager:
         """Set date range from a preset (start_date = preset, end_date = today).
 
         Args:
-            preset_date: The preset start date (datetime object)
+            preset_date: The preset start date (datetime or date object)
 
         Raises:
             ValidationError: If preset_date is invalid
+
+        Note:
+            Accepts both datetime.datetime and datetime.date objects.
 
         Examples:
             >>> StateManager.set_date_preset(datetime(2020, 1, 1))
