@@ -1254,5 +1254,179 @@ class TestURLParameters:
         assert st_mock.query_params['benchmarks'] == 'SPY,QQQ'
 
 
+class TestSearchableTickerInput:
+    """Test searchable ticker input component"""
+
+    @patch('app.ui_components.StateManager')
+    @patch('app.ui_components.st')
+    def test_basic_text_input(self, mock_st, mock_state_manager):
+        """Test basic text input rendering without search"""
+        from app.ui_components import render_searchable_ticker_input
+
+        # Setup
+        mock_state_manager.get_widget_state.return_value = {
+            'value': 'AAPL',
+            'show_search': False,
+            'pending_value': None
+        }
+        mock_st.session_state = {}
+        
+        # Mock columns to return context managers
+        mock_col1 = MagicMock()
+        mock_col2 = MagicMock()
+        mock_st.columns.return_value = [mock_col1, mock_col2]
+        
+        # Mock text_input return value
+        mock_st.text_input.return_value = "AAPL"
+        
+        # Execute
+        result = render_searchable_ticker_input("Test Label", "AAPL", key="test_key")
+        
+        # Verify
+        assert result == "AAPL"
+        mock_st.text_input.assert_called()
+        mock_state_manager.get_widget_state.assert_called_with("test_key", {
+            'value': 'AAPL',
+            'show_search': False,
+            'pending_value': None
+        })
+
+    @patch('app.ui_components.search_tickers_with_yahoo')
+    @patch('app.ui_components.StateManager')
+    @patch('app.ui_components.st')
+    def test_search_functionality(self, mock_st, mock_state_manager, mock_search):
+        """Test search button interaction and results display"""
+        from app.ui_components import render_searchable_ticker_input
+
+        # Setup state: search is active
+        mock_state_manager.get_widget_state.return_value = {
+            'value': 'app',
+            'show_search': True,
+            'pending_value': None
+        }
+        mock_st.session_state = {'test_key_input': 'app'}
+        
+        # Mock columns
+        mock_st.columns.return_value = [MagicMock(), MagicMock()]
+        
+        # Mock text_input
+        mock_st.text_input.return_value = "app"
+        
+        # Mock search results
+        mock_search.return_value = [("AAPL", "Apple Inc."), ("APLE", "Apple Hospitality REIT")]
+        
+        # Execute
+        render_searchable_ticker_input("Test Label", "app", key="test_key")
+        
+        # Verify search was called
+        mock_search.assert_called_with("app", limit=10)
+        
+        # Verify buttons created for results
+        # We expect buttons for results + close button
+        # Filter calls to button to check for result buttons
+        button_calls = mock_st.button.call_args_list
+        
+        # Check if result buttons were created
+        found_aapl = any("AAPL - Apple Inc." in str(call) for call in button_calls)
+        assert found_aapl, "Should display button for AAPL result"
+
+
+class TestChartGeneration:
+    """Test Plotly chart generation functions"""
+
+    def test_create_main_dashboard(self):
+        """Verify main dashboard creation with correct traces"""
+        from app.charts import create_main_dashboard
+        import plotly.graph_objects as go
+
+        # Setup data
+        dates = pd.date_range("2020-01-01", periods=10, freq="D")
+        results = pd.DataFrame({
+            'portfolio_value': np.linspace(100, 110, 10),
+            'portfolio_return': np.linspace(0, 0.1, 10),
+            'benchmark_value': np.linspace(100, 105, 10),
+            'benchmark_return': np.linspace(0, 0.05, 10)
+        }, index=dates)
+        
+        all_benchmark_results = {
+            'SPY': pd.DataFrame({
+                'benchmark_value': np.linspace(100, 105, 10),
+                'benchmark_return': np.linspace(0, 0.05, 10)
+            }, index=dates)
+        }
+        
+        benchmarks = ['SPY']
+
+        # Execute
+        fig = create_main_dashboard(results, all_benchmark_results, benchmarks)
+
+        # Verify
+        assert isinstance(fig, go.Figure)
+        # Traces: Portfolio Value, Benchmark Value, Portfolio Return, Benchmark Return, 
+        # Active Return (Pos), Active Return (Neg), Portfolio DD, Benchmark DD
+        # Total at least 8 traces
+        assert len(fig.data) >= 8
+        
+        # Check titles
+        assert "Portfolio vs Benchmark Value" in str(fig.layout)
+
+    def test_create_rolling_returns_chart(self):
+        """Verify rolling returns chart creation"""
+        from app.charts import create_rolling_returns_chart
+        import plotly.graph_objects as go
+
+        # Setup data
+        dates = pd.date_range("2020-01-01", periods=100, freq="D")
+        results = pd.DataFrame({
+            'portfolio_value': np.linspace(100, 200, 100)
+        }, index=dates)
+        
+        all_benchmark_results = {
+            'SPY': pd.DataFrame({
+                'benchmark_value': np.linspace(100, 150, 100)
+            }, index=dates)
+        }
+        
+        benchmarks = ['SPY']
+        windows = [30]
+
+        # Execute
+        fig = create_rolling_returns_chart(results, all_benchmark_results, benchmarks, windows)
+
+        # Verify
+        assert isinstance(fig, go.Figure)
+        # Traces: Portfolio 30D, SPY 30D
+        assert len(fig.data) == 2
+        assert "Portfolio 30D" in fig.data[0].name
+
+    def test_create_rolling_sharpe_chart(self):
+        """Verify rolling Sharpe chart creation"""
+        from app.charts import create_rolling_sharpe_chart
+        import plotly.graph_objects as go
+
+        # Setup data
+        dates = pd.date_range("2020-01-01", periods=50, freq="D")
+        results = pd.DataFrame({
+            'portfolio_rolling_sharpe_12m': np.random.randn(50)
+        }, index=dates)
+        
+        all_benchmark_results = {
+            'SPY': pd.DataFrame({
+                'benchmark_rolling_sharpe_12m': np.random.randn(50)
+            }, index=dates)
+        }
+        
+        benchmarks = ['SPY']
+
+        # Execute
+        fig = create_rolling_sharpe_chart(results, all_benchmark_results, benchmarks)
+
+        # Verify
+        assert isinstance(fig, go.Figure)
+        # Traces: Portfolio, SPY
+        assert len(fig.data) == 2
+        assert fig.data[0].name == 'Portfolio'
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

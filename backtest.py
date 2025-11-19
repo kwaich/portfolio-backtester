@@ -707,7 +707,7 @@ def _calculate_rebalanced_portfolio(
     Returns:
         Series with portfolio value for each date
     """
-    rebalance_freq = _normalize_pandas_frequency(rebalance_freq)
+    rebalance_freq = normalize_frequency(rebalance_freq)
 
     # Generate rebalancing dates
     rebalance_dates = pd.date_range(
@@ -779,7 +779,7 @@ def _calculate_dca_portfolio(
             - portfolio_values: Series with portfolio market value for each date
             - cumulative_contributions: Series with total amount invested up to each date
     """
-    dca_freq = _normalize_pandas_frequency(dca_freq)
+    dca_freq = normalize_frequency(dca_freq)
 
     # Generate DCA contribution dates
     dca_dates = pd.date_range(
@@ -1053,7 +1053,7 @@ def compute_metrics(
 
 
 def _calculate_xirr(cashflows: np.ndarray, dates_in_days: np.ndarray, guess: float = 0.1, max_iterations: int = 100, tolerance: float = 1e-6) -> float:
-    """Calculate XIRR (time-weighted Internal Rate of Return) using Newton-Raphson method.
+    """Calculate XIRR (time-weighted Internal Rate of Return) using Newton-Raphson with Bisection fallback.
 
     Args:
         cashflows: Array of cashflows (negative for outflows, positive for inflows)
@@ -1066,41 +1066,132 @@ def _calculate_xirr(cashflows: np.ndarray, dates_in_days: np.ndarray, guess: flo
         Annualized IRR as a decimal (e.g., 0.10 for 10%)
         Returns None if calculation fails or doesn't converge
     """
-    rate = guess
+    # Check for valid cashflows (must have at least one positive and one negative)
+    if not (np.any(cashflows > 0) and np.any(cashflows < 0)):
+        return None
 
+    # Smart initial guess based on simple return
+    total_inflow = np.sum(cashflows[cashflows > 0])
+    total_outflow = abs(np.sum(cashflows[cashflows < 0]))
+    if total_outflow > 0:
+        # Approximate duration in years
+        duration = (dates_in_days[-1] - dates_in_days[0]) / 365.0
+        if duration > 0:
+            simple_return = (total_inflow - total_outflow) / total_outflow
+            guess = simple_return / duration
+            # Clamp guess to reasonable range
+            guess = max(-0.9, min(guess, 10.0))
+
+    # Newton-Raphson Method
+    rate = guess
     for iteration in range(max_iterations):
-        # Calculate NPV and its derivative using actual time periods
         npv = 0.0
         npv_derivative = 0.0
 
         for cf, days in zip(cashflows, dates_in_days):
             years = days / 365.0
-            discount_factor = (1 + rate) ** years
+            # Protect against domain errors
+            if rate <= -1.0:
+                discount_factor = (1e-9) ** years # Avoid zero/negative base
+            else:
+                discount_factor = (1 + rate) ** years
 
             npv += cf / discount_factor
 
-            if years > 0:
+            if years > 0 and rate > -1.0:
                 npv_derivative -= years * cf / (discount_factor * (1 + rate))
 
-        # Check for convergence
         if abs(npv) < tolerance:
             return rate
 
-        # Avoid division by zero
         if abs(npv_derivative) < 1e-10:
-            return None
+            break # Derivative too small, switch to fallback
 
-        # Newton-Raphson update
         new_rate = rate - npv / npv_derivative
 
-        # Avoid extreme values
-        if new_rate < -0.99 or new_rate > 10.0:
-            return None
+        # If Newton shoots out of bounds, clamp or break
+        if new_rate <= -1.0 or new_rate > 100.0:
+            break
 
         rate = new_rate
 
-    # Didn't converge
-    return None
+    # Fallback: Bisection Method with Grid Search Bracketing
+    # Search range: -99% to 1000%
+    # We use a grid to find a sign change, as the function might not be monotonic
+    # or might have multiple roots. We want the one closest to the guess or 0.
+    
+    # Grid points to check for sign changes
+    grid = [-0.99, -0.9, -0.75, -0.5, -0.25, -0.1, 0.0, 0.1, 0.25, 0.5, 0.75, 1.0, 2.0, 5.0, 10.0]
+    
+    def calculate_npv(r):
+        val = 0.0
+        for cf, days in zip(cashflows, dates_in_days):
+            # Protect against domain errors for negative rates
+            if r <= -1.0:
+                base = 1e-9
+            else:
+                base = 1 + r
+            val += cf / (base ** (days / 365.0))
+        return val
+
+    # Find a bracket with sign change
+    low_bound = None
+    high_bound = None
+    
+    # Check grid points
+    npv_prev = calculate_npv(grid[0])
+    
+    for r in grid[1:]:
+        npv_curr = calculate_npv(r)
+        if npv_prev * npv_curr < 0:
+            # Found a sign change between prev_r (implicitly grid[i-1]) and r
+            # We need to retrieve the previous r. 
+            # Let's rewrite this loop slightly to be clearer.
+            pass 
+        npv_prev = npv_curr
+
+    # Better loop structure
+    found_bracket = False
+    for i in range(len(grid) - 1):
+        r1 = grid[i]
+        r2 = grid[i+1]
+        npv1 = calculate_npv(r1)
+        npv2 = calculate_npv(r2)
+        
+        if npv1 * npv2 <= 0:
+            low_bound = r1
+            high_bound = r2
+            found_bracket = True
+            break
+            
+    if not found_bracket:
+        logger.warning(f"XIRR: No sign change found in grid search between {min(grid):.0%} and {max(grid):.0%}. Returning None.")
+        return None
+
+    # Bisection on the found bracket
+    low = low_bound
+    high = high_bound
+    
+    for _ in range(max_iterations):
+        mid = (low + high) / 2
+        npv_mid = calculate_npv(mid)
+
+        if abs(npv_mid) < tolerance:
+            return mid
+
+        # Standard bisection update
+        # We know npv(low) and npv(high) have opposite signs (or one is zero)
+        # We need to maintain that invariant.
+        # Re-calculate npv_low to be safe or pass it through, but re-calc is cheap enough here
+        npv_low = calculate_npv(low)
+        
+        if npv_low * npv_mid < 0:
+            high = mid
+        else:
+            low = mid
+
+    logger.warning(f"XIRR calculation did not converge (Bisection). Returning best guess {mid:.2%}.")
+    return mid
 
 
 def _calculate_daily_returns(series: pd.Series, contributions_series: Optional[pd.Series] = None) -> pd.Series:
@@ -1123,12 +1214,39 @@ def _calculate_daily_returns(series: pd.Series, contributions_series: Optional[p
     return returns.replace([np.inf, -np.inf], np.nan)
 
 
-def _normalize_pandas_frequency(freq: Optional[str]) -> Optional[str]:
-    """Normalize deprecated pandas frequency codes to their modern equivalents."""
+def normalize_frequency(freq: Optional[str]) -> Optional[str]:
+    """Normalize frequency string to pandas frequency code.
+
+    Handles both pandas codes (M, Q, Y) and full names (monthly, quarterly, etc.).
+    Also handles deprecated pandas codes (M->ME, etc.).
+
+    Args:
+        freq: Frequency string (e.g., 'monthly', 'M', 'daily', 'D')
+
+    Returns:
+        Normalized pandas frequency code (e.g., 'ME', 'D') or None
+    """
     if freq is None:
         return None
 
-    normalized = freq.upper()
+    # Map common names to codes
+    freq_map = {
+        'daily': 'D',
+        'weekly': 'W',
+        'monthly': 'M',
+        'quarterly': 'Q',
+        'yearly': 'Y'
+    }
+
+    # Normalize input
+    normalized = freq.strip()
+    # Check if it's a known name (case-insensitive)
+    if normalized.lower() in freq_map:
+        normalized = freq_map[normalized.lower()]
+    else:
+        normalized = normalized.upper()
+
+    # Handle deprecated pandas aliases
     replacements = {
         'M': 'ME',
         'Q': 'QE',
@@ -1320,32 +1438,12 @@ def main(argv: List[str]) -> None:
 
     # Normalize rebalancing frequency
     rebalance_freq = args.rebalance
-    if rebalance_freq:
-        # Convert long form to pandas frequency codes
-        freq_map = {
-            'daily': 'D',
-            'weekly': 'W',
-            'monthly': 'M',
-            'quarterly': 'Q',
-            'yearly': 'Y'
-        }
-        rebalance_freq = freq_map.get(rebalance_freq.lower(), rebalance_freq.upper())
-        rebalance_freq = _normalize_pandas_frequency(rebalance_freq)
+    rebalance_freq = normalize_frequency(rebalance_freq)
 
     # Normalize DCA frequency
     dca_freq = args.dca_freq
     dca_amount = args.dca_amount
-    if dca_freq:
-        # Convert long form to pandas frequency codes
-        freq_map = {
-            'daily': 'D',
-            'weekly': 'W',
-            'monthly': 'M',
-            'quarterly': 'Q',
-            'yearly': 'Y'
-        }
-        dca_freq = freq_map.get(dca_freq.lower(), dca_freq.upper())
-        dca_freq = _normalize_pandas_frequency(dca_freq)
+    dca_freq = normalize_frequency(dca_freq)
 
     # Validate DCA parameters
     if (dca_freq is not None and dca_amount is None) or (dca_amount is not None and dca_freq is None):

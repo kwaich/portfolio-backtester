@@ -7,6 +7,37 @@
 
 ---
 
+## Review Update (2025-11-19)
+
+**Reviewer:** Antigravity
+**Status:** Verified
+
+### Verification of Previous Issues
+- **Security (Pickle)**: ✅ **Verified Fixed**. `backtest.py` now uses Parquet for caching and handles migration.
+- **Complexity (`compute_metrics`)**: ❌ **Still an Issue**. The function remains large (~190 lines) and handles multiple responsibilities (DCA, Rebalancing, Benchmarking).
+- **Batch Download**: ⚠️ **Addressed/Invalid**. The current implementation passes the list of tickers to `yf.download`, which handles batching internally. The concern about loop-based downloading seems to be based on an older version or misinterpretation.
+- **Code Duplication**: ✅ **FIXED**. Frequency normalization logic refactored into `normalize_frequency` utility function.
+
+### New Findings
+
+#### 1. XIRR Stability
+**Location:** `backtest.py:1055`
+**Issue:** The manual Newton-Raphson implementation for XIRR (`_calculate_xirr`) uses hardcoded parameters (guess=0.1, max_iterations=100) and bounds (-0.99 to 10.0). This may be unstable for complex cashflow patterns.
+**Status:** ✅ **FIXED**. Implemented robust XIRR calculation with Bisection fallback and improved initial guess. Added comprehensive tests.
+**Update (Bug Fix):** Fixed a bug where the fallback rejected valid roots if the wide interval bounds had the same sign. Implemented a grid search to reliably find bracketing intervals.
+
+#### 2. Hardcoded Validation Logic
+**Location:** `backtest.py:498`
+**Issue:** The check for "extreme price changes" (`price_changes.abs() > 0.9`) is hardcoded. While reasonable for many stocks, this could flag legitimate corporate actions or volatile assets as errors.
+**Recommendation:** Make this threshold configurable via arguments or constants.
+
+#### 3. Mixed Responsibilities in `compute_metrics`
+**Location:** `backtest.py:863`
+**Issue:** `compute_metrics` handles both Portfolio and Benchmark calculations, AND distinguishes between DCA and Rebalancing logic within the same flow. This makes the function hard to test and maintain.
+**Recommendation:** Split into `_calculate_portfolio_series` and `_calculate_benchmark_series`, and further separate DCA vs Rebalancing logic.
+
+---
+
 ## Executive Summary
 
 The portfolio backtester is a **well-structured, professionally developed codebase** with strong fundamentals:

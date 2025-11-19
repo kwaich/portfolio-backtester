@@ -1470,5 +1470,52 @@ class TestMain:
             backtest.main(["--tickers", "A", "B", "--weights", "0.5"])
 
 
+
+class TestXIRR:
+    """Test XIRR calculation stability"""
+
+    def test_basic_xirr(self):
+        # Simple case: -1000, +1100 after 1 year = 10%
+        cashflows = np.array([-1000.0, 1100.0])
+        days = np.array([0.0, 365.0])
+        irr = backtest._calculate_xirr(cashflows, days)
+        assert irr == pytest.approx(0.10, abs=1e-4)
+
+    def test_xirr_multiple_cashflows(self):
+        # -1000 at t=0, -1000 at t=365, +2310 at t=730
+        # Approx 10% return:
+        # -1000 * 1.1^2 = -1210
+        # -1000 * 1.1^1 = -1100
+        # Total required = 2310
+        cashflows = np.array([-1000.0, -1000.0, 2310.0])
+        days = np.array([0.0, 365.0, 730.0])
+        irr = backtest._calculate_xirr(cashflows, days)
+        assert irr == pytest.approx(0.10, abs=1e-4)
+
+    def test_xirr_fallback_convergence(self):
+        # Case that might challenge Newton-Raphson but work with Bisection
+        # Alternating signs or extreme values
+        cashflows = np.array([-100, 200, -150, 100])
+        days = np.array([0, 100, 200, 300])
+        # Just check it returns a valid number, not None
+        irr = backtest._calculate_xirr(cashflows, days)
+        assert irr is not None
+        assert -0.99 <= irr <= 10.0
+
+    def test_xirr_no_convergence_possible(self):
+        # All positive cashflows - impossible to have IRR
+        cashflows = np.array([100.0, 100.0])
+        days = np.array([0.0, 365.0])
+        irr = backtest._calculate_xirr(cashflows, days)
+        assert irr is None
+
+    def test_xirr_extreme_values(self):
+        # Very large return
+        cashflows = np.array([-100.0, 1000.0])
+        days = np.array([0.0, 365.0])
+        irr = backtest._calculate_xirr(cashflows, days)
+        assert irr == pytest.approx(9.0, abs=1e-4)  # 900% return
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
