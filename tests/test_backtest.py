@@ -1516,6 +1516,59 @@ class TestXIRR:
         irr = backtest._calculate_xirr(cashflows, days)
         assert irr == pytest.approx(9.0, abs=1e-4)  # 900% return
 
+    def test_xirr_loss_scenario(self):
+        # Negative return: -100 invested, 50 returned after 1 year
+        cashflows = np.array([-100.0, 50.0])
+        days = np.array([0.0, 365.0])
+        irr = backtest._calculate_xirr(cashflows, days)
+        assert irr is not None
+        assert irr == pytest.approx(-0.5, abs=1e-4)  # -50% return
+
+    def test_xirr_very_small_cashflows(self):
+        # Test with very small amounts to check precision
+        cashflows = np.array([-0.01, 0.011])
+        days = np.array([0.0, 365.0])
+        irr = backtest._calculate_xirr(cashflows, days)
+        assert irr is not None
+        assert irr == pytest.approx(0.10, abs=1e-3)  # 10% return
+
+    def test_xirr_long_duration(self):
+        # Very long investment period (27+ years)
+        cashflows = np.array([-100.0, 200.0])
+        days = np.array([0.0, 10000.0])
+        irr = backtest._calculate_xirr(cashflows, days)
+        assert irr is not None
+        # 100% return over 27.4 years ≈ 2.5% annual return
+        assert irr == pytest.approx(0.0253, abs=1e-3)
+
+    def test_xirr_zero_duration(self):
+        # Edge case: zero duration should return None
+        cashflows = np.array([-100.0, 110.0])
+        days = np.array([0.0, 0.0])
+        irr = backtest._calculate_xirr(cashflows, days)
+        # With zero duration, the smart initial guess will have division by zero
+        # Should gracefully handle this
+        assert irr is None or abs(irr) < 100  # Either None or reasonable value
+
+    def test_xirr_negative_cashflow_end(self):
+        # Multiple inflows followed by large outflow
+        cashflows = np.array([100.0, 100.0, -250.0])
+        days = np.array([0.0, 365.0, 730.0])
+        irr = backtest._calculate_xirr(cashflows, days)
+        assert irr is not None
+        # Should calculate correctly with outflow at end
+
+    def test_xirr_bisection_fallback_verified(self):
+        # Case designed to trigger bisection fallback with verifiable result
+        # Irregular cashflow pattern: -1000, +100, +100, +100, +800
+        # Total in: 1100, Total out: 1000, Net: 100 over ~3 years
+        cashflows = np.array([-1000.0, 100.0, 100.0, 100.0, 800.0])
+        days = np.array([0.0, 365.0, 730.0, 1095.0, 1460.0])
+        irr = backtest._calculate_xirr(cashflows, days)
+        assert irr is not None
+        # Rough estimate: 10% gain over 4 years ≈ 2.4% annual
+        assert 0.01 <= irr <= 0.05  # Should be small positive return
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

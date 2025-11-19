@@ -1134,23 +1134,7 @@ def _calculate_xirr(cashflows: np.ndarray, dates_in_days: np.ndarray, guess: flo
             val += cf / (base ** (days / 365.0))
         return val
 
-    # Find a bracket with sign change
-    low_bound = None
-    high_bound = None
-    
-    # Check grid points
-    npv_prev = calculate_npv(grid[0])
-    
-    for r in grid[1:]:
-        npv_curr = calculate_npv(r)
-        if npv_prev * npv_curr < 0:
-            # Found a sign change between prev_r (implicitly grid[i-1]) and r
-            # We need to retrieve the previous r. 
-            # Let's rewrite this loop slightly to be clearer.
-            pass 
-        npv_prev = npv_curr
-
-    # Better loop structure
+    # Find a bracket with sign change by checking consecutive grid points
     found_bracket = False
     for i in range(len(grid) - 1):
         r1 = grid[i]
@@ -1171,7 +1155,11 @@ def _calculate_xirr(cashflows: np.ndarray, dates_in_days: np.ndarray, guess: flo
     # Bisection on the found bracket
     low = low_bound
     high = high_bound
-    
+
+    # Cache NPV values at bracket endpoints to avoid redundant calculations
+    npv_low = calculate_npv(low)
+    npv_high = calculate_npv(high)
+
     for _ in range(max_iterations):
         mid = (low + high) / 2
         npv_mid = calculate_npv(mid)
@@ -1179,16 +1167,15 @@ def _calculate_xirr(cashflows: np.ndarray, dates_in_days: np.ndarray, guess: flo
         if abs(npv_mid) < tolerance:
             return mid
 
-        # Standard bisection update
-        # We know npv(low) and npv(high) have opposite signs (or one is zero)
-        # We need to maintain that invariant.
-        # Re-calculate npv_low to be safe or pass it through, but re-calc is cheap enough here
-        npv_low = calculate_npv(low)
-        
+        # Standard bisection update: maintain bracket with opposite-sign NPVs
         if npv_low * npv_mid < 0:
+            # Root is between low and mid
             high = mid
+            npv_high = npv_mid
         else:
+            # Root is between mid and high
             low = mid
+            npv_low = npv_mid
 
     logger.warning(f"XIRR calculation did not converge (Bisection). Returning best guess {mid:.2%}.")
     return mid
