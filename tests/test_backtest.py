@@ -960,6 +960,19 @@ class TestDataValidation:
         with pytest.raises(ValueError, match="extreme price change"):
             backtest.validate_price_data(df, ["AAPL"])
 
+    def test_validate_price_data_custom_extreme_change_threshold(self):
+        """Test that extreme change threshold can be customized."""
+        dates = pd.date_range("2020-01-01", periods=5, freq="D")
+        # 100 -> 160 is +60% (not extreme with default 90% threshold)
+        df = pd.DataFrame({"AAPL": [100, 160, 161, 162, 163]}, index=dates)
+
+        # Should pass with default threshold
+        backtest.validate_price_data(df, ["AAPL"])
+
+        # Should fail with tighter threshold
+        with pytest.raises(ValueError, match="extreme price change"):
+            backtest.validate_price_data(df, ["AAPL"], extreme_change_threshold=0.5)
+
     def test_validate_price_data_valid(self):
         """Test that valid data passes validation"""
         dates = pd.date_range("2020-01-01", periods=10, freq="D")

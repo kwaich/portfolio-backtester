@@ -47,6 +47,7 @@ logger = logging.getLogger(__name__)
 TRADING_DAYS_PER_YEAR = 252
 DEFAULT_CACHE_TTL_HOURS = 24
 CACHE_VERSION = "2.0"  # v2.0: Parquet format (was pickle in v1.0)
+MAX_DAILY_PRICE_CHANGE = 0.9
 
 
 def retry_with_backoff(
@@ -449,12 +450,18 @@ def _download_from_yfinance(tickers: List[str], start: str, end: str) -> Any:
     )
 
 
-def validate_price_data(df: pd.DataFrame, tickers: List[str]) -> None:
+def validate_price_data(
+    df: pd.DataFrame,
+    tickers: List[str],
+    extreme_change_threshold: float = MAX_DAILY_PRICE_CHANGE,
+) -> None:
     """Validate price data quality.
 
     Args:
         df: DataFrame containing price data
         tickers: List of ticker symbols
+        extreme_change_threshold: Maximum allowed absolute daily price change
+            before data is flagged as suspicious
 
     Raises:
         ValueError: If data quality issues are detected
@@ -495,7 +502,9 @@ def validate_price_data(df: pd.DataFrame, tickers: List[str]) -> None:
             # Check for extreme price changes (>90% in single day - likely data error)
             price_changes = valid_prices.pct_change().dropna()
             if len(price_changes) > 0:
-                extreme_changes = price_changes[price_changes.abs() > 0.9]
+                extreme_changes = price_changes[
+                    price_changes.abs() > extreme_change_threshold
+                ]
                 if len(extreme_changes) > 0:
                     max_change = extreme_changes.abs().max()
                     issues.append(
