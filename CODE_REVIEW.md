@@ -34,8 +34,12 @@
 #### 3. Mixed Responsibilities in `compute_metrics`
 **Location:** `backtest.py:879` (191 lines, confirmed 2026-04-30)
 **Issue:** `compute_metrics` handles both Portfolio and Benchmark calculations, AND distinguishes between DCA and Rebalancing logic within the same flow. This makes the function hard to test and maintain.
-**Status:** ❌ **Still Open**.
-**Recommendation:** Split into `_calculate_portfolio_series` and `_calculate_benchmark_series`, and further separate DCA vs Rebalancing logic.
+**Status:** ✅ **FIXED** (2026-04-30). Extracted three private helpers:
+- `_align_and_validate_data()` — data alignment & validation (lines 879–953)
+- `_calculate_series_value()` — strategy dispatch (DCA/rebalancing/buy-and-hold), shared by portfolio and benchmark (lines 955–989)
+- `_calculate_rolling_sharpe()` — promoted from inner function to module level (line 1211)
+
+`compute_metrics` reduced from 190 lines to 71 lines. Added 16 new targeted unit tests.
 
 ---
 
@@ -43,7 +47,7 @@
 
 **Status:** Spot-checked against current `main` branch.
 
-- **Issue #3 (compute_metrics complexity)**: ❌ Still 191 lines (879–1070). Remains the primary open refactoring item.
+- **Issue #3 (compute_metrics complexity)**: ✅ **FIXED**. Reduced from 191 to 71 lines via three extracted helpers.
 - **Issue #5 (Frequency normalization)**: ✅ **Confirmed Fixed**. `normalize_frequency()` is called at lines 726, 798, 1444, 1449 — no duplication remains.
 - **Issue #11 (Ticker search URL injection)**: ✅ **Not an Issue**. `requests.get(url, params=dict)` automatically URL-encodes query parameters; no manual sanitization needed.
 - **Issue #4 (StateManager validation)**: Duplicate of Issue #2 (already fixed). Marked below.
@@ -203,9 +207,9 @@ Added comprehensive type validation to all StateManager setter methods:
 
 ---
 
-### 3. Function Complexity: `compute_metrics()` Too Long
+### 3. ✅ FIXED: Function Complexity: `compute_metrics()` Too Long
 
-**Location:** `backtest.py:795-984` (190 lines)
+**Location:** `backtest.py:991-1062` (71 lines, down from 190)
 
 **Issue:**
 The `compute_metrics()` function is too long and handles multiple responsibilities:
@@ -281,7 +285,7 @@ def _calculate_portfolio_value(
 
 ---
 
-### 3. Performance: Batch Download Could Be More Efficient
+### 3A. Performance: Batch Download Could Be More Efficient
 
 **Location:** `backtest.py:556-603`
 
@@ -772,7 +776,7 @@ ADR-00X: Migrate to Parquet for safer caching
 
 ### Short-term (High Priority)
 2. ✅ **Add type validation to StateManager** (Reliability) — Fixed 2025-11-17
-3. ❌ **Refactor `compute_metrics()`** (Maintainability) — **Still Open** (191 lines as of 2026-04-30)
+3. ✅ **Refactor `compute_metrics()`** (Maintainability) — **Fixed** (71 lines, 3 helpers extracted)
 4. ⚠️ **Optimize batch downloads** (Performance) — Invalid; yfinance batches internally
 
 ### Medium-term (Medium Priority)

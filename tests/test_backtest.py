@@ -1609,5 +1609,174 @@ class TestXIRR:
         assert 0.01 <= irr <= 0.05  # Should be small positive return
 
 
+class TestAlignAndValidateData:
+    """Tests for _align_and_validate_data helper."""
+
+    def _make_prices(self, start, periods, tickers=("A", "B")):
+        idx = pd.date_range(start, periods=periods, freq="D")
+        data = {t: np.linspace(100, 110, periods) for t in tickers}
+        return pd.DataFrame(data, index=idx)
+
+    def _make_benchmark(self, start, periods):
+        idx = pd.date_range(start, periods=periods, freq="D")
+        return pd.Series(np.linspace(100, 110, periods), index=idx, name="bench")
+
+    def test_aligns_to_latest_start_date(self):
+        # Ticker B starts later — result should start when both are available
+        idx_a = pd.date_range("2020-01-01", periods=10, freq="D")
+        idx_b = pd.date_range("2020-01-05", periods=6, freq="D")
+        prices = pd.DataFrame({"A": pd.Series(100.0, index=idx_a), "B": pd.Series(100.0, index=idx_b)})
+        benchmark = self._make_benchmark("2020-01-01", 10)
+        aligned, bench = backtest._align_and_validate_data(prices, benchmark)
+        assert aligned.index[0] == pd.Timestamp("2020-01-05")
+
+    def test_benchmark_aligned_to_portfolio_start(self):
+        prices = self._make_prices("2020-01-05", 10)
+        benchmark = self._make_benchmark("2020-01-01", 14)
+        aligned, bench = backtest._align_and_validate_data(prices, benchmark)
+        assert bench.index[0] == aligned.index[0]
+
+    def test_raises_on_no_ticker_data(self):
+        idx = pd.date_range("2020-01-01", periods=5, freq="D")
+        prices = pd.DataFrame({"A": np.nan, "B": np.linspace(100, 105, 5)}, index=idx)
+        benchmark = self._make_benchmark("2020-01-01", 5)
+        with pytest.raises(ValueError, match="no valid prices"):
+            backtest._align_and_validate_data(prices, benchmark)
+
+    def test_raises_when_only_one_day_overlap(self):
+        prices = self._make_prices("2020-01-01", 2)
+        # Benchmark only overlaps on the last price day → 1 common day after alignment
+        bench_idx = pd.date_range("2020-01-02", periods=1, freq="D")
+        benchmark = pd.Series([100.0], index=bench_idx)
+        with pytest.raises(ValueError, match="Insufficient overlapping data"):
+            backtest._align_and_validate_data(prices, benchmark)
+
+    def test_warns_on_fewer_than_30_days(self, caplog):
+        prices = self._make_prices("2020-01-01", 10)
+        benchmark = self._make_benchmark("2020-01-01", 10)
+        with caplog.at_level(logging.WARNING, logger="backtest"):
+            backtest._align_and_validate_data(prices, benchmark)
+        assert any("Limited data" in r.message for r in caplog.records)
+
+    def test_no_warning_with_sufficient_data(self, caplog):
+        prices = self._make_prices("2020-01-01", 35)
+        benchmark = self._make_benchmark("2020-01-01", 35)
+        with caplog.at_level(logging.WARNING, logger="backtest"):
+            backtest._align_and_validate_data(prices, benchmark)
+        assert not any("Limited data" in r.message for r in caplog.records)
+
+    def test_raises_when_benchmark_has_no_data(self):
+        prices = self._make_prices("2020-01-01", 10)
+        idx = pd.date_range("2020-01-01", periods=5, freq="D")
+        benchmark = pd.Series(np.nan, index=idx)
+        with pytest.raises(ValueError, match="Benchmark has no data"):
+            backtest._align_and_validate_data(prices, benchmark)
+
+    def test_raises_when_benchmark_ends_before_portfolio_starts(self):
+        prices = self._make_prices("2020-02-01", 10)
+        benchmark = self._make_benchmark("2020-01-01", 10)  # ends 2020-01-10, before portfolio starts
+        with pytest.raises(ValueError, match="Benchmark has no overlapping data"):
+            backtest._align_and_validate_data(prices, benchmark)
+
+
+class TestCalculateSeriesValue:
+    """Tests for _calculate_series_value helper."""
+
+    def _flat_prices(self, periods=60, price=100.0):
+        idx = pd.date_range("2020-01-01", periods=periods, freq="D")
+        return pd.DataFrame({"A": price, "B": price}, index=idx)
+
+    def test_buy_and_hold_returns_constant_capital_with_flat_prices(self):
+        prices = self._flat_prices()
+        weights = np.array([0.5, 0.5])
+        value, contributions = backtest._calculate_series_value(prices, weights, 10_000, None, None, None)
+        assert value.iloc[0] == pytest.approx(10_000.0)
+        assert value.iloc[-1] == pytest.approx(10_000.0)
+        assert (contributions == 10_000.0).all()
+
+    def test_buy_and_hold_doubles_with_doubled_prices(self):
+        idx = pd.date_range("2020-01-01", periods=10, freq="D")
+        prices_arr = np.linspace(100, 200, 10)
+        prices = pd.DataFrame({"A": prices_arr, "B": prices_arr}, index=idx)
+        weights = np.array([0.5, 0.5])
+        value, _ = backtest._calculate_series_value(prices, weights, 10_000, None, None, None)
+        assert value.iloc[-1] == pytest.approx(20_000.0)
+
+    def test_dca_grows_with_regular_contributions(self):
+        prices = self._flat_prices(periods=90, price=100.0)
+        weights = np.array([0.5, 0.5])
+        value, contributions = backtest._calculate_series_value(prices, weights, 1_000, 500, "ME", None)
+        # With flat prices contributions accumulate and value grows
+        assert value.iloc[-1] > 1_000.0
+        assert contributions.iloc[-1] > 1_000.0
+
+    def test_rebalancing_returns_same_as_buy_and_hold_for_single_asset(self):
+        idx = pd.date_range("2020-01-01", periods=30, freq="D")
+        prices = pd.DataFrame({"A": np.linspace(100, 110, 30)}, index=idx)
+        weights = np.array([1.0])
+        value_bah, _ = backtest._calculate_series_value(prices, weights, 10_000, None, None, None)
+        value_reb, _ = backtest._calculate_series_value(prices, weights, 10_000, None, None, "ME")
+        # Single asset rebalancing == buy-and-hold (no-op rebalancing)
+        assert value_bah.iloc[-1] == pytest.approx(value_reb.iloc[-1], rel=1e-4)
+
+    def test_contributions_constant_for_non_dca(self):
+        prices = self._flat_prices()
+        weights = np.array([0.5, 0.5])
+        _, contributions = backtest._calculate_series_value(prices, weights, 5_000, None, None, None)
+        assert (contributions == 5_000.0).all()
+
+    def test_contributions_constant_for_rebalancing(self):
+        prices = self._flat_prices()
+        weights = np.array([0.5, 0.5])
+        _, contributions = backtest._calculate_series_value(prices, weights, 5_000, None, None, "ME")
+        assert (contributions == 5_000.0).all()
+
+    def test_dca_takes_precedence_over_rebalancing(self):
+        # When both dca_freq and rebalance_freq are set, DCA path must win
+        prices = self._flat_prices(periods=90)
+        weights = np.array([0.5, 0.5])
+        value_dca, contribs_dca = backtest._calculate_series_value(prices, weights, 1_000, 500, "ME", None)
+        value_both, contribs_both = backtest._calculate_series_value(prices, weights, 1_000, 500, "ME", "ME")
+        pd.testing.assert_series_equal(value_dca, value_both)
+        pd.testing.assert_series_equal(contribs_dca, contribs_both)
+
+
+class TestCalculateRollingSharpeMLevel:
+    """Tests for module-level _calculate_rolling_sharpe helper."""
+
+    def _linear_values(self, periods=300, start=100, end=200):
+        idx = pd.date_range("2020-01-01", periods=periods, freq="D")
+        return pd.Series(np.linspace(start, end, periods), index=idx)
+
+    def test_nan_for_first_window_minus_one_rows(self):
+        values = self._linear_values(300)
+        result = backtest._calculate_rolling_sharpe(values, 252)
+        assert result.iloc[:251].isna().all()
+
+    def test_not_nan_after_full_window(self):
+        values = self._linear_values(300)
+        result = backtest._calculate_rolling_sharpe(values, 252)
+        assert not result.iloc[252:].isna().all()
+
+    def test_zero_volatility_produces_zero_not_inf(self):
+        idx = pd.date_range("2020-01-01", periods=300, freq="D")
+        values = pd.Series(100.0, index=idx)
+        result = backtest._calculate_rolling_sharpe(values, 252)
+        valid = result.dropna()
+        assert (valid == 0.0).all()
+
+    def test_matches_compute_metrics_lump_sum_output(self):
+        # The extracted function should match what compute_metrics produces (lump-sum path)
+        idx = pd.date_range("2020-01-01", periods=400, freq="D")
+        np.random.seed(42)
+        price_vals = 100 * np.cumprod(1 + np.random.normal(0.0005, 0.01, 400))
+        prices = pd.DataFrame({"A": price_vals, "B": price_vals}, index=idx)
+        weights = np.array([0.5, 0.5])
+        benchmark = pd.Series(price_vals, index=idx)
+        table = backtest.compute_metrics(prices, weights, benchmark, 10_000)
+        standalone = backtest._calculate_rolling_sharpe(table["portfolio_value"], 252, table["portfolio_contributions"])
+        pd.testing.assert_series_equal(standalone, table["portfolio_rolling_sharpe_12m"], check_names=False)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

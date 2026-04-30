@@ -876,6 +876,118 @@ def _calculate_dca_portfolio(
     return portfolio_values, cumulative_contributions
 
 
+def _align_and_validate_data(
+    prices: pd.DataFrame,
+    benchmark: pd.Series,
+) -> tuple[pd.DataFrame, pd.Series]:
+    """Align prices and benchmark to a common date range and validate the result.
+
+    Args:
+        prices: DataFrame with adjusted close prices for portfolio tickers
+        benchmark: Series with benchmark prices
+
+    Returns:
+        Tuple of (aligned_prices, aligned_benchmark) sharing the same DatetimeIndex
+
+    Raises:
+        ValueError: If any ticker has no data, the benchmark has no data,
+                    or there is insufficient overlapping history (< 2 days)
+    """
+    prices = prices.sort_index()
+    first_valid_points = [series.first_valid_index() for _, series in prices.items()]
+    if any(idx is None for idx in first_valid_points):
+        tickers_status = [
+            f"{ticker}: {'OK' if idx is not None else 'NO DATA'}"
+            for ticker, idx in zip(prices.columns, first_valid_points)
+        ]
+        raise ValueError(
+            f"One or more tickers have no valid prices in this window:\n"
+            + "\n".join(f"  - {s}" for s in tickers_status)
+        )
+    start_date = max(first_valid_points)
+    aligned = prices.loc[start_date:].ffill().dropna()
+    if aligned.empty:
+        earliest_dates = {
+            ticker: idx.strftime("%Y-%m-%d") if idx else "N/A"
+            for ticker, idx in zip(prices.columns, first_valid_points)
+        }
+        raise ValueError(
+            f"Not enough overlapping history for portfolio tickers.\n"
+            f"Ticker start dates: {earliest_dates}\n"
+            f"Common start would be: {start_date.strftime('%Y-%m-%d')}\n"
+            f"Try using a later start date or different tickers."
+        )
+
+    benchmark = benchmark.sort_index()
+    bench_start = benchmark.first_valid_index()
+    if bench_start is None:
+        raise ValueError(
+            "Benchmark has no data in the requested window.\n"
+            "Verify the benchmark ticker is valid and traded during this period."
+        )
+    combined_start = max(aligned.index[0], bench_start)
+    aligned = aligned.loc[combined_start:]
+    benchmark = benchmark.loc[combined_start:].reindex(aligned.index).ffill().dropna()
+    if benchmark.empty:
+        raise ValueError(
+            f"Benchmark has no overlapping data in this window.\n"
+            f"Portfolio starts: {aligned.index[0].strftime('%Y-%m-%d')}\n"
+            f"Benchmark starts: {bench_start.strftime('%Y-%m-%d')}\n"
+            f"Try adjusting the date range or choose a different benchmark."
+        )
+
+    if len(aligned) < 2:
+        raise ValueError(
+            f"Insufficient overlapping data: only {len(aligned)} trading day(s).\n"
+            f"Need at least 2 days for meaningful backtest.\n"
+            f"Try using a longer date range or different tickers."
+        )
+
+    if len(aligned) < 30:
+        logger.warning(
+            f"Limited data: only {len(aligned)} trading days. "
+            f"Statistics may be unreliable for periods < 30 days."
+        )
+
+    return aligned, benchmark
+
+
+def _calculate_series_value(
+    prices_df: pd.DataFrame,
+    weights: np.ndarray,
+    capital: float,
+    dca_amount: Optional[float],
+    dca_freq: Optional[str],
+    rebalance_freq: Optional[str],
+) -> tuple[pd.Series, pd.Series]:
+    """Calculate portfolio value and cumulative contributions for a given strategy.
+
+    Applies DCA, rebalancing, or buy-and-hold in that priority order.
+
+    Args:
+        prices_df: Aligned price DataFrame (tickers as columns)
+        weights: Asset weights (must sum to 1.0)
+        capital: Initial capital
+        dca_amount: Per-period contribution for DCA (None disables DCA)
+        dca_freq: DCA frequency string (e.g. 'ME', 'W')
+        rebalance_freq: Rebalancing frequency string (None = buy-and-hold)
+
+    Returns:
+        Tuple of (value_series, contributions_series) with the same DatetimeIndex
+    """
+    if dca_freq is not None and dca_amount is not None and dca_amount > 0:
+        return _calculate_dca_portfolio(prices_df, weights, capital, dca_amount, dca_freq)
+
+    contributions = pd.Series(capital, index=prices_df.index, dtype=float)
+    if rebalance_freq is not None:
+        value = _calculate_rebalanced_portfolio(prices_df, weights, capital, rebalance_freq)
+    else:
+        first_prices = prices_df.iloc[0]
+        units = (capital * weights) / first_prices
+        value = (prices_df * units).sum(axis=1)
+    return value, contributions
+
+
 def compute_metrics(
     prices: pd.DataFrame,
     weights: np.ndarray,
@@ -904,112 +1016,27 @@ def compute_metrics(
     Note:
         DCA and rebalancing are mutually exclusive. If both are specified, DCA takes precedence.
     """
+    aligned, benchmark = _align_and_validate_data(prices, benchmark)
 
-    prices = prices.sort_index()
-    first_valid_points = [series.first_valid_index() for _, series in prices.items()]
-    if any(idx is None for idx in first_valid_points):
-        tickers_status = [
-            f"{ticker}: {'OK' if idx is not None else 'NO DATA'}"
-            for ticker, idx in zip(prices.columns, first_valid_points)
-        ]
-        raise ValueError(
-            f"One or more tickers have no valid prices in this window:\n"
-            + "\n".join(f"  - {s}" for s in tickers_status)
-        )
-    start_date = max(first_valid_points)
-    aligned = prices.loc[start_date:].ffill().dropna()
-    if aligned.empty:
-        earliest_dates = {
-            ticker: idx.strftime("%Y-%m-%d") if idx else "N/A"
-            for ticker, idx in zip(prices.columns, first_valid_points)
-        }
-        raise ValueError(
-            f"Not enough overlapping history for portfolio tickers.\n"
-            f"Ticker start dates: {earliest_dates}\n"
-            f"Common start would be: {start_date.strftime('%Y-%m-%d')}\n"
-            f"Try using a later start date or different tickers."
-        )
-
-    # Align benchmark to the same index, forward-filling gaps once it starts trading
-    benchmark = benchmark.sort_index()
-    bench_start = benchmark.first_valid_index()
-    if bench_start is None:
-        raise ValueError(
-            "Benchmark has no data in the requested window.\n"
-            "Verify the benchmark ticker is valid and traded during this period."
-        )
-    combined_start = max(aligned.index[0], bench_start)
-    aligned = aligned.loc[combined_start:]
-    benchmark = benchmark.loc[combined_start:].reindex(aligned.index).ffill().dropna()
-    if benchmark.empty:
-        raise ValueError(
-            f"Benchmark has no overlapping data in this window.\n"
-            f"Portfolio starts: {aligned.index[0].strftime('%Y-%m-%d')}\n"
-            f"Benchmark starts: {bench_start.strftime('%Y-%m-%d')}\n"
-            f"Try adjusting the date range or choose a different benchmark."
-        )
-
-    # Validate sufficient data after alignment
-    if len(aligned) < 2:
-        raise ValueError(
-            f"Insufficient overlapping data: only {len(aligned)} trading day(s).\n"
-            f"Need at least 2 days for meaningful backtest.\n"
-            f"Try using a longer date range or different tickers."
-        )
-
-    if len(aligned) < 30:
+    if dca_freq is not None and dca_amount is not None and dca_amount > 0 and rebalance_freq is not None:
         logger.warning(
-            f"Limited data: only {len(aligned)} trading days. "
-            f"Statistics may be unreliable for periods < 30 days."
+            "Both DCA and rebalancing specified. Using DCA strategy only. "
+            "DCA and rebalancing are mutually exclusive."
         )
 
-    # Calculate portfolio value based on strategy
-    # Priority: DCA > Rebalancing > Buy-and-hold
-    portfolio_contributions = None  # Track for DCA
-    if dca_freq is not None and dca_amount is not None and dca_amount > 0:
-        # DCA strategy (dollar-cost averaging with regular contributions)
-        if rebalance_freq is not None:
-            logger.warning(
-                "Both DCA and rebalancing specified. Using DCA strategy only. "
-                "DCA and rebalancing are mutually exclusive."
-            )
-        portfolio_value, portfolio_contributions = _calculate_dca_portfolio(aligned, weights, capital, dca_amount, dca_freq)
-    elif rebalance_freq is None:
-        # Buy-and-hold strategy (lump sum, no rebalancing)
-        first_prices = aligned.iloc[0]
-        units = (capital * weights) / first_prices
-        portfolio_value = (aligned * units).sum(axis=1)
-        portfolio_contributions = pd.Series(capital, index=aligned.index, dtype=float)
-    else:
-        # Rebalancing strategy (lump sum with periodic rebalancing)
-        portfolio_value = _calculate_rebalanced_portfolio(aligned, weights, capital, rebalance_freq)
-        portfolio_contributions = pd.Series(capital, index=aligned.index, dtype=float)
-
-    # Calculate returns based on cumulative contributions (accurate for DCA)
+    portfolio_value, portfolio_contributions = _calculate_series_value(
+        aligned, weights, capital, dca_amount, dca_freq, rebalance_freq
+    )
     portfolio_return = (portfolio_value - portfolio_contributions) / portfolio_contributions
 
-    # Calculate benchmark value with same strategy as portfolio for fair comparison
-    bench_contributions = None  # Track for DCA
-    if dca_freq is not None and dca_amount is not None and dca_amount > 0:
-        # Apply DCA to benchmark for fair comparison
-        benchmark_df = benchmark.to_frame(name='benchmark')
-        bench_weights = np.array([1.0])  # 100% in benchmark
-        bench_value, bench_contributions = _calculate_dca_portfolio(benchmark_df, bench_weights, capital, dca_amount, dca_freq)
-    elif rebalance_freq is not None:
-        # Apply rebalancing to benchmark (though it's a single asset, so effectively same as buy-and-hold)
-        benchmark_df = benchmark.to_frame(name='benchmark')
-        bench_weights = np.array([1.0])
-        bench_value = _calculate_rebalanced_portfolio(benchmark_df, bench_weights, capital, rebalance_freq)
-        bench_contributions = pd.Series(capital, index=benchmark_df.index, dtype=float)
-    else:
-        # Buy-and-hold for benchmark
-        bench_units = capital / benchmark.iloc[0]
-        bench_value = benchmark * bench_units
-        bench_contributions = pd.Series(capital, index=benchmark.index, dtype=float)
-
-    # Calculate returns based on cumulative contributions (accurate for DCA)
+    benchmark_df = benchmark.to_frame(name="benchmark")
+    bench_weights = np.array([1.0])
+    bench_value, bench_contributions = _calculate_series_value(
+        benchmark_df, bench_weights, capital, dca_amount, dca_freq, rebalance_freq
+    )
     bench_return = (bench_value - bench_contributions) / bench_contributions
 
+    window = 252  # ~12 months of trading days
     table = pd.DataFrame(
         {
             "portfolio_value": portfolio_value,
@@ -1021,44 +1048,8 @@ def compute_metrics(
             "active_return": portfolio_return - bench_return,
         }
     )
-
-    # Calculate rolling 12-month Sharpe ratio (252 trading days)
-    # This shows how risk-adjusted performance evolves over time
-    window = 252  # Approximately 12 months of trading days
-
-    def calculate_rolling_sharpe(values: pd.Series, window_size: int, contributions: Optional[pd.Series] = None) -> pd.Series:
-        """Calculate rolling Sharpe ratio over a specified window.
-
-        Args:
-            values: Series of portfolio/benchmark values
-            window_size: Rolling window size in trading days
-
-        Returns:
-            Series of rolling Sharpe ratios (NaN for insufficient data)
-        """
-        # Calculate daily returns (exclude contribution spikes when provided)
-        daily_returns = _calculate_daily_returns(values, contributions)
-
-        # Calculate rolling mean and std of returns
-        rolling_mean = daily_returns.rolling(window=window_size).mean()
-        rolling_std = daily_returns.rolling(window=window_size).std()
-
-        # Annualize: mean * 252, std * sqrt(252)
-        annualized_return = rolling_mean * TRADING_DAYS_PER_YEAR
-        annualized_volatility = rolling_std * np.sqrt(TRADING_DAYS_PER_YEAR)
-
-        # Sharpe ratio = annualized_return / annualized_volatility
-        # Division will produce NaN for insufficient data (from rolling window)
-        # and inf for zero volatility
-        sharpe = annualized_return / annualized_volatility
-
-        # Replace inf/-inf (from zero volatility) with 0, but preserve NaN
-        sharpe = sharpe.replace([np.inf, -np.inf], 0.0)
-
-        return sharpe
-
-    table["portfolio_rolling_sharpe_12m"] = calculate_rolling_sharpe(portfolio_value, window, portfolio_contributions)
-    table["benchmark_rolling_sharpe_12m"] = calculate_rolling_sharpe(bench_value, window, bench_contributions)
+    table["portfolio_rolling_sharpe_12m"] = _calculate_rolling_sharpe(portfolio_value, window, portfolio_contributions)
+    table["benchmark_rolling_sharpe_12m"] = _calculate_rolling_sharpe(bench_value, window, bench_contributions)
 
     logger.info(
         f"Calculated rolling 12-month Sharpe ratio "
@@ -1215,6 +1206,31 @@ def _calculate_daily_returns(series: pd.Series, contributions_series: Optional[p
 
     returns = market_value_changes / prev_values
     return returns.replace([np.inf, -np.inf], np.nan)
+
+
+def _calculate_rolling_sharpe(
+    values: pd.Series,
+    window_size: int,
+    contributions: Optional[pd.Series] = None,
+) -> pd.Series:
+    """Calculate rolling Sharpe ratio over a specified window.
+
+    Args:
+        values: Series of portfolio or benchmark values
+        window_size: Rolling window size in trading days
+        contributions: Optional cumulative contributions (used to exclude DCA spikes)
+
+    Returns:
+        Series of annualized rolling Sharpe ratios (NaN for insufficient data,
+        0.0 where volatility is zero)
+    """
+    daily_returns = _calculate_daily_returns(values, contributions)
+    rolling_mean = daily_returns.rolling(window=window_size).mean()
+    rolling_std = daily_returns.rolling(window=window_size).std()
+    annualized_return = rolling_mean * TRADING_DAYS_PER_YEAR
+    annualized_volatility = rolling_std * np.sqrt(TRADING_DAYS_PER_YEAR)
+    sharpe = annualized_return / annualized_volatility
+    return sharpe.replace([np.inf, -np.inf], 0.0)
 
 
 def normalize_frequency(freq: Optional[str]) -> Optional[str]:
