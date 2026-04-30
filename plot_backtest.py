@@ -57,6 +57,11 @@ LEGEND_FONT_SIZE = 10         # Legend text
 TICK_LABEL_FONT_SIZE = 9      # Tick labels
 ANNOTATION_FONT_SIZE = 9      # Annotations
 
+# Output quality
+# 150 DPI provides good balance between file size and print quality
+# (300 DPI is overkill for screen viewing; 72 DPI looks pixelated when zoomed)
+DEFAULT_DPI = 150
+
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments for the plotting CLI.
@@ -84,8 +89,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dpi",
         type=int,
-        default=150,
-        help="Output DPI for PNG files (default: 150)",
+        default=DEFAULT_DPI,
+        help=f"Output DPI for PNG files (default: {DEFAULT_DPI})",
     )
     parser.add_argument(
         "--dashboard",

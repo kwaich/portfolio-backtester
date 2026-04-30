@@ -451,12 +451,14 @@ All updated docstrings include the return type, a brief description, and
 
 ---
 
-### 7. Magic Numbers in Configuration
+### 7. ✅ FIXED: Magic Numbers in Configuration
 
-**Location:** `app/config.py`, `plot_backtest.py`
+**Status:** ✅ **FIXED** (2026-04-30)
+
+**Location:** `app/config.py`, `plot_backtest.py`, `backtest.py`
 
 **Issue:**
-Some magic numbers lack explanation:
+Some magic numbers lacked explanation:
 
 ```python
 # app/config.py
@@ -467,37 +469,30 @@ SUBPLOT_HORIZONTAL_SPACING = 0.12  # Why 0.12?
 DPI = 150  # Default DPI - why 150?
 ```
 
-**Recommendation:**
-Add comments explaining the rationale:
-
-```python
-# Visual spacing constants
-# Vertical spacing optimized for 2x2 grid at 800px height
-# 0.15 provides ~120px between rows for clear visual separation
-SUBPLOT_VERTICAL_SPACING = 0.15
-
-# Horizontal spacing optimized for wide layout
-# 0.12 provides ~150px between columns on typical screens
-SUBPLOT_HORIZONTAL_SPACING = 0.12
-
-# Output quality
-# 150 DPI provides good balance between file size and print quality
-# (300 DPI is overkill for screen viewing, 72 DPI looks pixelated when zoomed)
-DEFAULT_DPI = 150
-```
+**Implementation:**
+Added explanatory comments to all uncommented constants:
+- `app/config.py`: 19 constants documented (UI limits, defaults, chart dimensions,
+  spacing rationale with pixel estimates)
+- `plot_backtest.py`: Extracted `DEFAULT_DPI = 150` with comment explaining the
+  trade-off between file size and print quality
+- `backtest.py`: Added comments to `TRADING_DAYS_PER_YEAR`, `DEFAULT_CACHE_TTL_HOURS`,
+  `MAX_DAILY_PRICE_CHANGE`; extracted `ROLLING_SHARPE_WINDOW = 252` to module level
 
 **Priority:** MEDIUM
-**Effort:** 1-2 hours
+**Effort:** ~30 minutes
 **Impact:** Low - Improves code clarity
 
 ---
 
-### 8. Inefficient String Concatenation
+### 8. ✅ FIXED: Inefficient String Concatenation
 
-**Location:** `backtest.py:150-153`
+**Status:** ✅ **FIXED** (2026-04-30)
+
+**Location:** `backtest.py`
 
 **Issue:**
-Using `"\n".join()` for building multiline error messages is less readable than f-strings:
+Using `"\n".join()` inside f-string expressions mixed with `+` concatenation was
+less readable than pure f-strings:
 
 ```python
 raise ValueError(
@@ -506,20 +501,14 @@ raise ValueError(
 )
 ```
 
-**Recommendation:**
-Use consistent f-string formatting:
-
-```python
-error_list = "\n".join(errors)
-raise ValueError(
-    f"Invalid ticker(s) detected:\n"
-    f"{error_list}\n\n"
-    f"Valid ticker examples: AAPL, MSFT, VWRA.L, ^GSPC, EURUSD=X"
-)
-```
+**Implementation:**
+Refactored 4 locations in `backtest.py` to use consistent f-string formatting:
+- `validate_tickers()`: Extracted `error_list` variable, used pure f-strings
+- `align_and_validate_data()`: Extracted `ticker_status_lines`, used pure f-strings
+- `main()` print separators: Changed `"\n" + "="*70` to `f"\n{'='*70}"`
 
 **Priority:** MEDIUM
-**Effort:** 30 minutes
+**Effort:** ~15 minutes
 **Impact:** Low - Improves readability
 
 ---
@@ -776,8 +765,8 @@ ADR-00X: Migrate to Parquet for safer caching
 ### Medium-term (Medium Priority)
 5. ✅ **Extract frequency normalization** (Code quality) — Fixed
 6. ✅ **Improve docstring return types** (Documentation) — Fixed 2026-04-30
-7. ⬜ **Document magic numbers** (Clarity)
-8. ⬜ **Improve string formatting** (Readability)
+7. ✅ **Document magic numbers** (Clarity) — Fixed 2026-04-30
+8. ✅ **Improve string formatting** (Readability) — Fixed 2026-04-30
 
 ### Long-term (Low Priority)
 9. ⬜ **Add DEBUG logging** (Developer experience)

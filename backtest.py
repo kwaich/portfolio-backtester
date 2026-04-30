@@ -44,10 +44,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Constants
-TRADING_DAYS_PER_YEAR = 252
-DEFAULT_CACHE_TTL_HOURS = 24
+TRADING_DAYS_PER_YEAR = 252  # ~252 trading days/year (excludes weekends and ~9 market holidays)
+DEFAULT_CACHE_TTL_HOURS = 24  # Daily refresh; intraday price data changes every trading day
 CACHE_VERSION = "2.0"  # v2.0: Parquet format (was pickle in v1.0)
-MAX_DAILY_PRICE_CHANGE = 0.9
+MAX_DAILY_PRICE_CHANGE = 0.9  # 90% single-day move threshold; flags data errors (splits, bad prints)
+                              # while allowing extreme but legitimate moves
+ROLLING_SHARPE_WINDOW = 252  # ~12 months of trading days for rolling Sharpe calculation
 
 
 def retry_with_backoff(
@@ -148,8 +150,10 @@ def validate_tickers(tickers: List[str]) -> None:
             errors.append(f"  • {error_msg}")
 
     if errors:
+        error_list = "\n".join(errors)
         raise ValueError(
-            f"Invalid ticker(s) detected:\n" + "\n".join(errors) + "\n\n"
+            f"Invalid ticker(s) detected:\n"
+            f"{error_list}\n\n"
             f"Valid ticker examples: AAPL, MSFT, VWRA.L, ^GSPC, EURUSD=X"
         )
 
@@ -930,9 +934,10 @@ def _align_and_validate_data(
             f"{ticker}: {'OK' if idx is not None else 'NO DATA'}"
             for ticker, idx in zip(prices.columns, first_valid_points)
         ]
+        ticker_status_lines = "\n".join(f"  - {s}" for s in tickers_status)
         raise ValueError(
             f"One or more tickers have no valid prices in this window:\n"
-            + "\n".join(f"  - {s}" for s in tickers_status)
+            f"{ticker_status_lines}"
         )
     start_date = max(first_valid_points)
     aligned = prices.loc[start_date:].ffill().dropna()
@@ -1066,7 +1071,7 @@ def compute_metrics(
     )
     bench_return = (bench_value - bench_contributions) / bench_contributions
 
-    window = 252  # ~12 months of trading days
+    window = ROLLING_SHARPE_WINDOW
     table = pd.DataFrame(
         {
             "portfolio_value": portfolio_value,
@@ -1531,9 +1536,9 @@ def main(argv: List[str]) -> None:
     )
 
     # Print results
-    print("\n" + "="*70)
+    print(f"\n{'='*70}")
     print("BACKTEST RESULTS")
-    print("="*70)
+    print(f"{'='*70}")
     print(f"Initial Capital: ${args.capital:,.2f}")
     if dca_freq and dca_amount:
         print(f"Total Contributions: ${portfolio_total_contrib:,.2f} (Portfolio & Benchmark)")
@@ -1600,7 +1605,7 @@ def main(argv: List[str]) -> None:
     active_cagr = portfolio_stats["cagr"] - benchmark_stats["cagr"]
     print(f"  Active Return:   {active_return:>15.2%}")
     print(f"  Active CAGR:     {active_cagr:>15.2%}")
-    print("="*70 + "\n")
+    print(f"{'='*70}\n")
 
     if args.output:
         output_path = args.output

@@ -26,26 +26,26 @@ SIDEBAR_STATE = "expanded"
 # =============================================================================
 
 # Tickers
-MIN_TICKERS = 1
-MAX_TICKERS = 10
-DEFAULT_NUM_TICKERS = 2
+MIN_TICKERS = 1          # Minimum portfolio size (must have at least 1 holding)
+MAX_TICKERS = 10         # UI limit to keep interface manageable
+DEFAULT_NUM_TICKERS = 2  # Default portfolio size (e.g., two-fund split)
 
 # Benchmarks
-MIN_BENCHMARKS = 1
-MAX_BENCHMARKS = 3
-DEFAULT_NUM_BENCHMARKS = 1
+MIN_BENCHMARKS = 1          # At least 1 benchmark required for comparison
+MAX_BENCHMARKS = 3          # UI limit; more benchmarks clutter charts
+DEFAULT_NUM_BENCHMARKS = 1  # Default to single benchmark
 
 # Capital
-DEFAULT_CAPITAL = 100_000
-MIN_CAPITAL = 1_000
-MAX_CAPITAL = 10_000_000
+DEFAULT_CAPITAL = 100_000    # Round number for intuitive starting capital
+MIN_CAPITAL = 1_000          # Minimum meaningful investment amount
+MAX_CAPITAL = 10_000_000     # Upper bound to prevent UI overflow
 
 # =============================================================================
 # Default Values
 # =============================================================================
 
-DEFAULT_START_DATE = datetime(2018, 1, 1)
-MAX_START_DATE = datetime(2010, 1, 1)  # For "Max" preset
+DEFAULT_START_DATE = datetime(2018, 1, 1)  # ~5+ years of history for meaningful backtests
+MAX_START_DATE = datetime(2010, 1, 1)    # Earliest reliable data for "Max" preset
 
 # Default tickers for manual entry
 DEFAULT_TICKER_1 = "VDCP.L"
@@ -83,9 +83,9 @@ DCA_FREQUENCY_OPTIONS = {
 }
 
 DEFAULT_DCA_FREQUENCY = "None (Lump Sum)"
-DEFAULT_DCA_AMOUNT = 1000.0
-MIN_DCA_AMOUNT = 100.0
-MAX_DCA_AMOUNT = 100_000.0
+DEFAULT_DCA_AMOUNT = 1000.0    # Round monthly contribution typical for retail investors
+MIN_DCA_AMOUNT = 100.0         # Minimum recurring contribution threshold
+MAX_DCA_AMOUNT = 100_000.0     # Upper sanity bound
 
 # =============================================================================
 # Chart Configuration
@@ -112,11 +112,12 @@ POSITIVE_COLOR = "#0173B2"  # Blue
 NEGATIVE_COLOR = "#DE8F05"  # Orange
 
 # Rolling windows for returns analysis (in days)
+# 30 ≈ 1 month, 90 ≈ 3 months, 180 ≈ 6 months
 ROLLING_WINDOWS = [30, 90, 180]
 
-# Chart dimensions
-CHART_HEIGHT = 400
-DASHBOARD_HEIGHT = 800
+# Chart dimensions (in pixels)
+CHART_HEIGHT = 400       # Standard Plotly chart height
+DASHBOARD_HEIGHT = 800   # 2× chart height for 2×2 dashboard layout
 
 # =============================================================================
 # Visual Hierarchy Configuration
@@ -143,9 +144,11 @@ LEGEND_FONT_SIZE = 11       # Legend text
 TICK_FONT_SIZE = 10         # Axis tick labels
 ANNOTATION_FONT_SIZE = 10   # Annotations and notes
 
-# Spacing and layout
-SUBPLOT_VERTICAL_SPACING = 0.15    # Vertical spacing between subplots (increased from 0.12)
-SUBPLOT_HORIZONTAL_SPACING = 0.12  # Horizontal spacing between subplots (increased from 0.10)
+# Spacing and layout (fractions of figure dimensions)
+# 0.15 vertical spacing ≈ 120px gap between rows in an 800px-tall dashboard
+# 0.12 horizontal spacing ≈ 150px gap between columns on a typical 1200px-wide screen
+SUBPLOT_VERTICAL_SPACING = 0.15
+SUBPLOT_HORIZONTAL_SPACING = 0.12
 
 # =============================================================================
 # Metric Labels
