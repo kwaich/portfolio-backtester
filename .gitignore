@@ -8,3 +8,4 @@ charts/
 .pytest_cache/
 .coverage
 htmlcov/
+.DS_Store
