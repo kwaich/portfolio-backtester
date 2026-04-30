@@ -17,7 +17,7 @@ A lightweight, flexible Python utility for backtesting portfolio strategies agai
 - **Easy CLI**: Simple command-line interface with sensible defaults
 - **Data Quality Validation**: Automatic detection of data issues (missing values, invalid prices, extreme changes)
 - **Optimized Performance**: Batch downloads with per-ticker caching for faster multi-ticker operations
-- **Well-Tested**: Comprehensive suite (256 tests, see `docs/TESTING_GUIDE.md`) with 100% pass rate
+- **Well-Tested**: Comprehensive suite (293 tests, see `docs/TESTING_GUIDE.md`) with 100% pass rate
 
 ## Quick Start
 
@@ -424,7 +424,7 @@ This optimization is especially beneficial when:
 ```
 portfolio-backtester/
 ├── app.py                  # Streamlit web UI (backward compat wrapper)
-├── app/                    # Modular web UI package (NEW)
+├── app/                    # Modular web UI package (12 modules)
 │   ├── __init__.py         # Package initialization
 │   ├── config.py           # Configuration constants (32 constants)
 │   ├── presets.py          # Portfolio and date presets
@@ -433,10 +433,13 @@ portfolio-backtester/
 │   ├── ui_components.py    # Reusable UI rendering functions
 │   ├── ticker_data.py      # Searchable ticker helpers + Yahoo Finance integration
 │   ├── charts.py           # Plotly chart generation
+│   ├── sidebar.py          # Form-based sidebar rendering
+│   ├── results.py          # Results display functions
+│   ├── utils.py            # URL params, error handling, progress
 │   └── main.py             # Main application orchestration
 ├── backtest.py             # Core backtesting engine
 ├── plot_backtest.py        # Visualization utility
-├── tests/                  # Test suite (256 tests, ~88% coverage; see docs/TESTING_GUIDE.md)
+├── tests/                  # Test suite (293 tests, ~88% coverage; see docs/TESTING_GUIDE.md)
 │   ├── test_backtest.py    # Unit tests for backtest engine
 │   ├── test_app.py         # Streamlit UI regression suite
 │   ├── test_state_manager.py
@@ -459,25 +462,22 @@ portfolio-backtester/
 └── charts/                 # PNG outputs (gitignored)
 ```
 
-### Modular Architecture (NEW)
+### Modular Architecture
 
-The Streamlit web UI has been refactored into a clean, modular architecture:
-
-**Benefits**:
-- ✅ **Maintainable**: Each module has a single responsibility
-- ✅ **Testable**: Small, focused modules are easy to test
-- ✅ **Extensible**: Add new features without touching existing code
-- ✅ **Professional**: Industry-standard package structure
-- ✅ **DRY**: Zero code duplication (eliminated 134 duplicate lines)
-- ✅ **Backward Compatible**: Old `streamlit run app.py` still works
+The Streamlit web UI is organized as a clean, modular package:
 
 **Module Breakdown**:
-- `config.py` (121 lines): All configuration constants, colors, labels
-- `presets.py` (110 lines): Portfolio and date range presets
-- `validation.py` (162 lines): Input validation, session state management
-- `ui_components.py` (306 lines): Reusable metric and table rendering
-- `charts.py` (306 lines): Plotly chart generation functions
-- `main.py` (459 lines): Application orchestration and workflow
+- `config.py`: All configuration constants, colors, labels
+- `presets.py`: Portfolio and date range presets
+- `validation.py`: Input validation, session state management
+- `state_manager.py`: Centralized session state with type validation
+- `ui_components.py`: Reusable metric and table rendering
+- `ticker_data.py`: Ticker search + Yahoo Finance integration
+- `charts.py`: Plotly chart generation functions
+- `sidebar.py`: Form-based sidebar (90% fewer reruns)
+- `results.py`: Results display functions
+- `utils.py`: URL params, error handling, progress tracking
+- `main.py`: Application orchestration and workflow
 - `app.py` (43 lines): Backward compatibility wrapper
 
 ## Development
@@ -487,7 +487,7 @@ The Streamlit web UI has been refactored into a clean, modular architecture:
 See [`docs/TESTING_GUIDE.md`](docs/TESTING_GUIDE.md) for the authoritative breakdown, coverage targets, and workflow. Quick commands:
 
 ```bash
-# Entire suite (256 tests, ~88% coverage)
+# Entire suite (293 tests, ~88% coverage)
 pytest -v
 
 # Focus on a single area
@@ -548,7 +548,6 @@ Historical price data is fetched from Yahoo Finance via the [yfinance](https://g
 
 ## Limitations
 
-- **Buy-and-hold only**: No rebalancing or dynamic strategies
 - **No transaction costs**: Assumes zero trading fees
 - **No taxes**: Does not model tax implications
 - **Daily granularity**: Uses daily adjusted close prices

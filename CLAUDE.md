@@ -42,9 +42,9 @@ portfolio-backtester/
 │   ├── ui_components.py      # Reusable UI rendering with searchable inputs
 │   ├── ticker_data.py        # Ticker search & Yahoo Finance integration (w/ caching)
 │   ├── charts.py             # Plotly chart generation
-│   ├── sidebar.py            # Form-based sidebar rendering (NEW - 310 lines)
-│   ├── results.py            # Results display functions (NEW - 330 lines)
-│   ├── utils.py              # URL params, error handling, progress (NEW - 269 lines)
+│   ├── sidebar.py            # Form-based sidebar rendering (310 lines)
+│   ├── results.py            # Results display functions (330 lines)
+│   ├── utils.py              # URL params, error handling, progress (269 lines)
 │   └── main.py               # Application orchestration (reduced to 310 lines)
 ├── backtest.py               # Core backtesting engine (830 lines - Phases 1 & 3)
 ├── plot_backtest.py          # Visualization utility (395 lines - Phases 2 & 3)
@@ -52,7 +52,7 @@ portfolio-backtester/
 │   ├── conftest.py           # pytest configuration (with session state reset fixture)
 │   ├── test_backtest.py      # Unit tests for backtest.py (93 tests)
 │   ├── test_app.py           # Unit tests for app.py UI (76 tests - includes URL params)
-│   ├── test_state_manager.py # Unit tests for state_manager.py (67 tests - validation added)
+│   ├── test_state_manager.py # Unit tests for state_manager.py (67 tests)
 │   ├── test_ticker_data.py   # Unit tests for ticker_data.py (32 tests)
 │   ├── test_ticker_names.py  # Placeholder for upcoming ticker name scenarios
 │   └── test_integration.py   # Integration tests (21 tests)
@@ -144,7 +144,7 @@ portfolio-backtester/
 - Logarithmic scale toggle for portfolio value charts
 - CSV & HTML export
 
-**Best Practices (NEW)**:
+**Architecture Patterns**:
 - ✅ **Caching**: @st.cache_data with TTL for expensive operations
 - ✅ **Forms**: Sidebar wrapped in st.form to prevent unnecessary reruns
 - ✅ **Modular Code**: 764-line main.py split into focused modules (60% reduction)
@@ -192,7 +192,7 @@ portfolio-backtester/
   - Portfolio composition with ticker names (fetched from yfinance)
   - **DCA metrics**: IRR and total_contributions display
   - **Colorblind accessibility**: 8 tests for Wong palette validation
-  - **URL Parameters** (NEW): 5 tests for capital/benchmarks sharing bug fixes
+  - **URL Parameters**: 5 tests for capital/benchmarks sharing bug fixes
   - 16 test classes with comprehensive coverage
 
 - **tests/test_ticker_data.py** (32 tests): Unit tests for ticker search and name fetching
@@ -325,22 +325,9 @@ pytest -v && git commit
 
 ---
 
-## Phase Completion Summary
+## Phase History
 
-### ✅ Phase 1: Reliability & Validation
-Cache expiration (TTL), retry logic (exponential backoff), ticker/date validation. **+28 tests** (86→113), ~88% coverage.
-
-### ✅ Phase 2: Code Quality & Organization
-Modular architecture (874→1,358 lines across 7 modules), zero duplication (-134 lines), 32 extracted constants, centralized state. **113 tests**, ~88% coverage.
-
-### ✅ Phase 3: Performance & Data Validation
-Batch download optimization, data quality validation (NaN/zero/negative/extreme), min data requirements, integration tests. **+42 tests** (113→155), ~88% coverage.
-
-### ✅ Phase 4: Accessibility & Documentation Hardening
-Colorblind-accessible palette, active-return overhaul, new documentation, Streamlit session-state refactor, and expanded state/ticker test suites. **+101 tests** (155→256), ~88% coverage.
-
-### ✅ Phase 5: Security Hardening & Input Validation
-**Security Fix**: Migrated from pickle to Parquet format for cache storage (eliminated arbitrary code execution vulnerability). **Input Validation**: Added comprehensive type validation to all StateManager setter methods with 5 validation utility functions. **UI Improvements**: Fixed number input responsiveness by moving outside form. **Compatibility**: Fixed datetime.date compatibility with Streamlit widgets. **+37 tests** (256→293), ~88% coverage, 100% pass rate.
+See [CHANGELOG.md](docs/CHANGELOG.md) for full phase history (Phases 1–5 complete as of v2.5.0-dev).
 
 ---
 
@@ -371,8 +358,7 @@ python backtest.py --tickers AAPL MSFT --weights 0.6 0.4 --benchmark SPY
 # Plot results
 python plot_backtest.py --csv results/backtest.csv --output charts/test
 
-# Run all tests (256 tests)
-source .venv/bin/activate  # Ensure venv is active
+# Run all tests
 pytest -v
 
 # Run with coverage
@@ -523,8 +509,6 @@ git commit -m "feat: add new_metric calculation"
 
 ---
 
-**Last Updated**: 2025-11-17
-**Version**: v2.5.0-dev (Unreleased)
-**Current Branch**: claude/review-code-01FMcnN697didaPWUPyzpyT8
+**Last Updated**: 2026-04-30
+**Version**: v2.5.0-dev
 **Test Coverage**: ~88% (293 tests, 100% passing ✅)
-**Progress**: Security hardening complete (Parquet caching), StateManager validation, UI improvements
