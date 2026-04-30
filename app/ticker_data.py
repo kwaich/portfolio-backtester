@@ -209,6 +209,12 @@ def _get_ticker_name_impl(ticker: str) -> str:
     """Internal implementation of get_ticker_name.
 
     This is separated to allow for flexible caching strategies.
+
+    Args:
+        ticker: Ticker symbol to look up
+
+    Returns:
+        Full company or fund name, or empty string if lookup fails
     """
     if not ticker or not ticker.strip():
         return ""
@@ -280,7 +286,15 @@ else:
 
 
 def _search_yahoo_finance_impl(query: str, limit: int = 10) -> List[tuple[str, str]]:
-    """Internal implementation of Yahoo Finance search."""
+    """Internal implementation of Yahoo Finance search.
+
+    Args:
+        query: Search query string
+        limit: Maximum number of results to return
+
+    Returns:
+        List of (ticker, name) tuples matching the query
+    """
     if not query or len(query) < 1:
         return []
 

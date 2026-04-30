@@ -43,19 +43,22 @@ from .config import (
 
 def calculate_drawdown(series: pd.Series) -> pd.Series:
     """Calculate drawdown from value series.
-    
+
     Drawdown is the peak-to-trough decline during a specific period.
-    
+
     Args:
         series: Time series of values (e.g., portfolio value)
-    
+
     Returns:
-        Series of drawdown percentages
-    
+        pd.Series: Drawdown percentages (negative values) with the same
+            DatetimeIndex as the input. Values range from 0 (at peak) to
+            negative percentages (in drawdown).
+
     Examples:
         >>> values = pd.Series([100, 110, 105, 120, 115])
         >>> dd = calculate_drawdown(values)
-        >>> # Returns negative percentages showing decline from peak
+        >>> dd.iloc[-1]
+        -4.166666666666666
     """
     cummax = series.expanding().max()
     drawdown = ((series - cummax) / cummax) * 100

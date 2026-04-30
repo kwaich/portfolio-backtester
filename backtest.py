@@ -205,6 +205,19 @@ def validate_date_string(date_str: str) -> str:
 
 
 def parse_args(argv: List[str]) -> argparse.Namespace:
+    """Parse command-line arguments for the backtest CLI.
+
+    Args:
+        argv: List of command-line argument strings
+
+    Returns:
+        Parsed arguments as an argparse.Namespace object
+
+    Examples:
+        >>> args = parse_args(["--tickers", "AAPL", "MSFT", "--weights", "0.6", "0.4"])
+        >>> args.tickers
+        ['AAPL', 'MSFT']
+    """
     parser = argparse.ArgumentParser(description="Portfolio Backtest helper")
     parser.add_argument(
         "--tickers",
@@ -282,7 +295,16 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
 
 
 def get_cache_key(tickers: List[str], start: str, end: str) -> str:
-    """Generate a unique cache key for the given parameters."""
+    """Generate a unique cache key for the given parameters.
+
+    Args:
+        tickers: List of ticker symbols
+        start: Start date string (YYYY-MM-DD)
+        end: End date string (YYYY-MM-DD)
+
+    Returns:
+        MD5 hex digest string used as the cache key
+    """
     key_str = f"{'_'.join(sorted(tickers))}_{start}_{end}"
     return hashlib.md5(key_str.encode()).hexdigest()
 
@@ -293,6 +315,14 @@ def get_cache_path(tickers: List[str], start: str, end: str) -> Path:
     Returns the base path (without extension). Actual files will be:
     - {cache_path}.parquet - Price data
     - {cache_path}.json - Metadata (timestamp, version)
+
+    Args:
+        tickers: List of ticker symbols
+        start: Start date string (YYYY-MM-DD)
+        end: End date string (YYYY-MM-DD)
+
+    Returns:
+        Base Path object for cache files (extensions added by caller)
     """
     cache_dir = Path(".cache")
     cache_dir.mkdir(exist_ok=True)

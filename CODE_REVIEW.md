@@ -410,12 +410,14 @@ dca_freq = normalize_frequency_string(args.dca_freq)
 
 ---
 
-### 6. Missing Docstring Return Types
+### 6. ✅ FIXED: Missing Docstring Return Types
+
+**Status:** ✅ **FIXED** (2026-04-30)
 
 **Location:** Multiple files
 
 **Issue:**
-Many functions have docstrings but don't specify return types in the docstring:
+Many functions had docstrings but didn't specify return types in the docstring:
 
 ```python
 def calculate_drawdown(series: pd.Series) -> pd.Series:
@@ -431,33 +433,20 @@ def calculate_drawdown(series: pd.Series) -> pd.Series:
     """
 ```
 
-**Recommendation:**
-Add detailed return type information:
+**Implementation:**
+Added or tightened `Returns:` sections in 13 functions across 4 files:
+- `backtest.py`: `parse_args`, `get_cache_key`, `get_cache_path`
+- `plot_backtest.py`: `parse_args`, `create_value_plot`, `create_returns_plot`,
+  `create_active_return_plot`, `create_drawdown_plot`, `create_rolling_sharpe_plot`,
+  `create_dashboard`
+- `app/charts.py`: `calculate_drawdown`
+- `app/ticker_data.py`: `_get_ticker_name_impl`, `_search_yahoo_finance_impl`
 
-```python
-def calculate_drawdown(series: pd.Series) -> pd.Series:
-    """Calculate drawdown from value series.
-
-    Drawdown is the peak-to-trough decline during a specific period.
-
-    Args:
-        series: Time series of values (e.g., portfolio value)
-
-    Returns:
-        pd.Series: Drawdown percentages (negative values) with same index as input.
-            Values range from 0 (at peak) to negative percentages (in drawdown).
-
-    Examples:
-        >>> values = pd.Series([100, 110, 105, 120, 115],
-        ...                    index=pd.date_range('2020-01-01', periods=5))
-        >>> dd = calculate_drawdown(values)
-        >>> dd.iloc[-1]  # 115 vs peak of 120 = -4.17%
-        -4.166666666666666
-    """
-```
+All updated docstrings include the return type, a brief description, and
+`Examples:` blocks for user-facing functions.
 
 **Priority:** MEDIUM
-**Effort:** 4-6 hours
+**Effort:** ~45 minutes
 **Impact:** Low - Improves documentation
 
 ---
@@ -786,7 +775,7 @@ ADR-00X: Migrate to Parquet for safer caching
 
 ### Medium-term (Medium Priority)
 5. ✅ **Extract frequency normalization** (Code quality) — Fixed
-6. ⬜ **Improve docstring return types** (Documentation)
+6. ✅ **Improve docstring return types** (Documentation) — Fixed 2026-04-30
 7. ⬜ **Document magic numbers** (Clarity)
 8. ⬜ **Improve string formatting** (Readability)
 

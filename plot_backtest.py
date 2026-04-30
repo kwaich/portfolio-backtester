@@ -59,6 +59,16 @@ ANNOTATION_FONT_SIZE = 9      # Annotations
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments for the plotting CLI.
+
+    Returns:
+        Parsed arguments as an argparse.Namespace object
+
+    Examples:
+        >>> args = parse_args(["--csv", "results/backtest.csv", "--dashboard"])
+        >>> args.dashboard
+        True
+    """
     parser = argparse.ArgumentParser(description="Plot portfolio vs benchmark")
     parser.add_argument("--csv", required=True, help="CSV exported via backtest.py")
     parser.add_argument(
@@ -96,7 +106,19 @@ def format_percentage(x, p):
 
 
 def create_value_plot(df: pd.DataFrame, style: str) -> tuple:
-    """Create portfolio vs benchmark value plot with visual hierarchy."""
+    """Create portfolio vs benchmark value plot with visual hierarchy.
+
+    Args:
+        df: DataFrame containing portfolio_value and benchmark_value columns
+        style: Matplotlib style name
+
+    Returns:
+        Tuple of (matplotlib.figure.Figure, matplotlib.axes.Axes)
+
+    Examples:
+        >>> fig, ax = create_value_plot(df, "seaborn-v0_8")
+        >>> fig.savefig("value.png")
+    """
     plt.style.use(style)
     fig, ax = plt.subplots(figsize=(12, 6))
 
@@ -130,7 +152,19 @@ def create_value_plot(df: pd.DataFrame, style: str) -> tuple:
 
 
 def create_returns_plot(df: pd.DataFrame, style: str) -> tuple:
-    """Create cumulative returns comparison plot with visual hierarchy."""
+    """Create cumulative returns comparison plot with visual hierarchy.
+
+    Args:
+        df: DataFrame containing portfolio_return and benchmark_return columns
+        style: Matplotlib style name
+
+    Returns:
+        Tuple of (matplotlib.figure.Figure, matplotlib.axes.Axes)
+
+    Examples:
+        >>> fig, ax = create_returns_plot(df, "seaborn-v0_8")
+        >>> fig.savefig("returns.png")
+    """
     plt.style.use(style)
     fig, ax = plt.subplots(figsize=(12, 6))
 
@@ -164,7 +198,19 @@ def create_returns_plot(df: pd.DataFrame, style: str) -> tuple:
 
 
 def create_active_return_plot(df: pd.DataFrame, style: str) -> tuple:
-    """Create active return plot with colored fill and visual hierarchy."""
+    """Create active return plot with colored fill and visual hierarchy.
+
+    Args:
+        df: DataFrame containing active_return column
+        style: Matplotlib style name
+
+    Returns:
+        Tuple of (matplotlib.figure.Figure, matplotlib.axes.Axes)
+
+    Examples:
+        >>> fig, ax = create_active_return_plot(df, "seaborn-v0_8")
+        >>> fig.savefig("active_return.png")
+    """
     plt.style.use(style)
     fig, ax = plt.subplots(figsize=(12, 5))
 
@@ -209,7 +255,19 @@ def create_active_return_plot(df: pd.DataFrame, style: str) -> tuple:
 
 
 def create_drawdown_plot(df: pd.DataFrame, style: str) -> tuple:
-    """Create drawdown plot for portfolio and benchmark."""
+    """Create drawdown plot for portfolio and benchmark.
+
+    Args:
+        df: DataFrame containing portfolio_value and benchmark_value columns
+        style: Matplotlib style name
+
+    Returns:
+        Tuple of (matplotlib.figure.Figure, matplotlib.axes.Axes)
+
+    Examples:
+        >>> fig, ax = create_drawdown_plot(df, "seaborn-v0_8")
+        >>> fig.savefig("drawdown.png")
+    """
     plt.style.use(style)
     fig, ax = plt.subplots(figsize=(12, 5))
 
@@ -270,7 +328,22 @@ def create_drawdown_plot(df: pd.DataFrame, style: str) -> tuple:
 
 
 def create_rolling_sharpe_plot(df: pd.DataFrame, style: str) -> tuple:
-    """Create rolling 12-month Sharpe ratio plot."""
+    """Create rolling 12-month Sharpe ratio plot.
+
+    Args:
+        df: DataFrame containing portfolio_rolling_sharpe_12m and
+            benchmark_rolling_sharpe_12m columns (optional)
+        style: Matplotlib style name
+
+    Returns:
+        Tuple of (matplotlib.figure.Figure, matplotlib.axes.Axes),
+        or (None, None) if rolling Sharpe columns are missing
+
+    Examples:
+        >>> fig, ax = create_rolling_sharpe_plot(df, "seaborn-v0_8")
+        >>> if fig:
+        ...     fig.savefig("rolling_sharpe.png")
+    """
     plt.style.use(style)
     fig, ax = plt.subplots(figsize=(12, 5))
 
@@ -317,7 +390,20 @@ def create_rolling_sharpe_plot(df: pd.DataFrame, style: str) -> tuple:
 
 
 def create_dashboard(df: pd.DataFrame, style: str) -> tuple:
-    """Create a comprehensive 2x2 dashboard with all metrics."""
+    """Create a comprehensive 2x2 dashboard with all metrics.
+
+    Args:
+        df: DataFrame containing portfolio_value, benchmark_value,
+            portfolio_return, benchmark_return, and active_return columns
+        style: Matplotlib style name
+
+    Returns:
+        Tuple of (matplotlib.figure.Figure, numpy.ndarray of matplotlib.axes.Axes)
+
+    Examples:
+        >>> fig, axes = create_dashboard(df, "seaborn-v0_8")
+        >>> fig.savefig("dashboard.png")
+    """
     plt.style.use(style)
     fig, axes = plt.subplots(2, 2, figsize=(16, 10))
     fig.suptitle("Portfolio Performance Dashboard", fontsize=16, fontweight='bold', y=0.995)
