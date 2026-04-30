@@ -285,12 +285,17 @@ def _calculate_portfolio_value(
 
 ---
 
-### 3A. Performance: Batch Download Could Be More Efficient
+### 3A. ⚠️ INVALID: Performance: Batch Download Could Be More Efficient
+
+**Status:** ⚠️ **INVALID / ADDRESSED**
 
 **Location:** `backtest.py:556-603`
 
 **Issue:**
 The batch download logic downloads uncached tickers individually through yfinance, which could be optimized to batch multiple uncached tickers into a single API call.
+
+**Resolution:**
+The current implementation passes the list of tickers to `yf.download`, which handles batching internally. The concern about loop-based downloading was based on an older version or misinterpretation. No code changes required.
 
 **Current Flow:**
 ```python
