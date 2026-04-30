@@ -307,6 +307,12 @@ def render_sidebar_form() -> Dict[str, Any]:
             help="Reuse previously downloaded data for faster results",
             key="use_cache_input"
         )
+        debug_logging = st.checkbox(
+            "Debug logging",
+            value=False,
+            help="Enable verbose DEBUG-level logging in the console",
+            key="debug_logging_input"
+        )
 
         # Submit button
         submit_button = st.form_submit_button(
@@ -337,5 +343,6 @@ def render_sidebar_form() -> Dict[str, Any]:
         'dca_frequency': dca_frequency,
         'dca_freq': dca_freq,
         'dca_amount': dca_amount,
-        'use_cache': use_cache
+        'use_cache': use_cache,
+        'debug_logging': debug_logging,
     }

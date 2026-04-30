@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from backtest import RebalanceFrequency, DcaFrequency
+
 # =============================================================================
 # Page Configuration
 # =============================================================================
@@ -56,33 +58,19 @@ DEFAULT_BENCHMARK = "VWRA.L"
 # Rebalancing Configuration
 # =============================================================================
 
-# Rebalancing frequency options
-REBALANCE_OPTIONS = {
-    "Buy-and-Hold (No Rebalancing)": None,
-    "Daily": "D",
-    "Weekly": "W",
-    "Monthly": "M",
-    "Quarterly": "Q",
-    "Yearly": "Y"
-}
+# Rebalancing frequency options (derived from Enum for type safety)
+REBALANCE_OPTIONS = RebalanceFrequency.get_options()
 
-DEFAULT_REBALANCE_STRATEGY = "Buy-and-Hold (No Rebalancing)"
+DEFAULT_REBALANCE_STRATEGY = RebalanceFrequency.NONE.display_name
 
 # =============================================================================
 # DCA (Dollar-Cost Averaging) Configuration
 # =============================================================================
 
-# DCA frequency options (same as rebalancing)
-DCA_FREQUENCY_OPTIONS = {
-    "None (Lump Sum)": None,
-    "Daily": "D",
-    "Weekly": "W",
-    "Monthly": "M",
-    "Quarterly": "Q",
-    "Yearly": "Y"
-}
+# DCA frequency options (derived from Enum for type safety)
+DCA_FREQUENCY_OPTIONS = DcaFrequency.get_options()
 
-DEFAULT_DCA_FREQUENCY = "None (Lump Sum)"
+DEFAULT_DCA_FREQUENCY = DcaFrequency.NONE.display_name
 DEFAULT_DCA_AMOUNT = 1000.0    # Round monthly contribution typical for retail investors
 MIN_DCA_AMOUNT = 100.0         # Minimum recurring contribution threshold
 MAX_DCA_AMOUNT = 100_000.0     # Upper sanity bound

@@ -21,6 +21,7 @@ import logging
 import re
 import sys
 import time
+from enum import Enum
 from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, List, Optional
@@ -35,13 +36,25 @@ except ImportError as exc:  # pragma: no cover - dependency guard
         "Missing dependency yfinance. Install it via 'pip install yfinance'."
     ) from exc
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+# Configure default logging (only if no handlers are already configured)
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 logger = logging.getLogger(__name__)
+
+
+def _setup_logging(verbose: bool = False) -> None:
+    """Adjust logging level based on verbosity flag.
+
+    Args:
+        verbose: If True, set level to DEBUG; otherwise INFO.
+    """
+    level = logging.DEBUG if verbose else logging.INFO
+    logging.getLogger().setLevel(level)
+    logging.getLogger(__name__).setLevel(level)
 
 # Constants
 TRADING_DAYS_PER_YEAR = 252  # ~252 trading days/year (excludes weekends and ~9 market holidays)
@@ -50,6 +63,80 @@ CACHE_VERSION = "2.0"  # v2.0: Parquet format (was pickle in v1.0)
 MAX_DAILY_PRICE_CHANGE = 0.9  # 90% single-day move threshold; flags data errors (splits, bad prints)
                               # while allowing extreme but legitimate moves
 ROLLING_SHARPE_WINDOW = 252  # ~12 months of trading days for rolling Sharpe calculation
+
+
+class _FrequencyBase(Enum):
+    """Base mixin for frequency enums with shared helpers."""
+
+    def __init__(self, code: Optional[str], display_name: str):
+        self.code = code
+        self.display_name = display_name
+
+    @classmethod
+    def get_options(cls) -> dict[str, Optional[str]]:
+        """Return display_name -> code mapping for UI dropdowns."""
+        return {freq.display_name: freq.code for freq in cls}
+
+    @classmethod
+    def get_code_to_display(cls) -> dict[Optional[str], str]:
+        """Return code -> display_name mapping for CLI output.
+
+        Includes normalized pandas aliases (ME, QE, YE) for backward
+        compatibility with normalize_frequency().
+        """
+        mapping = {freq.code: freq.display_name for freq in cls}
+        # Add normalized pandas aliases
+        aliases = {'ME': 'M', 'QE': 'Q', 'YE': 'Y'}
+        for alias, orig in aliases.items():
+            if orig in mapping:
+                mapping[alias] = mapping[orig]
+        return mapping
+
+    @classmethod
+    def get_choices(cls) -> list[str]:
+        """Return valid CLI choices (codes and lowercase names)."""
+        choices = []
+        for freq in cls:
+            if freq.code is not None:
+                choices.append(freq.code)
+                choices.append(freq.name.lower())
+        return choices
+
+    @classmethod
+    def from_code_or_name(cls, value: Optional[str]) -> Optional["_FrequencyBase"]:
+        """Look up frequency by code (e.g. 'M') or name (e.g. 'monthly')."""
+        if value is None:
+            return None
+        value = value.strip()
+        for freq in cls:
+            if freq.code is not None and freq.code.upper() == value.upper():
+                return freq
+        for freq in cls:
+            if freq.code is not None and freq.name.lower() == value.lower():
+                return freq
+        return None
+
+
+class RebalanceFrequency(_FrequencyBase):
+    """Rebalancing frequency options."""
+
+    NONE = (None, "Buy-and-Hold (No Rebalancing)")
+    DAILY = ("D", "Daily")
+    WEEKLY = ("W", "Weekly")
+    MONTHLY = ("M", "Monthly")
+    QUARTERLY = ("Q", "Quarterly")
+    YEARLY = ("Y", "Yearly")
+
+
+class DcaFrequency(_FrequencyBase):
+    """DCA contribution frequency options."""
+
+    NONE = (None, "None (Lump Sum)")
+    DAILY = ("D", "Daily")
+    WEEKLY = ("W", "Weekly")
+    MONTHLY = ("M", "Monthly")
+    QUARTERLY = ("Q", "Quarterly")
+    YEARLY = ("Y", "Yearly")
 
 
 def retry_with_backoff(
@@ -279,7 +366,7 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
         "--rebalance",
         type=str,
         default=None,
-        choices=['D', 'W', 'M', 'Q', 'Y', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly'],
+        choices=RebalanceFrequency.get_choices(),
         help="Rebalancing frequency: D/daily, W/weekly, M/monthly, Q/quarterly, Y/yearly (default: None = buy-and-hold)",
     )
     parser.add_argument(
@@ -292,8 +379,13 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
         "--dca-freq",
         type=str,
         default=None,
-        choices=['D', 'W', 'M', 'Q', 'Y', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly'],
+        choices=DcaFrequency.get_choices(),
         help="DCA frequency: D/daily, W/weekly, M/monthly, Q/quarterly, Y/yearly (requires --dca-amount)",
+    )
+    parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Enable verbose (DEBUG) logging for detailed operational output",
     )
     return parser.parse_args(argv)
 
@@ -682,7 +774,7 @@ def download_prices(
 
             if cached_data is not None:
                 cached_results[ticker] = cached_data[ticker]
-                logger.info(f"Cache hit for {ticker}")
+                logger.debug(f"Cache hit for {ticker}")
             else:
                 uncached_tickers.append(ticker)
 
@@ -1444,6 +1536,7 @@ def summarize(
 
 def main(argv: List[str]) -> None:
     args = parse_args(argv)
+    _setup_logging(verbose=args.verbose)
 
     tickers = args.tickers
     weights = np.array(args.weights, dtype=float)
@@ -1547,30 +1640,13 @@ def main(argv: List[str]) -> None:
     print(f"Benchmark: {args.benchmark}")
 
     # Show strategy
+    rebalance_names = {k: v for k, v in RebalanceFrequency.get_code_to_display().items() if k is not None}
+    dca_names = {k: v for k, v in DcaFrequency.get_code_to_display().items() if k is not None}
+    freq_names = {**rebalance_names, **dca_names}
     if dca_freq and dca_amount:
-        freq_names = {
-            'D': 'Daily',
-            'W': 'Weekly',
-            'M': 'Monthly',
-            'ME': 'Monthly',
-            'Q': 'Quarterly',
-            'QE': 'Quarterly',
-            'Y': 'Yearly',
-            'YE': 'Yearly'
-        }
         strategy_name = freq_names.get(dca_freq, dca_freq)
         print(f"Strategy: Dollar-Cost Averaging ({strategy_name}, ${dca_amount:,.2f}/contribution)")
     elif rebalance_freq:
-        freq_names = {
-            'D': 'Daily',
-            'W': 'Weekly',
-            'M': 'Monthly',
-            'ME': 'Monthly',
-            'Q': 'Quarterly',
-            'QE': 'Quarterly',
-            'Y': 'Yearly',
-            'YE': 'Yearly'
-        }
         strategy_name = freq_names.get(rebalance_freq, rebalance_freq)
         print(f"Strategy: {strategy_name} Rebalancing")
     else:

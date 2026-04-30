@@ -515,26 +515,24 @@ Refactored 4 locations in `backtest.py` to use consistent f-string formatting:
 
 ## Low Priority Issues (Nice to Have)
 
-### 9. Consider Adding Logging Levels
+### 9. ✅ FIXED: Consider Adding Logging Levels
+
+**Status:** ✅ **FIXED** (2026-04-30)
 
 **Location:** Multiple files
 
 **Issue:**
-Logging uses only INFO and WARNING levels. Could benefit from DEBUG for development:
+Logging used only INFO and WARNING levels, with no way to enable DEBUG output.
 
-```python
-logger.info(f"Cache hit for {ticker}")  # Could be DEBUG
-logger.info(f"Rebalancing on {date.strftime('%Y-%m-%d')}: ...")  # Could be DEBUG
-```
-
-**Recommendation:**
-Use DEBUG for verbose operational details:
-
-```python
-logger.debug(f"Cache hit for {ticker}")
-logger.debug(f"Rebalancing on {date.strftime('%Y-%m-%d')}: portfolio value = ${current_value:,.2f}")
-logger.info(f"Batch download complete: {len(cached_results)} ticker(s)")
-```
+**Implementation:**
+- **Added `--verbose` / `-v` flag** to both `backtest.py` and `plot_backtest.py` CLIs
+- **Created `_setup_logging(verbose)`** function in both modules to dynamically adjust level
+- **Made module-level `basicConfig` conditional** (only runs if no handlers exist), preventing side effects at import time
+- **Fixed `app/ticker_data.py`** to use `logging.getLogger(__name__)` instead of root logger
+- **Converted chatty INFO logs to DEBUG:** `Cache hit for {ticker}` now uses `logger.debug`
+- **Added "Debug logging" checkbox** to Streamlit UI Options section
+- **Test Coverage:** 349/349 tests passing (100% ✅)
+  - 6 new tests for logging and Enum functionality
 
 **Priority:** LOW
 **Effort:** 1-2 hours
@@ -542,46 +540,24 @@ logger.info(f"Batch download complete: {len(cached_results)} ticker(s)")
 
 ---
 
-### 10. Consider Using Enum for Frequencies
+### 10. ✅ FIXED: Consider Using Enum for Frequencies
 
-**Location:** `app/config.py:60-67, 76-83`
+**Status:** ✅ **FIXED** (2026-04-30)
+
+**Location:** `app/config.py:60-67, 76-83`, `backtest.py`
 
 **Issue:**
-Frequency options are defined as dictionaries, could be more type-safe with Enum:
+Frequency options were plain dictionaries, duplicated across UI and CLI with no type safety.
 
-```python
-REBALANCE_OPTIONS = {
-    "Buy-and-Hold (No Rebalancing)": None,
-    "Daily": "D",
-    "Weekly": "W",
-    # ...
-}
-```
-
-**Recommendation:**
-Use Enum for better type safety:
-
-```python
-from enum import Enum
-
-class RebalanceFrequency(Enum):
-    """Rebalancing frequency options."""
-    NONE = (None, "Buy-and-Hold (No Rebalancing)")
-    DAILY = ("D", "Daily")
-    WEEKLY = ("W", "Weekly")
-    MONTHLY = ("M", "Monthly")
-    QUARTERLY = ("Q", "Quarterly")
-    YEARLY = ("Y", "Yearly")
-
-    def __init__(self, code, display_name):
-        self.code = code
-        self.display_name = display_name
-
-    @classmethod
-    def get_options(cls) -> Dict[str, Optional[str]]:
-        """Get display_name -> code mapping for UI."""
-        return {freq.display_name: freq.code for freq in cls}
-```
+**Implementation:**
+- **Created `_FrequencyBase` mixin** with shared helpers (`get_options`, `get_code_to_display`, `get_choices`, `from_code_or_name`)
+- **Added `RebalanceFrequency` and `DcaFrequency` Enums** in `backtest.py` (central domain location)
+- **Updated `app/config.py`** to derive `REBALANCE_OPTIONS` and `DCA_FREQUENCY_OPTIONS` from Enums
+- **Updated `backtest.py` `parse_args()`** to use `RebalanceFrequency.get_choices()` and `DcaFrequency.get_choices()` for CLI choices
+- **Refactored `main()` frequency display mapping** to use `Enum.get_code_to_display()` (includes normalized pandas aliases ME/QE/YE)
+- **Eliminated duplicate inline `freq_names` dicts** in `main()`
+- **Test Coverage:** 349/349 tests passing (100% ✅)
+  - 6 new tests for Enum members, mappings, choices, and lookups
 
 **Priority:** LOW
 **Effort:** 2-3 hours
@@ -769,8 +745,8 @@ ADR-00X: Migrate to Parquet for safer caching
 8. ✅ **Improve string formatting** (Readability) — Fixed 2026-04-30
 
 ### Long-term (Low Priority)
-9. ⬜ **Add DEBUG logging** (Developer experience)
-10. ⬜ **Use Enum for frequencies** (Type safety)
+9. ✅ **Add DEBUG logging** (Developer experience) — Fixed 2026-04-30
+10. ✅ **Use Enum for frequencies** (Type safety) — Fixed 2026-04-30
 11. ✅ **Sanitize ticker search input** (Security) — Not an issue; `requests` handles encoding
 12. ⬜ **Add property-based tests** (Test quality)
 13. ⬜ **Add performance benchmarks** (Monitoring)

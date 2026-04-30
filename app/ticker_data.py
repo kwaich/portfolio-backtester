@@ -12,6 +12,8 @@ from typing import List, Optional
 import requests
 import yfinance as yf
 
+logger = logging.getLogger(__name__)
+
 try:
     import streamlit as st
     HAS_STREAMLIT = True
@@ -225,21 +227,21 @@ def _get_ticker_name_impl(ticker: str) -> str:
 
         # info might be None or empty dict
         if not info:
-            logging.warning(f"No info available for ticker: {ticker}")
+            logger.warning(f"No info available for ticker: {ticker}")
             return ""
 
         # Try to get longName first, then shortName as fallback
         name = info.get('longName') or info.get('shortName') or ""
 
         if name:
-            logging.info(f"Fetched ticker name for {ticker}: {name}")
+            logger.info(f"Fetched ticker name for {ticker}: {name}")
         else:
-            logging.warning(f"No name fields available for ticker: {ticker}")
+            logger.warning(f"No name fields available for ticker: {ticker}")
 
         return name
 
     except Exception as e:
-        logging.warning(f"Error fetching ticker name for {ticker}: {e}")
+        logger.warning(f"Error fetching ticker name for {ticker}: {e}")
         return ""
 
 
@@ -331,14 +333,14 @@ def _search_yahoo_finance_impl(query: str, limit: int = 10) -> List[tuple[str, s
             if symbol and name:
                 results.append((symbol, name))
 
-        logging.info(f"Yahoo Finance search for '{query}': found {len(results)} results")
+        logger.info(f"Yahoo Finance search for '{query}': found {len(results)} results")
         return results
 
     except requests.RequestException as e:
-        logging.warning(f"Yahoo Finance search failed for '{query}': {e}")
+        logger.warning(f"Yahoo Finance search failed for '{query}': {e}")
         return []
     except Exception as e:
-        logging.error(f"Unexpected error in Yahoo Finance search for '{query}': {e}")
+        logger.error(f"Unexpected error in Yahoo Finance search for '{query}': {e}")
         return []
 
 

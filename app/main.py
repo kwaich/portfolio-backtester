@@ -17,6 +17,7 @@ IMPROVEMENTS (Streamlit Best Practices):
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 
 # Third-party imports with error handling
@@ -307,6 +308,7 @@ def main() -> None:
 
     # Run backtest if form submitted
     if config['submit_clicked']:
+        backtest._setup_logging(verbose=config.get('debug_logging', False))
         _run_backtest(config)
 
     # Display results if available

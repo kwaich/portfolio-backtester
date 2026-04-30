@@ -20,13 +20,25 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import pandas as pd
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+# Configure default logging (only if no handlers are already configured)
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 logger = logging.getLogger(__name__)
+
+
+def _setup_logging(verbose: bool = False) -> None:
+    """Adjust logging level based on verbosity flag.
+
+    Args:
+        verbose: If True, set level to DEBUG; otherwise INFO.
+    """
+    level = logging.DEBUG if verbose else logging.INFO
+    logging.getLogger().setLevel(level)
+    logging.getLogger(__name__).setLevel(level)
 
 # Colorblind-friendly color scheme (Wong palette)
 # Avoids problematic blue-purple and red-green combinations
@@ -63,8 +75,11 @@ ANNOTATION_FONT_SIZE = 9      # Annotations
 DEFAULT_DPI = 150
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] = None) -> argparse.Namespace:
     """Parse command-line arguments for the plotting CLI.
+
+    Args:
+        argv: List of command-line argument strings (defaults to sys.argv[1:])
 
     Returns:
         Parsed arguments as an argparse.Namespace object
@@ -97,7 +112,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Create a single dashboard with all plots in subplots",
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Enable verbose (DEBUG) logging for detailed operational output",
+    )
+    return parser.parse_args(argv)
 
 
 def format_currency(x, p):
@@ -475,6 +495,7 @@ def create_dashboard(df: pd.DataFrame, style: str) -> tuple:
 
 def main() -> None:
     args = parse_args()
+    _setup_logging(verbose=args.verbose)
 
     # Read and prepare data
     logger.info(f"Loading data from {args.csv}")

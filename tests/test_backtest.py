@@ -74,6 +74,95 @@ class TestParseArgs:
         with pytest.raises(SystemExit):
             backtest.parse_args(["--dca-freq", "invalid"])
 
+    def test_verbose_flag(self):
+        """Test --verbose flag parsing"""
+        args = backtest.parse_args(["--verbose"])
+        assert args.verbose is True
+
+    def test_verbose_short_flag(self):
+        """Test -v short flag parsing"""
+        args = backtest.parse_args(["-v"])
+        assert args.verbose is True
+
+    def test_verbose_default(self):
+        """Test verbose defaults to False"""
+        args = backtest.parse_args([])
+        assert args.verbose is False
+
+
+class TestFrequencyEnums:
+    """Test RebalanceFrequency and DcaFrequency enums"""
+
+    def test_rebalance_frequency_members(self):
+        """Test RebalanceFrequency has expected members"""
+        assert backtest.RebalanceFrequency.NONE.code is None
+        assert backtest.RebalanceFrequency.DAILY.code == "D"
+        assert backtest.RebalanceFrequency.MONTHLY.code == "M"
+
+    def test_dca_frequency_members(self):
+        """Test DcaFrequency has expected members"""
+        assert backtest.DcaFrequency.NONE.code is None
+        assert backtest.DcaFrequency.DAILY.code == "D"
+        assert backtest.DcaFrequency.MONTHLY.code == "M"
+
+    def test_frequency_options_mapping(self):
+        """Test get_options returns display_name -> code mapping"""
+        options = backtest.RebalanceFrequency.get_options()
+        assert "Buy-and-Hold (No Rebalancing)" in options
+        assert options["Buy-and-Hold (No Rebalancing)"] is None
+        assert options["Monthly"] == "M"
+
+    def test_frequency_code_to_display(self):
+        """Test get_code_to_display includes normalized aliases"""
+        mapping = backtest.RebalanceFrequency.get_code_to_display()
+        assert mapping["M"] == "Monthly"
+        assert mapping["ME"] == "Monthly"
+        assert mapping["Q"] == "Quarterly"
+        assert mapping["QE"] == "Quarterly"
+
+    def test_frequency_choices(self):
+        """Test get_choices includes codes and lowercase names"""
+        choices = backtest.RebalanceFrequency.get_choices()
+        assert "D" in choices
+        assert "daily" in choices
+        assert "M" in choices
+        assert "monthly" in choices
+
+    def test_frequency_from_code_or_name(self):
+        """Test lookup by code or name"""
+        assert backtest.RebalanceFrequency.from_code_or_name("M") == backtest.RebalanceFrequency.MONTHLY
+        assert backtest.RebalanceFrequency.from_code_or_name("monthly") == backtest.RebalanceFrequency.MONTHLY
+        assert backtest.RebalanceFrequency.from_code_or_name("invalid") is None
+        assert backtest.RebalanceFrequency.from_code_or_name(None) is None
+
+
+class TestLoggingSetup:
+    """Test _setup_logging function"""
+
+    def test_setup_logging_verbose(self):
+        """Test _setup_logging sets DEBUG level when verbose=True"""
+        original_root = logging.getLogger().level
+        original_backtest = logging.getLogger("backtest").level
+        try:
+            backtest._setup_logging(verbose=True)
+            assert logging.getLogger().level == logging.DEBUG
+            assert logging.getLogger("backtest").level == logging.DEBUG
+        finally:
+            logging.getLogger().setLevel(original_root)
+            logging.getLogger("backtest").setLevel(original_backtest)
+
+    def test_setup_logging_default(self):
+        """Test _setup_logging sets INFO level when verbose=False"""
+        original_root = logging.getLogger().level
+        original_backtest = logging.getLogger("backtest").level
+        try:
+            backtest._setup_logging(verbose=False)
+            assert logging.getLogger().level == logging.INFO
+            assert logging.getLogger("backtest").level == logging.INFO
+        finally:
+            logging.getLogger().setLevel(original_root)
+            logging.getLogger("backtest").setLevel(original_backtest)
+
 
 class TestCacheFunctions:
     """Test caching functionality"""
@@ -1776,6 +1865,51 @@ class TestCalculateRollingSharpeMLevel:
         table = backtest.compute_metrics(prices, weights, benchmark, 10_000)
         standalone = backtest._calculate_rolling_sharpe(table["portfolio_value"], 252, table["portfolio_contributions"])
         pd.testing.assert_series_equal(standalone, table["portfolio_rolling_sharpe_12m"], check_names=False)
+
+
+class TestPlotBacktestArgs:
+    """Tests for plot_backtest.py argument parsing."""
+
+    def test_verbose_flag(self):
+        """Test --verbose flag parsing in plot_backtest"""
+        import plot_backtest
+        args = plot_backtest.parse_args(["--csv", "test.csv", "--verbose"])
+        assert args.verbose is True
+
+    def test_verbose_short_flag(self):
+        """Test -v short flag parsing in plot_backtest"""
+        import plot_backtest
+        args = plot_backtest.parse_args(["--csv", "test.csv", "-v"])
+        assert args.verbose is True
+
+    def test_verbose_default(self):
+        """Test verbose defaults to False in plot_backtest"""
+        import plot_backtest
+        args = plot_backtest.parse_args(["--csv", "test.csv"])
+        assert args.verbose is False
+
+
+class TestAppConfigEnumIntegration:
+    """Test that app.config correctly derives dicts from Enums."""
+
+    def test_rebalance_options_from_enum(self):
+        """Test REBALANCE_OPTIONS is derived from RebalanceFrequency enum"""
+        from app.config import REBALANCE_OPTIONS
+        assert "Buy-and-Hold (No Rebalancing)" in REBALANCE_OPTIONS
+        assert REBALANCE_OPTIONS["Buy-and-Hold (No Rebalancing)"] is None
+        assert REBALANCE_OPTIONS["Monthly"] == "M"
+
+    def test_dca_frequency_options_from_enum(self):
+        """Test DCA_FREQUENCY_OPTIONS is derived from DcaFrequency enum"""
+        from app.config import DCA_FREQUENCY_OPTIONS
+        assert "None (Lump Sum)" in DCA_FREQUENCY_OPTIONS
+        assert DCA_FREQUENCY_OPTIONS["None (Lump Sum)"] is None
+        assert DCA_FREQUENCY_OPTIONS["Monthly"] == "M"
+
+    def test_default_rebalance_strategy_matches_enum(self):
+        """Test DEFAULT_REBALANCE_STRATEGY matches enum display name"""
+        from app.config import DEFAULT_REBALANCE_STRATEGY
+        assert DEFAULT_REBALANCE_STRATEGY == "Buy-and-Hold (No Rebalancing)"
 
 
 if __name__ == "__main__":
