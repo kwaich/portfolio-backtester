@@ -504,7 +504,7 @@ def validate_price_data(
                     issue_parts.append(f"{neg_count} negative price(s)")
                 issues.append(f"{ticker}: contains {', '.join(issue_parts)}")
 
-            # Check for extreme price changes (>|extreme_change_threshold| in a single day - likely data error)
+            # Check for extreme price changes in a single day - likely data error
             price_changes = valid_prices.pct_change().dropna()
             if len(price_changes) > 0:
                 extreme_changes = price_changes[
