@@ -9,3 +9,4 @@ charts/
 .coverage
 htmlcov/
 .DS_Store
+.benchmarks/
