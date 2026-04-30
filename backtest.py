@@ -464,8 +464,13 @@ def validate_price_data(
             before data is flagged as suspicious
 
     Raises:
-        ValueError: If data quality issues are detected
+        ValueError: If data quality issues are detected or threshold is invalid
     """
+    if extreme_change_threshold <= 0.0:
+        raise ValueError(
+            f"extreme_change_threshold must be positive, got {extreme_change_threshold}"
+        )
+
     issues = []
 
     for ticker in tickers:
@@ -508,7 +513,9 @@ def validate_price_data(
                 if len(extreme_changes) > 0:
                     max_change = extreme_changes.abs().max()
                     issues.append(
-                        f"{ticker}: contains extreme price change ({max_change:.1%}/day - possible data error)"
+                        f"{ticker}: contains extreme price change "
+                        f"({max_change:.1%}/day exceeds {extreme_change_threshold:.1%} threshold"
+                        f" - possible data error)"
                     )
 
     if issues:
