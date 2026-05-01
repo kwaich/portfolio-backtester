@@ -275,7 +275,7 @@ def render_searchable_ticker_input(
         st.session_state[input_key] = widget_state['value']
 
     # Text input for ticker
-    col1, col2 = st.columns([3, 1])
+    col1, col2 = st.columns([4, 1], vertical_alignment="bottom")
 
     with col1:
         ticker_input = st.text_input(
@@ -286,9 +286,7 @@ def render_searchable_ticker_input(
         )
 
     with col2:
-        st.write("")  # Spacing
-        st.write("")  # Spacing
-        search_clicked = st.button("🔍 Search", key=search_key, use_container_width=True)
+        search_clicked = st.button("🔍", key=search_key, use_container_width=True, help="Search tickers")
 
     # If search button clicked, show search interface
     if search_clicked or widget_state.get('show_search', False):
