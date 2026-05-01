@@ -40,6 +40,59 @@ from .config import (
     SUBPLOT_HORIZONTAL_SPACING
 )
 
+from app.design_system import COLORS
+
+
+def _apply_fintech_layout(fig: go.Figure) -> go.Figure:
+    """Apply fintech design system styling to a Plotly figure."""
+    fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",  # transparent background
+        plot_bgcolor=COLORS["bg_card"],   # white card background for plot area
+        font=dict(
+            family="Inter, sans-serif",
+            color=COLORS["primary_text"],
+            size=12,
+        ),
+        title_font=dict(
+            family="Outfit, sans-serif",
+            size=16,
+            color=COLORS["primary_text"],
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+            font=dict(size=11, color=COLORS["muted"]),
+            bgcolor="rgba(0,0,0,0)",
+        ),
+        hoverlabel=dict(
+            bgcolor=COLORS["bg_card"],
+            font=dict(family="Inter, sans-serif", size=13, color=COLORS["primary_text"]),
+            bordercolor=COLORS["border"],
+        ),
+    )
+    
+    fig.update_xaxes(
+        showgrid=True,
+        gridwidth=0.5,
+        gridcolor=COLORS["grid"],
+        zeroline=False,
+        tickfont=dict(size=11, color=COLORS["muted"]),
+        title_font=dict(size=12, color=COLORS["muted"]),
+    )
+    fig.update_yaxes(
+        showgrid=True,
+        gridwidth=0.5,
+        gridcolor=COLORS["grid"],
+        zeroline=False,
+        tickfont=dict(size=11, color=COLORS["muted"]),
+        title_font=dict(size=12, color=COLORS["muted"]),
+    )
+    
+    return fig
+
 
 def calculate_drawdown(series: pd.Series) -> pd.Series:
     """Calculate drawdown from value series.
@@ -100,8 +153,8 @@ def create_main_dashboard(
     # Create 2x2 grid of charts with improved spacing
     fig = make_subplots(
         rows=2, cols=2,
-        subplot_titles=('Portfolio vs Benchmark Value', 'Cumulative Returns',
-                       'Active Return (Portfolio - Benchmark)', 'Drawdown Over Time'),
+        subplot_titles=('Portfolio vs Benchmark Value', 'Portfolio vs Benchmark Cumulative Returns',
+                       'Active Return (Portfolio - Benchmark)', 'Portfolio Drawdown Over Time'),
         vertical_spacing=SUBPLOT_VERTICAL_SPACING,
         horizontal_spacing=SUBPLOT_HORIZONTAL_SPACING
     )
@@ -294,8 +347,9 @@ def create_main_dashboard(
 
     # Update subplot title annotations (preserve existing text and positioning)
     for annotation in fig['layout']['annotations']:
-        annotation['font'] = dict(size=SUBPLOT_TITLE_FONT_SIZE, color='#333333')
+        annotation['font'] = dict(size=14, color=COLORS["primary_text"], family="Outfit, sans-serif")
     
+    fig = _apply_fintech_layout(fig)
     return fig
 
 
@@ -386,6 +440,7 @@ def create_rolling_returns_chart(
         )
     )
 
+    fig = _apply_fintech_layout(fig)
     return fig
 
 
@@ -455,7 +510,7 @@ def create_rolling_sharpe_chart(
     # Update layout with improved typography
     fig.update_layout(
         title=dict(
-            text="Rolling 12-Month Sharpe Ratio",
+            text="Rolling Sharpe Ratio (12M)",
             font=dict(size=SUBPLOT_TITLE_FONT_SIZE)
         ),
         xaxis_title=dict(text="Date", font=dict(size=AXIS_TITLE_FONT_SIZE)),
@@ -473,4 +528,5 @@ def create_rolling_sharpe_chart(
         )
     )
 
+    fig = _apply_fintech_layout(fig)
     return fig
