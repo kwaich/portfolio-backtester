@@ -53,11 +53,13 @@ try:
     )
     from .state_manager import StateManager
     from .sidebar import render_sidebar_form
-    from .results import render_results, render_welcome_screen
+    from .results import render_results
     from .utils import (
         get_query_params, set_query_params, show_error, show_success,
         show_info, ProgressTracker
     )
+    from app.design_system import get_global_css
+    from app.ui_components import display_welcome_screen
 except ImportError as e:
     st.error(f"❌ Failed to import app modules: {e}")
     st.stop()
@@ -280,12 +282,8 @@ def main() -> None:
         initial_sidebar_state=SIDEBAR_STATE
     )
 
-    # Custom CSS for improved styling
-    st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
-
-    # Header
-    st.markdown(f'<div class="main-header">{MAIN_TITLE}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="sub-header">{SUBTITLE}</div>', unsafe_allow_html=True)
+    # Inject global design system CSS
+    st.markdown(get_global_css(), unsafe_allow_html=True)
 
     # Initialize session state
     initialize_session_state()
@@ -315,7 +313,7 @@ def main() -> None:
         stored_results = StateManager.get_backtest_results()
         render_results(stored_results)
     else:
-        render_welcome_screen()
+        display_welcome_screen()
 
 
 if __name__ == "__main__":

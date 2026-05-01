@@ -14,7 +14,16 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-from .ui_components import render_metrics_column, render_relative_metrics, render_portfolio_composition
+from .ui_components import (
+    render_metrics_column,
+    render_relative_metrics,
+    render_portfolio_composition,
+    display_section_header,
+    display_info_bar,
+    display_hero_metrics_row,
+    display_metrics_tables,
+    display_downloads,
+)
 from .charts import create_main_dashboard, create_rolling_returns_chart, create_rolling_sharpe_chart
 
 try:
@@ -221,7 +230,7 @@ def render_raw_data(results: pd.DataFrame) -> None:
 
 
 def render_results(stored_results: Dict) -> None:
-    """Render all backtest results.
+    """Render all backtest results with the new fintech dashboard layout.
 
     Args:
         stored_results: Dictionary containing all backtest results from StateManager
@@ -239,32 +248,106 @@ def render_results(stored_results: Dict) -> None:
     dca_freq = stored_results.get('dca_freq')
     dca_amount = stored_results.get('dca_amount')
 
-    # Display results
-    st.divider()
-    st.header("📊 Backtest Results")
+    # Compute portfolio summary for hero metrics
+    portfolio_total_contrib = results["portfolio_contributions"].iloc[-1]
+    if summarize is None:
+        portfolio_summary = {}
+    else:
+        portfolio_summary = summarize(
+            results["portfolio_value"],
+            capital,
+            total_contributions=portfolio_total_contrib,
+            contributions_series=results["portfolio_contributions"] if (dca_freq and dca_amount) else None
+        )
 
-    # Summary statistics
-    render_summary_statistics(
-        results, all_benchmark_results, benchmarks,
-        capital, dca_freq, dca_amount
+    # Get start/end dates from the results DataFrame index
+    start_date = str(results.index[0].date()) if hasattr(results.index[0], 'date') else str(results.index[0])
+    end_date = str(results.index[-1].date()) if hasattr(results.index[-1], 'date') else str(results.index[-1])
+
+    # ------------------------------------------------------------------
+    # Hero Metrics Row
+    # ------------------------------------------------------------------
+    hero_metrics = {
+        "Ending Value": f"${portfolio_summary.get('ending_value', 0):,.2f}",
+        "Total Return": f"{portfolio_summary.get('total_return', 0):+.2%}",
+        "CAGR": f"{portfolio_summary.get('cagr', 0):+.2%}",
+        "Sharpe Ratio": f"{portfolio_summary.get('sharpe_ratio', 0):.2f}",
+        "Max Drawdown": f"{portfolio_summary.get('max_drawdown', 0):.2%}",
+    }
+    display_hero_metrics_row(hero_metrics)
+
+    # ------------------------------------------------------------------
+    # Portfolio Info Bar
+    # ------------------------------------------------------------------
+    display_info_bar(
+        portfolio_tickers=tickers,
+        weights=weights_array.tolist(),
+        benchmarks=benchmarks,
+        start_date=start_date,
+        end_date=end_date,
     )
 
-    # Portfolio composition and strategy
-    st.divider()
-    render_portfolio_info(
-        tickers, weights_array, rebalance_strategy,
-        rebalance_freq, dca_frequency, dca_freq, dca_amount
-    )
+    # ------------------------------------------------------------------
+    # Main Dashboard Chart
+    # ------------------------------------------------------------------
+    display_section_header("Performance Overview")
+    fig = create_main_dashboard(results, all_benchmark_results, benchmarks, log_scale=False)
+    st.plotly_chart(fig, use_container_width=True)
 
-    # Charts
-    st.divider()
-    main_fig = render_charts(results, all_benchmark_results, benchmarks)
+    # ------------------------------------------------------------------
+    # Rolling Returns
+    # ------------------------------------------------------------------
+    display_section_header("Rolling Returns")
+    fig_rolling = create_rolling_returns_chart(results, all_benchmark_results, benchmarks)
+    st.plotly_chart(fig_rolling, use_container_width=True)
 
-    # Download options
-    st.divider()
-    render_download_options(results, main_fig)
+    # ------------------------------------------------------------------
+    # Rolling Sharpe
+    # ------------------------------------------------------------------
+    display_section_header("Rolling Sharpe Ratio")
+    fig_sharpe = create_rolling_sharpe_chart(results, all_benchmark_results, benchmarks)
+    st.plotly_chart(fig_sharpe, use_container_width=True)
 
-    # Raw data
+    # ------------------------------------------------------------------
+    # Detailed Metrics Tables
+    # ------------------------------------------------------------------
+    display_section_header("Detailed Metrics")
+
+    performance_metrics = {
+        "Total Return": f"{portfolio_summary.get('total_return', 0):.2%}",
+        "CAGR": f"{portfolio_summary.get('cagr', 0):.2%}",
+        "Volatility (Annualized)": f"{portfolio_summary.get('volatility', 0):.2%}",
+    }
+    # Add IRR only for DCA strategies
+    if 'irr' in portfolio_summary:
+        performance_metrics["IRR"] = f"{portfolio_summary['irr']:.2%}"
+
+    risk_metrics = {
+        "Sharpe Ratio": f"{portfolio_summary.get('sharpe_ratio', 0):.2f}",
+        "Sortino Ratio": f"{portfolio_summary.get('sortino_ratio', 0):.2f}",
+        "Max Drawdown": f"{portfolio_summary.get('max_drawdown', 0):.2%}",
+    }
+
+    display_metrics_tables(performance_metrics, risk_metrics)
+
+    # ------------------------------------------------------------------
+    # Downloads
+    # ------------------------------------------------------------------
+    display_section_header("Downloads")
+
+    csv_buffer = io.StringIO()
+    results.to_csv(csv_buffer)
+    csv_bytes = csv_buffer.getvalue().encode("utf-8")
+
+    # Generate chart HTML bytes
+    chart_html = fig.to_html(include_plotlyjs='cdn')
+    chart_bytes = chart_html.encode("utf-8")
+
+    display_downloads(csv_data=csv_bytes, chart_data=chart_bytes)
+
+    # ------------------------------------------------------------------
+    # Raw Data
+    # ------------------------------------------------------------------
     render_raw_data(results)
 
 
