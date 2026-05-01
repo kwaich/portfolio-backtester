@@ -23,6 +23,8 @@ from .ui_components import (
     display_hero_metrics_row,
     display_metrics_tables,
     display_downloads,
+    METRIC_LABELS,
+    format_metric_value,
 )
 from .charts import create_main_dashboard, create_rolling_returns_chart, create_rolling_sharpe_chart
 
@@ -264,19 +266,21 @@ def render_results(stored_results: Dict) -> None:
     start_date = str(results.index[0].date()) if hasattr(results.index[0], 'date') else str(results.index[0])
     end_date = str(results.index[-1].date()) if hasattr(results.index[-1], 'date') else str(results.index[-1])
 
-    # Compute primary benchmark summary for hero metrics
-    benchmark_summary = {}
-    primary_benchmark_name = benchmarks[0] if benchmarks else None
-    if summarize is not None and primary_benchmark_name:
-        bench_result = all_benchmark_results.get(primary_benchmark_name)
-        if bench_result is not None:
+    # Compute summaries for all benchmarks
+    all_benchmark_summaries = {}
+    if summarize is not None:
+        for bench_name, bench_result in all_benchmark_results.items():
             benchmark_total_contrib = bench_result["benchmark_contributions"].iloc[-1]
-            benchmark_summary = summarize(
-                bench_result["benchmark_value"],
+            all_benchmark_summaries[bench_name] = summarize(
+                bench_result['benchmark_value'],
                 capital,
                 total_contributions=benchmark_total_contrib,
                 contributions_series=bench_result["benchmark_contributions"] if (dca_freq and dca_amount) else None
             )
+
+    # Get start/end dates from the results DataFrame index
+    start_date = str(results.index[0].date()) if hasattr(results.index[0], 'date') else str(results.index[0])
+    end_date = str(results.index[-1].date()) if hasattr(results.index[-1], 'date') else str(results.index[-1])
 
     # ------------------------------------------------------------------
     # Hero Metrics Row
@@ -291,14 +295,15 @@ def render_results(stored_results: Dict) -> None:
     }
     display_hero_metrics_row(hero_metrics)
 
-    if benchmark_summary:
+    primary_benchmark_name = benchmarks[0] if benchmarks else None
+    if primary_benchmark_name and primary_benchmark_name in all_benchmark_summaries:
         st.markdown("**Benchmark ({})**".format(primary_benchmark_name))
         benchmark_hero_metrics = {
-            "Ending Value": f"${benchmark_summary.get('ending_value', 0):,.2f}",
-            "Total Return": f"{benchmark_summary.get('total_return', 0):+.2%}",
-            "CAGR": f"{benchmark_summary.get('cagr', 0):+.2%}",
-            "Sharpe Ratio": f"{benchmark_summary.get('sharpe_ratio', 0):.2f}",
-            "Max Drawdown": f"{benchmark_summary.get('max_drawdown', 0):.2%}",
+            "Ending Value": f"${all_benchmark_summaries[primary_benchmark_name].get('ending_value', 0):,.2f}",
+            "Total Return": f"{all_benchmark_summaries[primary_benchmark_name].get('total_return', 0):+.2%}",
+            "CAGR": f"{all_benchmark_summaries[primary_benchmark_name].get('cagr', 0):+.2%}",
+            "Sharpe Ratio": f"{all_benchmark_summaries[primary_benchmark_name].get('sharpe_ratio', 0):.2f}",
+            "Max Drawdown": f"{all_benchmark_summaries[primary_benchmark_name].get('max_drawdown', 0):.2%}",
         }
         display_hero_metrics_row(benchmark_hero_metrics)
 
@@ -312,6 +317,62 @@ def render_results(stored_results: Dict) -> None:
         start_date=start_date,
         end_date=end_date,
     )
+
+    # ------------------------------------------------------------------
+    # Summary Statistics
+    # ------------------------------------------------------------------
+    st.subheader("Summary Statistics")
+
+    # Filter out metrics already shown in hero row
+    hero_keys = {"ending_value", "total_return", "cagr", "sharpe_ratio", "max_drawdown"}
+    portfolio_detailed = {k: v for k, v in portfolio_summary.items() if k not in hero_keys}
+
+    def _build_row(summary_dict: dict) -> dict:
+        return {METRIC_LABELS.get(k, k): format_metric_value(k, v) for k, v in summary_dict.items()}
+
+    def _build_relative_row(port: dict, bench: dict) -> dict:
+        rel = {}
+        rel["Excess Return"] = f"{port['total_return'] - bench['total_return']:+.2%}"
+        rel["Excess CAGR"] = f"{port['cagr'] - bench['cagr']:+.2%}"
+        if "irr" in port and "irr" in bench:
+            rel["Excess IRR"] = f"{port['irr'] - bench['irr']:+.2%}"
+        rel["Volatility Diff"] = f"{port['volatility'] - bench['volatility']:+.2%}"
+        rel["Sharpe Difference"] = f"{port['sharpe_ratio'] - bench['sharpe_ratio']:+.3f}"
+        rel["Sortino Difference"] = f"{port['sortino_ratio'] - bench['sortino_ratio']:+.3f}"
+        return rel
+
+    # Portfolio detailed metrics row
+    if portfolio_detailed:
+        st.markdown("**Portfolio**")
+        display_hero_metrics_row(_build_row(portfolio_detailed))
+
+    # Benchmark detailed metrics row
+    if primary_benchmark_name and primary_benchmark_name in all_benchmark_summaries:
+        bench_summary = all_benchmark_summaries[primary_benchmark_name]
+        bench_detailed = {k: v for k, v in bench_summary.items() if k not in hero_keys}
+        if bench_detailed:
+            st.markdown("**Benchmark ({})**".format(primary_benchmark_name))
+            display_hero_metrics_row(_build_row(bench_detailed))
+
+        # Relative Performance row
+        st.markdown("**Relative Performance**")
+        display_hero_metrics_row(_build_relative_row(portfolio_summary, bench_summary))
+
+    # Additional benchmark comparisons
+    if len(benchmarks) > 1:
+        st.divider()
+        st.subheader("Additional Benchmark Comparisons")
+
+        for bench_name in benchmarks[1:]:
+            with st.expander(f"📊 Portfolio vs {bench_name}", expanded=False):
+                bench_summary = all_benchmark_summaries[bench_name]
+                bench_detailed = {k: v for k, v in bench_summary.items() if k not in hero_keys}
+                if bench_detailed:
+                    st.markdown("**{}**".format(bench_name))
+                    display_hero_metrics_row(_build_row(bench_detailed))
+
+                st.markdown("**Relative Performance**")
+                display_hero_metrics_row(_build_relative_row(portfolio_summary, bench_summary))
 
     # ------------------------------------------------------------------
     # Main Dashboard Chart
