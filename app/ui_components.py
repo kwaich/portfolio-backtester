@@ -17,6 +17,14 @@ import pandas as pd
 from .config import METRIC_LABELS
 from .ticker_data import get_all_tickers, format_ticker_option, search_tickers_with_yahoo, get_ticker_name
 from .state_manager import StateManager
+from app.design_system import (
+    COLORS,
+    TYPOGRAPHY,
+    SPACING,
+    get_card_style,
+    get_metric_card_style,
+    get_welcome_style,
+)
 
 
 def format_metric_value(key: str, value: float) -> str:
@@ -326,3 +334,167 @@ def render_searchable_ticker_input(
             st.rerun()
 
     return ticker_input.strip().upper() if ticker_input else ""
+
+
+def display_welcome_screen() -> None:
+    """Display the centered welcome hero when no backtest has been run."""
+    st.markdown(get_welcome_style(), unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="welcome-container">
+            <div class="welcome-icon">📈</div>
+            <div class="welcome-title">Portfolio Backtester</div>
+            <div class="welcome-subtitle">
+                Analyze historical portfolio performance<br>
+                Enter tickers in the sidebar and click "Run Backtest" to get started.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def display_section_header(title: str) -> None:
+    """Display a section header using the design system."""
+    st.markdown(
+        f"""
+        <h3 style="
+            font-family: {TYPOGRAPHY['font_header']};
+            font-size: {TYPOGRAPHY['section_header_size']};
+            font-weight: {TYPOGRAPHY['section_header_weight']};
+            color: {COLORS['primary_text']};
+            margin-top: {SPACING['section_gap']};
+            margin-bottom: 1rem;
+        ">{title}</h3>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def display_info_bar(portfolio_tickers: list[str], weights: list[float], benchmarks: list[str], start_date: str, end_date: str) -> None:
+    """Display a compact portfolio info bar."""
+    if not portfolio_tickers or not weights:
+        return
+
+    weight_strs = [f"{t} {w:.0%}" for t, w in zip(portfolio_tickers, weights)]
+    portfolio_str = " · ".join(weight_strs)
+    benchmark_str = ", ".join(benchmarks) if benchmarks else "—"
+    date_str = f"{start_date} – {end_date}"
+
+    st.markdown(
+        f"""
+        <div style="
+            background-color: {COLORS['bg_card']};
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            border: 1px solid {COLORS['border']};
+            font-family: {TYPOGRAPHY['font_body']};
+            font-size: 14px;
+            color: {COLORS['muted']};
+            margin-bottom: 1rem;
+        ">
+            <strong style="color: {COLORS['primary_text']};">{portfolio_str}</strong>
+            <span style="margin: 0 0.5rem;">vs</span>
+            <strong style="color: {COLORS['primary_text']};">{benchmark_str}</strong>
+            <span style="margin: 0 0.5rem;">·</span>
+            {date_str}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def display_hero_metrics_row(metrics: dict[str, str]) -> None:
+    """Display the hero metrics row as a flexbox of metric cards.
+
+    Args:
+        metrics: Dict mapping label → formatted value string.
+                 Expected keys: Ending Value, Total Return, CAGR, Sharpe Ratio, Max Drawdown
+    """
+    st.markdown(get_metric_card_style(), unsafe_allow_html=True)
+
+    cards_html = '<div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;">'
+    for label, value in metrics.items():
+        color_class = ""
+        if any(k in label.lower() for k in ("return", "cagr")):
+            try:
+                num = float(value.replace("%", "").replace("$", "").replace(",", ""))
+                color_class = "metric-positive" if num > 0 else "metric-negative" if num < 0 else ""
+            except ValueError:
+                pass
+        elif "drawdown" in label.lower():
+            color_class = "metric-negative"
+
+        cards_html += f"""
+        <div class="metric-card" style="flex: 1; min-width: 140px;">
+            <div class="metric-value {color_class}">{value}</div>
+            <div class="metric-label">{label}</div>
+        </div>
+        """
+    cards_html += "</div>"
+
+    st.markdown(cards_html, unsafe_allow_html=True)
+
+
+def display_metrics_tables(performance: dict[str, str], risk: dict[str, str]) -> None:
+    """Display two side-by-side metrics tables.
+
+    Args:
+        performance: Dict of performance metric label → value
+        risk: Dict of risk metric label → value
+    """
+    col1, col2 = st.columns(2)
+
+    def _build_table(title: str, data: dict[str, str]) -> str:
+        rows = ""
+        for label, value in data.items():
+            rows += f"""
+            <tr style="border-bottom: 1px solid {COLORS['border']};">
+                <td style="padding: 0.6rem 0; font-family: {TYPOGRAPHY['font_body']}; font-size: 14px; color: {COLORS['primary_text']};">{label}</td>
+                <td style="padding: 0.6rem 0; font-family: {TYPOGRAPHY['font_body']}; font-size: 14px; color: {COLORS['primary_text']}; text-align: right; font-weight: 500;">{value}</td>
+            </tr>
+            """
+        return f"""
+        <div style="background-color: {COLORS['bg_card']}; border-radius: {SPACING['card_radius']}; padding: {SPACING['card_padding']}; border: 1px solid {COLORS['border']}; margin-bottom: 1rem;">
+            <div style="font-family: {TYPOGRAPHY['font_header']}; font-size: 14px; font-weight: 600; color: {COLORS['muted']}; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">{title}</div>
+            <table style="width: 100%; border-collapse: collapse;">{rows}</table>
+        </div>
+        """
+
+    with col1:
+        st.markdown(_build_table("Performance", performance), unsafe_allow_html=True)
+    with col2:
+        st.markdown(_build_table("Risk", risk), unsafe_allow_html=True)
+
+
+def display_downloads(csv_data: bytes | None = None, chart_data: bytes | None = None) -> None:
+    """Display the downloads section with styled buttons."""
+    st.markdown(get_card_style(), unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <div class="fintech-card" style="margin-top: 1.5rem;">
+            <div style="font-family: {TYPOGRAPHY['font_header']}; font-size: 16px; font-weight: 500; color: {COLORS['primary_text']}; margin-bottom: 0.75rem;">Downloads</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if csv_data:
+            st.download_button(
+                label="⬇ Download Results CSV",
+                data=csv_data,
+                file_name="backtest_results.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+    with col2:
+        if chart_data:
+            st.download_button(
+                label="⬇ Download Chart",
+                data=chart_data,
+                file_name="backtest_chart.png",
+                mime="image/png",
+                use_container_width=True,
+            )
