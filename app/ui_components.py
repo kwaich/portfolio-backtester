@@ -21,9 +21,6 @@ from app.design_system import (
     COLORS,
     TYPOGRAPHY,
     SPACING,
-    get_card_style,
-    get_metric_card_style,
-    get_welcome_style,
 )
 
 
@@ -338,13 +335,12 @@ def render_searchable_ticker_input(
 
 def display_welcome_screen() -> None:
     """Display the centered welcome hero when no backtest has been run."""
-    st.markdown(get_welcome_style(), unsafe_allow_html=True)
     st.markdown(
-        """
-        <div class="welcome-container">
-            <div class="welcome-icon">📈</div>
-            <div class="welcome-title">Portfolio Backtester</div>
-            <div class="welcome-subtitle">
+        f"""
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 4rem 2rem;">
+            <div style="color: {COLORS['accent']}; font-size: 48px; margin-bottom: 1rem;">📈</div>
+            <div style="font-family: {TYPOGRAPHY['font_header']}; font-size: {TYPOGRAPHY['page_title_size']}; font-weight: {TYPOGRAPHY['page_title_weight']}; color: {COLORS['primary_text']}; margin-bottom: 0.5rem;">Portfolio Backtester</div>
+            <div style="font-family: {TYPOGRAPHY['font_body']}; font-size: 16px; color: {COLORS['muted']};">
                 Analyze historical portfolio performance<br>
                 Enter tickers in the sidebar and click "Run Backtest" to get started.
             </div>
@@ -411,24 +407,22 @@ def display_hero_metrics_row(metrics: dict[str, str]) -> None:
         metrics: Dict mapping label → formatted value string.
                  Expected keys: Ending Value, Total Return, CAGR, Sharpe Ratio, Max Drawdown
     """
-    st.markdown(get_metric_card_style(), unsafe_allow_html=True)
-
     cards_html = '<div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;">'
     for label, value in metrics.items():
-        color_class = ""
+        value_color = COLORS["primary_text"]
         if any(k in label.lower() for k in ("return", "cagr")):
             try:
                 num = float(value.replace("%", "").replace("$", "").replace(",", ""))
-                color_class = "metric-positive" if num > 0 else "metric-negative" if num < 0 else ""
+                value_color = COLORS["success"] if num > 0 else COLORS["danger"] if num < 0 else COLORS["primary_text"]
             except ValueError:
                 pass
         elif "drawdown" in label.lower():
-            color_class = "metric-negative"
+            value_color = COLORS["danger"]
 
         cards_html += f"""
-        <div class="metric-card" style="flex: 1; min-width: 140px;">
-            <div class="metric-value {color_class}">{value}</div>
-            <div class="metric-label">{label}</div>
+        <div style="background-color: {COLORS['bg_card']}; border-radius: {SPACING['card_radius']}; padding: {SPACING['card_padding']}; box-shadow: {SPACING['card_shadow']}; border: 1px solid {COLORS['border']}; text-align: center; flex: 1; min-width: 140px;">
+            <div style="font-family: {TYPOGRAPHY['font_body']}; font-size: {TYPOGRAPHY['metric_value_size']}; font-weight: {TYPOGRAPHY['metric_value_weight']}; color: {value_color}; margin-bottom: 4px;">{value}</div>
+            <div style="font-family: {TYPOGRAPHY['font_body']}; font-size: {TYPOGRAPHY['metric_label_size']}; font-weight: {TYPOGRAPHY['metric_label_weight']}; color: {COLORS['muted']};">{label}</div>
         </div>
         """
     cards_html += "</div>"
@@ -469,10 +463,9 @@ def display_metrics_tables(performance: dict[str, str], risk: dict[str, str]) ->
 
 def display_downloads(csv_data: bytes | None = None, chart_data: bytes | None = None) -> None:
     """Display the downloads section with styled buttons."""
-    st.markdown(get_card_style(), unsafe_allow_html=True)
     st.markdown(
         f"""
-        <div class="fintech-card" style="margin-top: 1.5rem;">
+        <div style="background-color: {COLORS['bg_card']}; border-radius: {SPACING['card_radius']}; padding: {SPACING['card_padding']}; box-shadow: {SPACING['card_shadow']}; border: 1px solid {COLORS['border']}; margin-top: 1.5rem;">
             <div style="font-family: {TYPOGRAPHY['font_header']}; font-size: 16px; font-weight: 500; color: {COLORS['primary_text']}; margin-bottom: 0.75rem;">Downloads</div>
         </div>
         """,

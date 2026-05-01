@@ -23,16 +23,16 @@ from .presets import get_portfolio_presets, get_date_presets
 from .state_manager import StateManager
 from .ui_components import render_searchable_ticker_input
 from .design_system import (
-    COLORS,
-    get_sidebar_badge_style,
-    get_pill_button_style,
     get_run_button_style,
 )
 
 
 def _section_badge(title: str) -> None:
     """Render a sidebar section badge label."""
-    st.markdown(f'<span class="sidebar-badge">{title}</span>', unsafe_allow_html=True)
+    st.sidebar.markdown(
+        f'<span style="font-family: Inter, sans-serif; font-size: 10px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; display: block;">{title}</span>',
+        unsafe_allow_html=True
+    )
 
 
 def render_sidebar_header() -> None:
@@ -214,8 +214,6 @@ def render_sidebar_form() -> Dict[str, Any]:
     Returns:
         Dictionary containing all form inputs
     """
-    st.sidebar.markdown(get_sidebar_badge_style(), unsafe_allow_html=True)
-    st.sidebar.markdown(get_pill_button_style(), unsafe_allow_html=True)
     st.sidebar.markdown(get_run_button_style(), unsafe_allow_html=True)
 
     render_sidebar_header()
