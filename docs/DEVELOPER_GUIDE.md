@@ -29,7 +29,7 @@ Core dependencies with minimum versions:
 
 ### Testing Setup
 
-`docs/TESTING_GUIDE.md` is the single source of truth for commands, coverage targets, and suite breakdown (currently 256 tests). Use it to keep workflows in sync. Common invocations:
+`docs/TESTING_GUIDE.md` is the single source of truth for commands, coverage targets, and suite breakdown (currently 404 tests). Use it to keep workflows in sync. Common invocations:
 
 ```bash
 pytest -v                         # entire suite
@@ -516,7 +516,7 @@ streamlit run app.py
 - ✅ Warnings shown for limited data
 
 **Tests**:
-- ✅ Run `pytest -v` to verify the full suite (256 tests) passes
+- ✅ Run `pytest -v` to verify the full suite (404 tests) passes
 - ✅ Coverage remains at ~88% (see docs/TESTING_GUIDE.md)
 
 ### Known Edge Cases
@@ -784,9 +784,10 @@ See [FILE_REFERENCE.md](FILE_REFERENCE.md) for comprehensive file documentation.
 - Web UI: app/main.py:75-459 (main orchestration)
 - Charts: app/charts.py (Plotly visualizations)
 - Configuration: app/config.py (32 constants)
+- Data repository: app/data_repository.py (repository pattern)
 
 ---
 
-**Last Updated**: 2025-11-15
-**For**: Portfolio Backtester v2.1.0
+**Last Updated**: 2026-05-01
+**For**: Portfolio Backtester v2.6.0
 **See Also**: [FILE_REFERENCE.md](FILE_REFERENCE.md), [TESTING_GUIDE.md](TESTING_GUIDE.md), [CLAUDE.md](../CLAUDE.md)

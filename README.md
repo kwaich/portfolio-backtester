@@ -450,6 +450,7 @@ portfolio-backtester/
 │   ├── test_ticker_names.py
 │   ├── test_properties.py  # Hypothesis property-based tests
 │   ├── test_benchmarks.py  # pytest-benchmark performance baselines
+│   ├── test_plot_backtest.py  # Matplotlib chart regression tests
 │   └── test_integration.py
 ├── requirements.txt        # Python dependencies
 ├── README.md               # This file
@@ -459,7 +460,8 @@ portfolio-backtester/
 │   ├── TESTING_GUIDE.md          # TDD rules and test patterns
 │   ├── DEVELOPER_GUIDE.md        # Development workflows
 │   ├── CHANGELOG.md              # Version history
-│   └── PROJECT_SUMMARY.md        # Additional documentation
+│   ├── PROJECT_SUMMARY.md        # Project roadmap and architecture
+│   └── superpowers/              # Agent skill definitions
 ├── .gitignore              # Git ignore rules
 ├── .venv/                  # Virtual environment (gitignored)
 ├── .cache/                 # Price data cache (gitignored)

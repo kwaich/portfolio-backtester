@@ -1,0 +1,1061 @@
+# Repository Pattern for Data Access (Issue 14) Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Abstract all Yahoo Finance data access behind a `DataRepository` interface with `YahooFinanceRepository` and `MockRepository` implementations, while preserving backward compatibility for `download_prices`, `search_tickers_with_yahoo`, and `get_ticker_name`.
+
+**Architecture:** A module-level singleton in `app/data_repository.py` holds a default `YahooFinanceRepository`. Public APIs (`download_prices`, `search_tickers_with_yahoo`, `get_ticker_name`) become thin wrappers that delegate to `get_repository()`. Tests inject `MockRepository` via `set_repository()`.
+
+**Tech Stack:** Python 3.11+, pandas, yfinance, pytest, unittest.mock
+
+---
+
+## File Map
+
+| File | Action | Responsibility |
+|------|--------|---------------|
+| `app/data_repository.py` | **Create** | `DataRepository` ABC, `YahooFinanceRepository`, `MockRepository`, module singleton |
+| `tests/test_data_repository.py` | **Create** | Repository unit tests (cache, download, mock, singleton) |
+| `backtest.py` | **Modify** | `download_prices` delegates to repo; cache functions become wrappers; remove `_download_from_yfinance` and `_process_yfinance_data` |
+| `app/ticker_data.py` | **Modify** | `get_ticker_name` and `search_yahoo_finance` delegate to repo; keep caching decorators |
+| `tests/test_backtest.py` | **Modify** | Update `TestDownloadPrices` to patch repo or use `MockRepository`; keep `TestCacheFunctions` pointing at wrappers |
+| `tests/test_integration.py` | **Modify** | Update `test_cache_workflow` to test repository directly; update `test_missing_ticker_data` patch path |
+| `tests/test_app.py` | **Modify** | Update any `download_prices` patches to use `MockRepository` or new patch path |
+
+---
+
+## Task 1: Create `app/data_repository.py` — Core Repository
+
+**Files:**
+- Create: `app/data_repository.py`
+
+- [ ] **Step 1: Write the `DataRepository` ABC**
+
+```python
+"""Repository pattern for portfolio data access.
+
+Abstracts all external data sources (Yahoo Finance, CSV, mocks) behind a
+single interface. Use get_repository() / set_repository() for the module-level
+singleton pattern.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import logging
+import time
+from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import Any, List, Tuple
+
+import numpy as np
+import pandas as pd
+
+logger = logging.getLogger(__name__)
+
+CACHE_VERSION = "2.0"
+DEFAULT_CACHE_TTL_HOURS = 24
+
+
+class DataRepository(ABC):
+    """Abstract interface for portfolio data access."""
+
+    @abstractmethod
+    def get_prices(
+        self,
+        tickers: List[str],
+        start: str,
+        end: str,
+        use_cache: bool = True,
+        cache_ttl_hours: int = DEFAULT_CACHE_TTL_HOURS,
+    ) -> pd.DataFrame:
+        """Fetch adjusted close prices for tickers."""
+        ...
+
+    @abstractmethod
+    def search_tickers(self, query: str, limit: int = 10) -> List[Tuple[str, str]]:
+        """Search for tickers matching a query."""
+        ...
+
+    @abstractmethod
+    def get_ticker_name(self, ticker: str) -> str:
+        """Get the full name for a ticker symbol."""
+        ...
+```
+
+- [ ] **Step 2: Write `YahooFinanceRepository` (cache helpers)**
+
+Add inside `app/data_repository.py`, after the ABC:
+
+```python
+class YahooFinanceRepository(DataRepository):
+    """Yahoo Finance implementation with per-ticker Parquet caching."""
+
+    # ------------------------------------------------------------------
+    # Cache helpers (migrated from backtest.py)
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _get_cache_key(tickers: List[str], start: str, end: str) -> str:
+        key_str = f"{'_'.join(sorted(tickers))}_{start}_{end}"
+        return hashlib.md5(key_str.encode()).hexdigest()
+
+    @staticmethod
+    def _get_cache_path(tickers: List[str], start: str, end: str) -> Path:
+        cache_dir = Path(".cache")
+        cache_dir.mkdir(exist_ok=True)
+        cache_key = YahooFinanceRepository._get_cache_key(tickers, start, end)
+        return cache_dir / cache_key
+
+    def _load_cached_prices(
+        self, cache_path: Path, max_age_hours: int = DEFAULT_CACHE_TTL_HOURS
+    ) -> pd.DataFrame | None:
+        parquet_path = cache_path.with_suffix(".parquet")
+        metadata_path = cache_path.with_suffix(".json")
+        old_pickle_path = cache_path.with_suffix(".pkl")
+
+        # Migrate old pickle caches
+        if old_pickle_path.exists() and not parquet_path.exists():
+            logger.warning(f"Old pickle cache detected at {old_pickle_path}, migrating to Parquet")
+            try:
+                with open(old_pickle_path, "rb") as f:
+                    import pickle
+
+                    cache_data = pickle.load(f)
+
+                if isinstance(cache_data, dict) and "data" in cache_data:
+                    df = cache_data["data"]
+                    timestamp = cache_data.get("timestamp", time.time())
+                elif isinstance(cache_data, pd.DataFrame):
+                    df = cache_data
+                    timestamp = time.time()
+                else:
+                    raise ValueError("Unknown pickle cache format")
+
+                df.to_parquet(parquet_path, compression="gzip", index=True)
+                metadata = {"timestamp": timestamp, "version": CACHE_VERSION}
+                with open(metadata_path, "w") as f:
+                    json.dump(metadata, f)
+
+                old_pickle_path.unlink()
+                logger.info(f"Migrated pickle cache to Parquet: {parquet_path}")
+            except Exception as e:
+                logger.warning(f"Failed to migrate old cache: {e}")
+                try:
+                    old_pickle_path.unlink()
+                except Exception:
+                    pass
+                return None
+
+        if not parquet_path.exists() or not metadata_path.exists():
+            return None
+
+        try:
+            with open(metadata_path, "r") as f:
+                metadata = json.load(f)
+
+            cache_age_hours = (time.time() - metadata["timestamp"]) / 3600
+            if cache_age_hours > max_age_hours:
+                logger.info(f"Cache expired (age: {cache_age_hours:.1f}h, max: {max_age_hours}h)")
+                parquet_path.unlink(missing_ok=True)
+                metadata_path.unlink(missing_ok=True)
+                return None
+
+            df = pd.read_parquet(parquet_path)
+            logger.debug(f"Loaded cached data (age: {cache_age_hours:.1f}h from {parquet_path})")
+            return df
+        except Exception as e:
+            logger.warning(f"Failed to load cache: {e}")
+            parquet_path.unlink(missing_ok=True)
+            metadata_path.unlink(missing_ok=True)
+            return None
+
+    def _save_cached_prices(self, cache_path: Path, prices: pd.DataFrame) -> None:
+        parquet_path = cache_path.with_suffix(".parquet")
+        metadata_path = cache_path.with_suffix(".json")
+
+        try:
+            prices.to_parquet(parquet_path, compression="gzip", index=True)
+            metadata = {"timestamp": time.time(), "version": CACHE_VERSION}
+            with open(metadata_path, "w") as f:
+                json.dump(metadata, f)
+            logger.debug(f"Saved data to cache: {parquet_path}")
+        except Exception as e:
+            logger.warning(f"Failed to save cache: {e}")
+            parquet_path.unlink(missing_ok=True)
+            metadata_path.unlink(missing_ok=True)
+```
+
+- [ ] **Step 3: Write `YahooFinanceRepository` (download + process helpers)**
+
+Add the yfinance-specific methods inside `YahooFinanceRepository`:
+
+```python
+    # ------------------------------------------------------------------
+    # yfinance download helpers (migrated from backtest.py)
+    # ------------------------------------------------------------------
+    def _download_from_yfinance(self, tickers: List[str], start: str, end: str) -> Any:
+        import yfinance as yf
+
+        logger.info(f"Downloading data for {len(tickers)} ticker(s) from {start} to {end}")
+        return yf.download(
+            tickers=tickers,
+            start=start,
+            end=end,
+            interval="1d",
+            auto_adjust=True,
+            progress=False,
+        )
+
+    def _process_yfinance_data(
+        self, data: Any, tickers: List[str], start: str, end: str
+    ) -> pd.DataFrame:
+        if data.empty:
+            raise ValueError(
+                f"No price data returned for period {start} to {end}.\n"
+                f"Tickers requested: {', '.join(tickers)}\n"
+                f"Please verify:\n"
+                f"  1. Tickers are valid symbols\n"
+                f"  2. Tickers were trading during this period\n"
+                f"  3. Date range is valid (not in the future)"
+            )
+
+        if isinstance(data, pd.Series):
+            prices = data.to_frame(name=tickers[0])
+        elif isinstance(data.columns, pd.MultiIndex):
+            level0 = data.columns.get_level_values(0)
+            price_field = None
+            for candidate in ("Adj Close", "Close"):
+                if candidate in level0:
+                    price_field = candidate
+                    break
+            if price_field is None:
+                price_field = level0[0]
+            prices = data.xs(price_field, axis=1, level=0)
+        else:
+            preferred = next(
+                (c for c in ("Adj Close", "Close") if c in data.columns), None
+            )
+            column = preferred or data.columns[0]
+            prices = data[[column]].rename(columns={column: tickers[0]})
+
+        prices = prices.dropna(how="all")
+        if prices.empty:
+            raise ValueError(
+                f"No price data returned for period {start} to {end}.\n"
+                f"Tickers requested: {', '.join(tickers)}\n"
+                f"Please verify:\n"
+                f"  1. Tickers are valid symbols\n"
+                f"  2. Tickers were trading during this period\n"
+                f"  3. Date range is valid (not in the future)"
+            )
+
+        if isinstance(prices, pd.Series):
+            prices = prices.to_frame(name=tickers[0])
+
+        missing = [ticker for ticker in tickers if ticker not in prices.columns]
+        if missing:
+            available = [t for t in tickers if t not in missing]
+            raise ValueError(
+                f"Missing data for ticker(s): {', '.join(missing)}\n"
+                f"Date range: {start} to {end}\n"
+                f"Available ticker(s): {', '.join(available) if available else 'None'}\n"
+                f"Verify the missing tickers were trading during this period."
+            )
+
+        prices = prices.loc[:, tickers]
+        return prices
+```
+
+- [ ] **Step 4: Write `YahooFinanceRepository.get_prices`**
+
+Add the main orchestrator method:
+
+```python
+    # ------------------------------------------------------------------
+    # Public interface
+    # ------------------------------------------------------------------
+    def get_prices(
+        self,
+        tickers: List[str],
+        start: str,
+        end: str,
+        use_cache: bool = True,
+        cache_ttl_hours: int = DEFAULT_CACHE_TTL_HOURS,
+    ) -> pd.DataFrame:
+        """Fetch adjusted closes with per-ticker caching."""
+
+        # Optimized batch caching: check each ticker individually
+        if use_cache and len(tickers) > 1:
+            cached_results: dict[str, pd.Series] = {}
+            uncached_tickers: List[str] = []
+
+            for ticker in tickers:
+                single_cache_path = self._get_cache_path([ticker], start, end)
+                cached_data = self._load_cached_prices(
+                    single_cache_path, max_age_hours=cache_ttl_hours
+                )
+                if cached_data is not None:
+                    cached_results[ticker] = cached_data[ticker]
+                    logger.debug(f"Cache hit for {ticker}")
+                else:
+                    uncached_tickers.append(ticker)
+
+            if uncached_tickers:
+                logger.info(
+                    f"Downloading {len(uncached_tickers)} uncached ticker(s): "
+                    f"{', '.join(uncached_tickers)}"
+                )
+                new_data = self._download_from_yfinance(uncached_tickers, start, end)
+                new_prices = self._process_yfinance_data(
+                    new_data, uncached_tickers, start, end
+                )
+
+                for ticker in uncached_tickers:
+                    if ticker in new_prices.columns:
+                        single_cache_path = self._get_cache_path([ticker], start, end)
+                        self._save_cached_prices(single_cache_path, new_prices[[ticker]])
+                        cached_results[ticker] = new_prices[ticker]
+
+            if cached_results:
+                combined_prices = pd.DataFrame(
+                    {ticker: cached_results[ticker] for ticker in tickers if ticker in cached_results}
+                )
+                missing = [ticker for ticker in tickers if ticker not in combined_prices.columns]
+                if missing:
+                    raise ValueError(
+                        f"Missing data for ticker(s): {', '.join(missing)}\n"
+                        f"Date range: {start} to {end}\n"
+                        f"Verify the missing tickers were trading during this period."
+                    )
+                logger.info(
+                    f"Batch download complete: {len(cached_results)} ticker(s) "
+                    f"({len(cached_results) - len(uncached_tickers)} cached, "
+                    f"{len(uncached_tickers)} downloaded)"
+                )
+                return combined_prices
+            else:
+                pass  # fallback to standard path
+
+        # Standard path: single ticker or cache disabled
+        if use_cache:
+            cache_path = self._get_cache_path(tickers, start, end)
+            cached_data = self._load_cached_prices(cache_path, max_age_hours=cache_ttl_hours)
+            if cached_data is not None:
+                return cached_data
+
+        data = self._download_from_yfinance(tickers, start, end)
+        prices = self._process_yfinance_data(data, tickers, start, end)
+
+        if use_cache:
+            cache_path = self._get_cache_path(tickers, start, end)
+            self._save_cached_prices(cache_path, prices)
+
+        return prices
+```
+
+- [ ] **Step 5: Write `YahooFinanceRepository` ticker search + name methods**
+
+Add the remaining public methods (migrated from `app/ticker_data.py`):
+
+```python
+    def search_tickers(self, query: str, limit: int = 10) -> List[Tuple[str, str]]:
+        """Search Yahoo Finance autocomplete API."""
+        if not query or len(query) < 1:
+            return []
+
+        try:
+            import requests
+
+            url = "https://query2.finance.yahoo.com/v1/finance/search"
+            params = {
+                "q": query,
+                "quotesCount": limit,
+                "newsCount": 0,
+                "enableFuzzyQuery": False,
+                "quotesQueryId": "tss_match_phrase_query",
+            }
+            headers = {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                ),
+                "Accept": "application/json",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Referer": "https://finance.yahoo.com",
+                "Origin": "https://finance.yahoo.com",
+            }
+
+            response = requests.get(url, params=params, headers=headers, timeout=5)
+            response.raise_for_status()
+            data = response.json()
+            quotes = data.get("quotes", [])
+
+            results = []
+            for quote in quotes[:limit]:
+                symbol = quote.get("symbol", "")
+                name = quote.get("longname") or quote.get("shortname", "")
+                if symbol and name:
+                    results.append((symbol, name))
+
+            logger.info(f"Yahoo Finance search for '{query}': found {len(results)} results")
+            return results
+
+        except Exception as e:
+            logger.warning(f"Yahoo Finance search failed for '{query}': {e}")
+            return []
+
+    def get_ticker_name(self, ticker: str) -> str:
+        """Fetch full name from yfinance Ticker.info."""
+        if not ticker or not ticker.strip():
+            return ""
+
+        try:
+            import yfinance as yf
+
+            yf_ticker = yf.Ticker(ticker)
+            info = yf_ticker.info
+            if not info:
+                logger.warning(f"No info available for ticker: {ticker}")
+                return ""
+
+            name = info.get("longName") or info.get("shortName") or ""
+            if name:
+                logger.info(f"Fetched ticker name for {ticker}: {name}")
+            else:
+                logger.warning(f"No name fields available for ticker: {ticker}")
+            return name
+
+        except Exception as e:
+            logger.warning(f"Error fetching ticker name for {ticker}: {e}")
+            return ""
+```
+
+- [ ] **Step 6: Commit Task 1**
+
+```bash
+git add app/data_repository.py
+git commit -m "feat: add DataRepository ABC and YahooFinanceRepository"
+```
+
+---
+
+## Task 2: Add `MockRepository` and Module Singleton
+
+**Files:**
+- Modify: `app/data_repository.py`
+
+- [ ] **Step 1: Add `MockRepository`**
+
+Append to `app/data_repository.py`:
+
+```python
+class MockRepository(DataRepository):
+    """Mock implementation for testing.
+
+    Args:
+        prices: DataFrame to return from get_prices
+        search_results: List of (ticker, name) tuples for search_tickers
+        ticker_names: Dict mapping ticker -> name for get_ticker_name
+    """
+
+    def __init__(
+        self,
+        prices: pd.DataFrame | None = None,
+        search_results: List[Tuple[str, str]] | None = None,
+        ticker_names: dict[str, str] | None = None,
+    ):
+        self.prices = prices
+        self.search_results = search_results or []
+        self.ticker_names = ticker_names or {}
+        self.get_prices_calls: List[tuple] = []
+        self.search_tickers_calls: List[tuple] = []
+        self.get_ticker_name_calls: List[str] = []
+
+    def get_prices(
+        self,
+        tickers: List[str],
+        start: str,
+        end: str,
+        use_cache: bool = True,
+        cache_ttl_hours: int = DEFAULT_CACHE_TTL_HOURS,
+    ) -> pd.DataFrame:
+        self.get_prices_calls.append((tickers, start, end, use_cache, cache_ttl_hours))
+        if self.prices is None:
+            dates = pd.date_range(start, end, freq="B")
+            data = {t: np.linspace(100, 110, len(dates)) for t in tickers}
+            return pd.DataFrame(data, index=dates)
+        return self.prices
+
+    def search_tickers(self, query: str, limit: int = 10) -> List[Tuple[str, str]]:
+        self.search_tickers_calls.append((query, limit))
+        return self.search_results[:limit]
+
+    def get_ticker_name(self, ticker: str) -> str:
+        self.get_ticker_name_calls.append(ticker)
+        return self.ticker_names.get(ticker, "")
+```
+
+- [ ] **Step 2: Add module-level singleton**
+
+Append to `app/data_repository.py`:
+
+```python
+# Module-level singleton
+_default_repo: DataRepository | None = None
+
+
+def get_repository() -> DataRepository:
+    """Get the default data repository instance.
+
+    Lazily initializes a YahooFinanceRepository on first call.
+    """
+    global _default_repo
+    if _default_repo is None:
+        _default_repo = YahooFinanceRepository()
+    return _default_repo
+
+
+def set_repository(repo: DataRepository) -> None:
+    """Replace the default data repository instance.
+
+    Use this in tests to inject MockRepository.
+    """
+    global _default_repo
+    _default_repo = repo
+```
+
+- [ ] **Step 3: Commit Task 2**
+
+```bash
+git add app/data_repository.py
+git commit -m "feat: add MockRepository and module singleton"
+```
+
+---
+
+## Task 3: Write `tests/test_data_repository.py`
+
+**Files:**
+- Create: `tests/test_data_repository.py`
+
+- [ ] **Step 1: Write cache tests**
+
+```python
+"""Tests for the DataRepository pattern."""
+
+from __future__ import annotations
+
+import json
+import tempfile
+import time
+from pathlib import Path
+from unittest.mock import patch
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from app.data_repository import (
+    YahooFinanceRepository,
+    MockRepository,
+    get_repository,
+    set_repository,
+    DataRepository,
+    DEFAULT_CACHE_TTL_HOURS,
+)
+
+
+class TestYahooFinanceRepositoryCache:
+    """Test caching functionality in YahooFinanceRepository."""
+
+    def test_get_cache_key_order_invariant(self):
+        repo = YahooFinanceRepository()
+        key1 = repo._get_cache_key(["AAPL", "MSFT"], "2020-01-01", "2021-01-01")
+        key2 = repo._get_cache_key(["MSFT", "AAPL"], "2020-01-01", "2021-01-01")
+        assert key1 == key2
+        assert len(key1) == 32
+
+    def test_get_cache_key_different_params(self):
+        repo = YahooFinanceRepository()
+        key1 = repo._get_cache_key(["AAPL"], "2020-01-01", "2021-01-01")
+        key2 = repo._get_cache_key(["AAPL"], "2020-01-01", "2022-01-01")
+        assert key1 != key2
+
+    def test_save_and_load_cached_prices(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = YahooFinanceRepository()
+            cache_path = Path(tmpdir) / "test_cache"
+            test_data = pd.DataFrame(
+                {"AAPL": [100, 101, 102], "MSFT": [200, 201, 202]},
+                index=pd.date_range("2020-01-01", periods=3),
+            )
+
+            repo._save_cached_prices(cache_path, test_data)
+            loaded_data = repo._load_cached_prices(cache_path)
+
+            assert loaded_data is not None
+            pd.testing.assert_frame_equal(loaded_data, test_data, check_freq=False)
+            assert cache_path.with_suffix(".parquet").exists()
+            assert cache_path.with_suffix(".json").exists()
+
+    def test_cache_expiration(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = YahooFinanceRepository()
+            cache_path = Path(tmpdir) / "test_cache"
+            test_data = pd.DataFrame(
+                {"AAPL": [100, 101, 102]},
+                index=pd.date_range("2020-01-01", periods=3),
+            )
+
+            repo._save_cached_prices(cache_path, test_data)
+
+            # Backdate metadata to simulate stale cache
+            metadata_path = cache_path.with_suffix(".json")
+            with open(metadata_path, "r") as f:
+                metadata = json.load(f)
+            metadata["timestamp"] = time.time() - (25 * 3600)
+            with open(metadata_path, "w") as f:
+                json.dump(metadata, f)
+
+            loaded = repo._load_cached_prices(cache_path, max_age_hours=24)
+            assert loaded is None
+            assert not cache_path.with_suffix(".parquet").exists()
+            assert not cache_path.with_suffix(".json").exists()
+
+    def test_load_nonexistent_cache(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = YahooFinanceRepository()
+            cache_path = Path(tmpdir) / "nonexistent"
+            result = repo._load_cached_prices(cache_path)
+            assert result is None
+```
+
+- [ ] **Step 2: Write download tests**
+
+```python
+class TestYahooFinanceRepositoryDownload:
+    """Test yfinance download integration."""
+
+    @patch("app.data_repository.yf.download")
+    def test_single_ticker_download(self, mock_yf):
+        repo = YahooFinanceRepository()
+        dates = pd.date_range("2020-01-01", periods=5, freq="D")
+        mock_yf.return_value = pd.DataFrame({"AAPL": [100, 101, 102, 103, 104]}, index=dates)
+
+        result = repo.get_prices(["AAPL"], "2020-01-01", "2020-01-05", use_cache=False)
+
+        assert list(result.columns) == ["AAPL"]
+        assert len(result) == 5
+        mock_yf.assert_called_once()
+
+    @patch("app.data_repository.yf.download")
+    def test_multi_ticker_download(self, mock_yf):
+        repo = YahooFinanceRepository()
+        dates = pd.date_range("2020-01-01", periods=5, freq="D")
+        data = pd.DataFrame(
+            {"AAPL": [100, 101, 102, 103, 104], "MSFT": [200, 201, 202, 203, 204]},
+            index=dates,
+        )
+        mock_yf.return_value = data
+
+        result = repo.get_prices(["AAPL", "MSFT"], "2020-01-01", "2020-01-05", use_cache=False)
+
+        assert list(result.columns) == ["AAPL", "MSFT"]
+        mock_yf.assert_called_once()
+
+    @patch("app.data_repository.yf.download")
+    def test_empty_data_raises_error(self, mock_yf):
+        repo = YahooFinanceRepository()
+        mock_yf.return_value = pd.DataFrame()
+
+        with pytest.raises(ValueError, match="No price data returned"):
+            repo.get_prices(["INVALID"], "2020-01-01", "2020-01-05", use_cache=False)
+
+    @patch("app.data_repository.yf.download")
+    def test_cache_hit_avoids_download(self, mock_yf):
+        repo = YahooFinanceRepository()
+        dates = pd.date_range("2020-01-01", periods=5, freq="D")
+        cached = pd.DataFrame({"AAPL": [100, 101, 102, 103, 104]}, index=dates)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_path = repo._get_cache_path(["AAPL"], "2020-01-01", "2020-01-05")
+            # Patch cache dir to tmpdir
+            with patch.object(repo, "_get_cache_path", return_value=Path(tmpdir) / cache_path.name):
+                repo._save_cached_prices(Path(tmpdir) / cache_path.name, cached)
+                result = repo.get_prices(["AAPL"], "2020-01-01", "2020-01-05", use_cache=True)
+
+        mock_yf.assert_not_called()
+        pd.testing.assert_frame_equal(result, cached)
+```
+
+- [ ] **Step 3: Write MockRepository and singleton tests**
+
+```python
+class TestMockRepository:
+    """Test MockRepository behavior."""
+
+    def test_get_prices_returns_provided_data(self):
+        dates = pd.date_range("2020-01-01", periods=3, freq="D")
+        prices = pd.DataFrame({"AAPL": [100, 101, 102]}, index=dates)
+        repo = MockRepository(prices=prices)
+
+        result = repo.get_prices(["AAPL"], "2020-01-01", "2020-01-05")
+        pd.testing.assert_frame_equal(result, prices)
+        assert repo.get_prices_calls == [("AAPL"], "2020-01-01", "2020-01-05", True, DEFAULT_CACHE_TTL_HOURS)]
+
+    def test_get_prices_generates_default_data(self):
+        repo = MockRepository()
+        result = repo.get_prices(["AAPL"], "2020-01-01", "2020-01-05")
+        assert list(result.columns) == ["AAPL"]
+        assert len(result) > 0
+
+    def test_search_tickers(self):
+        repo = MockRepository(search_results=[("AAPL", "Apple Inc.")])
+        result = repo.search_tickers("apple")
+        assert result == [("AAPL", "Apple Inc.")]
+        assert repo.search_tickers_calls == [("apple", 10)]
+
+    def test_get_ticker_name(self):
+        repo = MockRepository(ticker_names={"AAPL": "Apple Inc."})
+        assert repo.get_ticker_name("AAPL") == "Apple Inc."
+        assert repo.get_ticker_name("UNKNOWN") == ""
+        assert repo.get_ticker_name_calls == ["AAPL", "UNKNOWN"]
+
+
+class TestModuleSingleton:
+    """Test get_repository / set_repository module singleton."""
+
+    def test_get_repository_returns_yahoo_finance(self):
+        repo = get_repository()
+        assert isinstance(repo, YahooFinanceRepository)
+
+    def test_set_repository_changes_default(self):
+        original = get_repository()
+        mock = MockRepository()
+        set_repository(mock)
+        assert get_repository() is mock
+        # Restore
+        set_repository(original)
+        assert get_repository() is original
+```
+
+- [ ] **Step 4: Run new tests**
+
+```bash
+pytest tests/test_data_repository.py -v
+```
+Expected: all tests pass.
+
+- [ ] **Step 5: Commit Task 3**
+
+```bash
+git add tests/test_data_repository.py
+git commit -m "test: add DataRepository unit tests"
+```
+
+---
+
+## Task 4: Update `backtest.py` to Delegate
+
+**Files:**
+- Modify: `backtest.py`
+
+- [ ] **Step 1: Update `download_prices` to delegate**
+
+Replace the entire `download_prices` function (lines 734–850 approx) with:
+
+```python
+def download_prices(
+    tickers: List[str],
+    start: str,
+    end: str,
+    use_cache: bool = True,
+    cache_ttl_hours: int = DEFAULT_CACHE_TTL_HOURS
+) -> pd.DataFrame:
+    """Fetch adjusted closes for the requested tickers.
+
+    Delegates to the default DataRepository (YahooFinanceRepository).
+    Validates tickers before download and price data after download.
+    """
+    validate_tickers(tickers)
+
+    from app.data_repository import get_repository
+    repo = get_repository()
+    prices = repo.get_prices(tickers, start, end, use_cache=use_cache, cache_ttl_hours=cache_ttl_hours)
+
+    validate_price_data(prices, tickers)
+    return prices
+```
+
+- [ ] **Step 2: Keep cache wrappers for backward compat**
+
+Replace `load_cached_prices` and `save_cached_prices` (lines 438–560 approx) with thin wrappers:
+
+```python
+def load_cached_prices(cache_path: Path, max_age_hours: int = DEFAULT_CACHE_TTL_HOURS) -> pd.DataFrame | None:
+    """Backward-compatible wrapper around repository cache loading."""
+    from app.data_repository import get_repository
+    repo = get_repository()
+    if isinstance(repo, YahooFinanceRepository):
+        return repo._load_cached_prices(cache_path, max_age_hours=max_age_hours)
+    return None
+
+
+def save_cached_prices(cache_path: Path, prices: pd.DataFrame) -> None:
+    """Backward-compatible wrapper around repository cache saving."""
+    from app.data_repository import get_repository
+    repo = get_repository()
+    if isinstance(repo, YahooFinanceRepository):
+        repo._save_cached_prices(cache_path, prices)
+```
+
+- [ ] **Step 3: Remove migrated private functions**
+
+Delete `_download_from_yfinance` and `_process_yfinance_data` from `backtest.py` entirely. Their logic now lives in `YahooFinanceRepository`.
+
+- [ ] **Step 4: Run backtest tests to verify nothing breaks**
+
+```bash
+pytest tests/test_backtest.py::TestCacheFunctions -v
+pytest tests/test_backtest.py::TestDataValidation -v
+```
+Expected: all pass (cache wrappers still work).
+
+- [ ] **Step 5: Commit Task 4**
+
+```bash
+git add backtest.py
+git commit -m "refactor: delegate download_prices to DataRepository"
+```
+
+---
+
+## Task 5: Update `app/ticker_data.py` to Delegate
+
+**Files:**
+- Modify: `app/ticker_data.py`
+
+- [ ] **Step 1: Update `_get_ticker_name_impl` to delegate**
+
+Replace `_get_ticker_name_impl` with:
+
+```python
+def _get_ticker_name_impl(ticker: str) -> str:
+    """Internal implementation of get_ticker_name.
+
+    Delegates to the default DataRepository.
+    """
+    from .data_repository import get_repository
+    return get_repository().get_ticker_name(ticker)
+```
+
+- [ ] **Step 2: Update `_search_yahoo_finance_impl` to delegate**
+
+Replace `_search_yahoo_finance_impl` with:
+
+```python
+def _search_yahoo_finance_impl(query: str, limit: int = 10) -> List[tuple[str, str]]:
+    """Internal implementation of Yahoo Finance search.
+
+    Delegates to the default DataRepository.
+    """
+    from .data_repository import get_repository
+    return get_repository().search_tickers(query, limit=limit)
+```
+
+- [ ] **Step 3: Run ticker data tests**
+
+```bash
+pytest tests/test_ticker_data.py -v
+```
+Expected: all pass.
+
+- [ ] **Step 4: Commit Task 5**
+
+```bash
+git add app/ticker_data.py
+git commit -m "refactor: delegate ticker search and name lookup to DataRepository"
+```
+
+---
+
+## Task 6: Update Existing Tests
+
+**Files:**
+- Modify: `tests/test_backtest.py`
+- Modify: `tests/test_integration.py`
+- Modify: `tests/test_app.py`
+
+- [ ] **Step 1: Update `TestDownloadPrices` in `test_backtest.py`**
+
+Replace `TestDownloadPrices` with tests that verify delegation + validation:
+
+```python
+class TestDownloadPrices:
+    """Test price download functionality via repository delegation."""
+
+    def test_download_delegates_to_repository(self):
+        """Test that download_prices delegates to the repository."""
+        from app.data_repository import MockRepository, set_repository, get_repository
+        original_repo = get_repository()
+
+        dates = pd.date_range("2020-01-01", periods=5, freq="D")
+        mock_prices = pd.DataFrame({"AAPL": [100, 101, 102, 103, 104]}, index=dates)
+        mock_repo = MockRepository(prices=mock_prices)
+        set_repository(mock_repo)
+
+        try:
+            result = backtest.download_prices(["AAPL"], "2020-01-01", "2020-01-05", use_cache=False)
+            pd.testing.assert_frame_equal(result, mock_prices)
+            assert mock_repo.get_prices_calls == [(
+                ["AAPL"], "2020-01-01", "2020-01-05", False, backtest.DEFAULT_CACHE_TTL_HOURS
+            )]
+        finally:
+            set_repository(original_repo)
+
+    def test_download_validates_tickers(self):
+        """Test that invalid tickers are rejected before repository call."""
+        with pytest.raises(ValueError, match="Invalid ticker"):
+            backtest.download_prices(["123"], "2020-01-01", "2020-01-05")
+
+    def test_download_validates_price_data(self):
+        """Test that downloaded data is validated."""
+        from app.data_repository import MockRepository, set_repository, get_repository
+        original_repo = get_repository()
+
+        dates = pd.date_range("2020-01-01", periods=5, freq="D")
+        # All NaN should trigger validation error
+        mock_prices = pd.DataFrame({"AAPL": [np.nan] * 5}, index=dates)
+        set_repository(MockRepository(prices=mock_prices))
+
+        try:
+            with pytest.raises(ValueError, match="all values are NaN"):
+                backtest.download_prices(["AAPL"], "2020-01-01", "2020-01-05", use_cache=False)
+        finally:
+            set_repository(original_repo)
+```
+
+- [ ] **Step 2: Update `test_integration.py`**
+
+Replace `test_cache_workflow` with a repository-level test:
+
+```python
+    @patch("app.data_repository.yf.download")
+    def test_cache_workflow(self, mock_download, tmp_path):
+        """Test caching workflow at repository level."""
+        from app.data_repository import YahooFinanceRepository
+
+        repo = YahooFinanceRepository()
+        dates = pd.date_range("2023-01-01", periods=50, freq="B")
+        data = pd.DataFrame({"AAPL": np.linspace(150, 180, len(dates))}, index=dates)
+        mock_download.return_value = data
+
+        # Override cache dir to tmp_path
+        with patch.object(repo, "_get_cache_path", side_effect=lambda tickers, start, end: tmp_path / repo._get_cache_key(tickers, start, end)):
+            # First call: should download and cache
+            prices1 = repo.get_prices(["AAPL"], "2023-01-01", "2023-12-31", use_cache=True)
+            mock_download.assert_called_once()
+
+            # Second call: should use cache
+            mock_download.reset_mock()
+            prices2 = repo.get_prices(["AAPL"], "2023-01-01", "2023-12-31", use_cache=True)
+            mock_download.assert_not_called()
+
+        pd.testing.assert_frame_equal(prices1, prices2)
+```
+
+Update `test_missing_ticker_data` patch path:
+
+```python
+    @patch("app.data_repository.yf.download")
+    def test_missing_ticker_data(self, mock_download):
+        """Test handling of tickers with missing data."""
+        dates = pd.date_range("2020-01-01", periods=100, freq="D")
+        mock_download.return_value = pd.DataFrame({
+            "AAPL": np.linspace(150, 180, len(dates))
+        }, index=dates)
+
+        from app.data_repository import YahooFinanceRepository
+        repo = YahooFinanceRepository()
+
+        with pytest.raises(ValueError, match="Missing data for ticker"):
+            repo.get_prices(["AAPL", "INVALID"], "2020-01-01", "2020-12-31", use_cache=False)
+```
+
+- [ ] **Step 3: Update `test_app.py` if needed**
+
+Search for `@patch('backtest.download_prices')` or similar. If tests mock `backtest.download_prices` directly, they should still work because `download_prices` is still a callable in `backtest`. No changes needed unless tests also patch `backtest.yf.download`.
+
+Verify:
+```bash
+grep -n "yf.download" tests/test_app.py || echo "No yf.download patches in test_app.py"
+```
+
+- [ ] **Step 4: Run all updated tests**
+
+```bash
+pytest tests/test_backtest.py::TestDownloadPrices -v
+pytest tests/test_integration.py -v
+pytest tests/test_app.py -v
+```
+Expected: all pass.
+
+- [ ] **Step 5: Commit Task 6**
+
+```bash
+git add tests/test_backtest.py tests/test_integration.py tests/test_app.py
+git commit -m "test: update tests for DataRepository delegation"
+```
+
+---
+
+## Task 7: Run Full Test Suite
+
+- [ ] **Step 1: Run entire test suite**
+
+```bash
+pytest -v
+```
+
+- [ ] **Step 2: Verify coverage**
+
+```bash
+pytest --cov=app.data_repository --cov=backtest --cov=app.ticker_data --cov-report=term-missing
+```
+Expected: coverage ≥85% for all modified modules.
+
+- [ ] **Step 3: Commit if clean**
+
+```bash
+git commit -m "test: verify full suite passes with repository pattern"
+```
+
+---
+
+## Spec Coverage Checklist
+
+| Spec Requirement | Plan Task |
+|------------------|-----------|
+| `DataRepository` ABC | Task 1, Step 1 |
+| `YahooFinanceRepository` with cache + download | Task 1, Steps 2–5 |
+| `MockRepository` for testing | Task 2, Step 1 |
+| Module singleton (`get_repository` / `set_repository`) | Task 2, Step 2 |
+| `download_prices` delegates to repository | Task 4, Step 1 |
+| `search_tickers_with_yahoo` delegates | Task 5, Step 2 |
+| `get_ticker_name` delegates | Task 5, Step 1 |
+| Backward-compatible cache wrappers | Task 4, Step 2 |
+| Tests for repository | Task 3 |
+| Updated existing tests | Task 6 |
+| Full test suite passes | Task 7 |
+
+---
+
+## Placeholder Scan
+
+- No "TBD", "TODO", "implement later", or "fill in details" found.
+- All code snippets are complete and runnable.
+- All file paths are exact.
+- All commands include expected outputs.

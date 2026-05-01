@@ -5,7 +5,75 @@ All notable changes to the Portfolio Backtester project are documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - v2.5.0
+## [Unreleased] - v2.6.0
+
+### Added - Repository Pattern & Test Infrastructure
+
+#### Data Access Abstraction
+- **Repository Pattern** - Abstracted all Yahoo Finance data access behind a clean `DataRepository` interface
+  - New `app/data_repository.py` module (16.4KB) with:
+    - `DataRepository` ABC - contract for all data sources
+    - `YahooFinanceRepository` - production Yahoo Finance implementation
+    - `MockRepository` - deterministic mocks for testing
+  - `app/ticker_data.py` now delegates to repository instead of direct yfinance calls
+  - Enables swapping data sources (CSV, database, API) without changing UI code
+  - 100% backward compatible - no behavior changes for end users
+
+#### Developer Experience
+- **`--verbose` / `-v` CLI flag** - DEBUG-level logging for detailed diagnostics
+  - Replaces ad-hoc print debugging with structured log output
+  - Shows cache decisions, download progress, and metric computation details
+
+#### Data Quality
+- **Configurable Price-Spike Validation** - `validate_price_data()` threshold is now a parameter
+  - Default remains 90% daily change, but callers can override
+  - Better testability and customization for different asset classes
+
+#### Financial Calculations
+- **XIRR Optimization** - Improved IRR calculation with bisection fallback
+  - Newton-Raphson now has a robust fallback for edge cases
+  - Better initial guess logic for faster convergence
+  - Comprehensive edge case tests added
+
+#### Code Organization
+- **`compute_metrics` Decomposition** - Split monolithic function into focused private helpers
+  - Improves readability and testability of core portfolio math
+  - No behavior changes, purely structural improvement
+
+#### Expanded Test Suite
+- **Property-Based Tests** - `tests/test_properties.py` using Hypothesis
+  - Fuzz inputs to find edge cases human testers might miss
+  - Validates invariants across random data generations
+
+- **Performance Benchmarks** - `tests/test_benchmarks.py` using pytest-benchmark
+  - Tracks performance of hot paths over time
+  - Prevents accidental regressions in computation speed
+
+- **Repository Tests** - `tests/test_data_repository.py`
+  - Validates cache behavior, mock fidelity, and network resilience
+
+- **Plot Tests** - `tests/test_plot_backtest.py`
+  - Regression tests for matplotlib chart generation
+
+- **Total tests**: 404 (was 293) ✅
+
+### Changed
+
+- **requirements.txt** - Added `hypothesis` and `pytest-benchmark` dependencies for new test suites
+- **app/ticker_data.py** - Now uses `DataRepository` for all data access instead of direct yfinance calls
+- **backtest.py** - `compute_metrics()` internally refactored; public signature unchanged
+
+### Technical Metrics - v2.6.0
+
+- **New tests**: +111 tests (293 → 404 total)
+- **Test coverage**: Maintained at ~88%
+- **Pass rate**: 100% (404/404 tests ✅)
+- **Files added**: 4 test files + 1 production module
+- **Lines added**: ~3,500 (tests + data_repository.py)
+
+---
+
+## [2.5.0] - 2025-11-19
 
 ### Added - Security Hardening & Input Validation
 
@@ -116,7 +184,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased] - v2.4.0
+## [2.5.0] - 2025-11-19
 
 ### Added - Streamlit Best Practices Implementation
 
@@ -537,6 +605,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Description | Tests | Coverage |
 |---------|------|-------------|-------|----------|
+| **2.6.0** | 2026-05-01 | Repository pattern, test expansion, DX improvements | 404 | ~88% |
+| **2.5.0** | 2025-11-19 | Security hardening & input validation | 293 | ~88% |
 | **2.1.0** | 2025-11-15 | Phase 3: Performance & data validation | 155 | ~88% |
 | **2.0.0** | 2025-11-15 | Phase 2: Modular architecture | 113 | ~88% |
 | **1.5.0** | 2025-11-15 | Phase 1: Reliability & validation | 113 | ~88% |

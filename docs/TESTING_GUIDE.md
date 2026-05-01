@@ -14,17 +14,21 @@ For AI development guidance, see [CLAUDE.md](../CLAUDE.md).
 ### Current Test Coverage Status
 
 **Canonical Source (last validated via `pytest -v`):**
-- **Total Tests**: 256 (93 backtest + 71 UI + 39 state manager + 32 ticker data + 21 integration) ✅
-- **Pass Rate**: 100% (256/256 passing) ✅
-- **Test-to-Code Ratio**: ~0.90:1 ✅
+- **Total Tests**: 404 ✅
+- **Pass Rate**: 100% (404/404 passing) ✅
+- **Test-to-Code Ratio**: ~1.10:1 ✅
 - **Overall Coverage**: ~88% ✅
 
 **Breakdown by Module**:
-- Backtest engine (`tests/test_backtest.py`): 93 tests covering metrics, caching, validation, DCA/IRR logic
-- Streamlit UI (`tests/test_app.py`): 71 tests spanning presets, validation, downloads, rolling metrics
-- State manager (`tests/test_state_manager.py`): 39 tests covering centralized session logic
-- Ticker utilities (`tests/test_ticker_data.py`): 32 tests covering curated lists/search helpers (`tests/test_ticker_names.py` currently holds scaffolding for future scenarios)
-- Integration (`tests/test_integration.py`): 21 end-to-end scenarios
+- Backtest engine (`tests/test_backtest.py`): ~100+ tests covering metrics, caching, validation, DCA/IRR logic
+- Streamlit UI (`tests/test_app.py`): ~70+ tests spanning presets, validation, downloads, rolling metrics
+- State manager (`tests/test_state_manager.py`): ~60+ tests covering centralized session logic and type validation
+- Ticker utilities (`tests/test_ticker_data.py`): ~30+ tests covering curated lists/search helpers
+- Data repository (`tests/test_data_repository.py`): Repository pattern tests for cache, mocks, and network resilience
+- Property-based (`tests/test_properties.py`): Hypothesis-driven invariant checks
+- Performance benchmarks (`tests/test_benchmarks.py`): pytest-benchmark performance baselines
+- Plot backtest (`tests/test_plot_backtest.py`): Matplotlib chart generation regression tests
+- Integration (`tests/test_integration.py`): ~20 end-to-end scenarios
 
 **Target**: Maintain 85%+ coverage for all new code ✅ **ACHIEVED**
 
@@ -120,15 +124,30 @@ For AI development guidance, see [CLAUDE.md](../CLAUDE.md).
 - ✅ Delta indicator calculations
 - ✅ Rolling returns calculations
 
+### Data Repository Tests (test_data_repository.py)
+- Validates `DataRepository` ABC contract, `YahooFinanceRepository` caching, and `MockRepository` fidelity
+- Covers cache hit/miss behavior and network resilience patterns
+
+### Property-Based Tests (test_properties.py)
+- Uses Hypothesis to fuzz inputs and catch edge cases across random data generations
+- Validates invariants that should hold for all valid inputs
+
+### Performance Benchmarks (test_benchmarks.py)
+- pytest-benchmark baselines for hot computational paths
+- Tracks regression in metric calculation speed over time
+
+### Plot Backtest Tests (test_plot_backtest.py)
+- Regression tests for matplotlib chart generation from CSV outputs
+
 ### Integration Tests (test_integration.py)
 
 **Test Classes** (6 total):
-- `TestEndToEndWorkflow`: CLI to CSV workflow, multi-ticker, caching (3 tests)
-- `TestEdgeCases`: Leap years, extreme drawdowns, zero volatility, etc. (8 tests)
-- `TestDataQuality`: NaN detection, negative prices, extreme changes (5 tests)
-- `TestValidation`: Ticker/date format validation, future dates (5 tests)
-- `TestStatisticalEdgeCases`: Sharpe/Sortino edge cases, CAGR precision (4 tests)
-- `TestMultiTickerEdgeCases`: Different start dates alignment (1 test)
+- `TestEndToEndWorkflow`: CLI to CSV workflow, multi-ticker, caching
+- `TestEdgeCases`: Leap years, extreme drawdowns, zero volatility, etc.
+- `TestDataQuality`: NaN detection, negative prices, extreme changes
+- `TestValidation`: Ticker/date format validation, future dates
+- `TestStatisticalEdgeCases`: Sharpe/Sortino edge cases, CAGR precision
+- `TestMultiTickerEdgeCases`: Different start dates alignment
 
 **Coverage Areas**:
 - ✅ End-to-end workflows (CLI → download → compute → CSV)
@@ -470,9 +489,9 @@ class TestPortfolioPresets:
 
 | Metric | Goal | Actual | Status |
 |--------|------|--------|--------|
-| Total tests | 200+ | 256 | ✅ Exceeded |
+| Total tests | 200+ | 404 | ✅ Exceeded |
 | Pass rate | 100% | 100% | ✅ Perfect |
-| Test-to-code ratio | >0.80:1 | ~0.90:1 | ✅ Exceeded |
+| Test-to-code ratio | >0.80:1 | ~1.10:1 | ✅ Exceeded |
 | Coverage | 85%+ | ~88% | ✅ Achieved |
 
 ---
@@ -533,14 +552,14 @@ pytest --cov=backtest --cov=app --cov-report=term --cov-fail-under=85
 **Successful Test Run**:
 ```
 ============================= test session starts ==============================
-collected 256 items
+collected 404 items
 
 test_backtest.py::TestParseArgs::test_default_values PASSED           [  0%]
 test_backtest.py::TestCacheFunctions::test_cache_key_generation PASSED [  0%]
 ...
 test_integration.py::TestEndToEndWorkflow::test_cli_to_csv_workflow PASSED [100%]
 
-============================= 256 passed in 2.02s ===============================
+============================= 404 passed in 3.50s ===============================
 ```
 
 **Failed Test Example**:
@@ -611,14 +630,14 @@ pytest --cov=backtest --cov=app --cov-report=html
 
 ### Current Test Statistics
 
-- **Total Tests**: 256 (93 backtest + 71 UI + 39 state manager + 32 ticker data + 21 integration)
+- **Total Tests**: 404
 - **Pass Rate**: 100% (last run: `pytest -v`)
 - **Coverage**: ~88% overall (see `pytest --cov` reports)
-- **Test Files**: 6 primary suites (`test_backtest.py`, `test_app.py`, `test_state_manager.py`, `test_ticker_data.py`, `test_ticker_names.py`, `test_integration.py`)
-- **Execution Time**: ~2-3 seconds on a modern laptop
+- **Test Files**: 9 suites (`test_backtest.py`, `test_app.py`, `test_state_manager.py`, `test_ticker_data.py`, `test_ticker_names.py`, `test_data_repository.py`, `test_properties.py`, `test_benchmarks.py`, `test_plot_backtest.py`, `test_integration.py`)
+- **Execution Time**: ~3-4 seconds on a modern laptop
 
 ---
 
-**Last Updated**: 2025-11-17
-**For**: Portfolio Backtester v2.1.0
+**Last Updated**: 2026-05-01
+**For**: Portfolio Backtester v2.6.0
 **See Also**: [FILE_REFERENCE.md](FILE_REFERENCE.md), [CLAUDE.md](../CLAUDE.md), [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)

@@ -103,6 +103,19 @@ This document provides detailed information about each file in the portfolio-bac
 - Error handling with user-friendly messages
 - Run with: `streamlit run app.py` (via wrapper) or `streamlit run app/main.py` (direct)
 
+### app/data_repository.py (16.4KB)
+**Repository pattern for data access abstraction**
+- `DataRepository` ABC - abstract base class defining the contract for all data sources
+  - Methods: `download_prices()`, `search_tickers()`, `get_ticker_info()`
+- `YahooFinanceRepository` - production implementation using yfinance
+  - Caching integration with the existing `.cache/` infrastructure
+  - Retry logic and error handling for network resilience
+- `MockRepository` - deterministic mock for testing
+  - Configurable return values for reproducible tests
+  - No network dependency - ideal for CI and offline development
+- `app/ticker_data.py` delegates all data access to the repository
+- Enables swapping data sources (CSV, database, API) without changing UI code
+
 ---
 
 ## Core Engine
@@ -191,6 +204,39 @@ This document provides detailed information about each file in the portfolio-bac
 - Covers formatting, deduplication, caching, and resilience to malformed API responses
 
 **Run with**: `pytest tests/test_ticker_data.py -v`
+
+### tests/test_data_repository.py
+**Repository pattern tests**
+- Validates `DataRepository` ABC contract compliance
+- Tests `YahooFinanceRepository` caching and network resilience
+- Tests `MockRepository` deterministic behavior
+- Covers cache hit/miss patterns and error scenarios
+
+**Run with**: `pytest tests/test_data_repository.py -v`
+
+### tests/test_properties.py
+**Property-based tests using Hypothesis**
+- Fuzzes inputs to find edge cases across random data generations
+- Validates invariants that should hold for all valid inputs
+- Complements example-based tests with generative coverage
+
+**Run with**: `pytest tests/test_properties.py -v`
+
+### tests/test_benchmarks.py
+**Performance baseline tests using pytest-benchmark**
+- Tracks computation speed of hot paths (metrics, downloads, caching)
+- Prevents accidental performance regressions
+- Useful for identifying algorithmic bottlenecks
+
+**Run with**: `pytest tests/test_benchmarks.py -v`
+
+### tests/test_plot_backtest.py
+**Matplotlib chart generation regression tests**
+- Validates chart rendering from CSV outputs
+- Tests dashboard and individual plot modes
+- Ensures visual output consistency across changes
+
+**Run with**: `pytest tests/test_plot_backtest.py -v`
 
 ### tests/test_integration.py
 **Integration and edge-case coverage**
@@ -296,6 +342,6 @@ Refer to [`docs/TESTING_GUIDE.md`](TESTING_GUIDE.md) for authoritative counts, c
 
 ---
 
-**Last Updated**: 2025-11-17  
-**For**: Portfolio Backtester v2.3.0-dev  
+**Last Updated**: 2026-05-01  
+**For**: Portfolio Backtester v2.6.0  
 **See Also**: [CLAUDE.md](../CLAUDE.md), [TESTING_GUIDE.md](TESTING_GUIDE.md), [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)

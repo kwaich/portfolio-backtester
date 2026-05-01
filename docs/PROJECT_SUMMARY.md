@@ -17,7 +17,7 @@ This document provides a concise roadmap for the repository. Detailed user instr
 | Core CLI backtester | `backtest.py` | Data download + caching, portfolio metrics, DCA/IRR handling, logging, input validation |
 | Streamlit web UI | `app/` package | Modular architecture (config, presets, validation/state manager, UI components, charts, ticker search, main orchestration) |
 | Visualization helper | `plot_backtest.py` | Reads CSV output, produces dashboard/individual charts, logging + validation |
-| Test suite | `tests/` | 256 automated tests spanning engine, UI, ticker utilities, session state, and integration coverage (`pytest -v`) |
+| Test suite | `tests/` | 404 automated tests spanning engine, UI, ticker utilities, session state, data repository, property-based checks, performance benchmarks, and integration coverage (`pytest -v`) |
 
 See `docs/FILE_REFERENCE.md` for module-by-module details.
 
@@ -27,7 +27,7 @@ See `docs/FILE_REFERENCE.md` for module-by-module details.
 - Comprehensive metrics: CAGR, IRR, Sharpe, Sortino, volatility, drawdown, delta indicators
 - Plotly-based Streamlit dashboard with presets, multiple benchmarks, rolling analyses, and accessible color palette
 - Matplotlib helper to batch-generate PNG dashboards
-- 256-test suite ensuring ~88% line coverage (tracked in `docs/TESTING_GUIDE.md`)
+- 404-test suite ensuring ~88% line coverage (tracked in `docs/TESTING_GUIDE.md`)
 
 ## Documentation Map
 
@@ -50,9 +50,10 @@ Each guide owns its domain to prevent duplication:
 ## Recent Highlights
 
 For full details see `docs/CHANGELOG.md`, but the latest notable work includes:
+- Repository pattern (`app/data_repository.py`) abstracting all Yahoo Finance access for testability and future data-source swaps
+- Expanded test suite to 404 tests with property-based (Hypothesis) and performance (pytest-benchmark) coverage
 - Colorblind-accessible palettes and revamped active-return visuals across Streamlit and matplotlib outputs
 - New Streamlit presets, rolling metrics, and centralized `state_manager.py`
-- Expanded documentation/tests bundled with the refactors (all tracked via 256 passing tests)
 
 ## Need Something Else?
 
