@@ -283,7 +283,7 @@ def main() -> None:
     )
 
     # Inject global design system CSS
-    st.markdown(get_global_css(), unsafe_allow_html=True)
+    st.html(get_global_css())
 
     # Initialize session state
     initialize_session_state()

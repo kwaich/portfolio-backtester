@@ -335,7 +335,7 @@ def render_searchable_ticker_input(
 
 def display_welcome_screen() -> None:
     """Display the centered welcome hero when no backtest has been run."""
-    st.markdown(
+    st.html(
         f"""
         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 4rem 2rem;">
             <div style="color: {COLORS['accent']}; font-size: 48px; margin-bottom: 1rem;">📈</div>
@@ -345,14 +345,13 @@ def display_welcome_screen() -> None:
                 Enter tickers in the sidebar and click "Run Backtest" to get started.
             </div>
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
 def display_section_header(title: str) -> None:
     """Display a section header using the design system."""
-    st.markdown(
+    st.html(
         f"""
         <h3 style="
             font-family: {TYPOGRAPHY['font_header']};
@@ -362,8 +361,7 @@ def display_section_header(title: str) -> None:
             margin-top: {SPACING['section_gap']};
             margin-bottom: 1rem;
         ">{title}</h3>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
@@ -377,7 +375,7 @@ def display_info_bar(portfolio_tickers: list[str], weights: list[float], benchma
     benchmark_str = ", ".join(benchmarks) if benchmarks else "—"
     date_str = f"{start_date} – {end_date}"
 
-    st.markdown(
+    st.html(
         f"""
         <div style="
             background-color: {COLORS['bg_card']};
@@ -395,8 +393,7 @@ def display_info_bar(portfolio_tickers: list[str], weights: list[float], benchma
             <span style="margin: 0 0.5rem;">·</span>
             {date_str}
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
@@ -427,7 +424,7 @@ def display_hero_metrics_row(metrics: dict[str, str]) -> None:
         """
     cards_html += "</div>"
 
-    st.markdown(cards_html, unsafe_allow_html=True)
+    st.html(cards_html)
 
 
 def display_metrics_tables(performance: dict[str, str], risk: dict[str, str]) -> None:
@@ -456,20 +453,19 @@ def display_metrics_tables(performance: dict[str, str], risk: dict[str, str]) ->
         """
 
     with col1:
-        st.markdown(_build_table("Performance", performance), unsafe_allow_html=True)
+        st.html(_build_table("Performance", performance))
     with col2:
-        st.markdown(_build_table("Risk", risk), unsafe_allow_html=True)
+        st.html(_build_table("Risk", risk))
 
 
 def display_downloads(csv_data: bytes | None = None, chart_data: bytes | None = None) -> None:
     """Display the downloads section with styled buttons."""
-    st.markdown(
+    st.html(
         f"""
         <div style="background-color: {COLORS['bg_card']}; border-radius: {SPACING['card_radius']}; padding: {SPACING['card_padding']}; box-shadow: {SPACING['card_shadow']}; border: 1px solid {COLORS['border']}; margin-top: 1.5rem;">
             <div style="font-family: {TYPOGRAPHY['font_header']}; font-size: 16px; font-weight: 500; color: {COLORS['primary_text']}; margin-bottom: 0.75rem;">Downloads</div>
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
     col1, col2 = st.columns(2)
