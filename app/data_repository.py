@@ -17,6 +17,7 @@ from typing import Any, List, Tuple
 
 import numpy as np
 import pandas as pd
+import requests
 import yfinance as yf
 
 logger = logging.getLogger(__name__)
@@ -69,7 +70,7 @@ class YahooFinanceRepository(DataRepository):
         cache_key = YahooFinanceRepository._get_cache_key(tickers, start, end)
         return cache_dir / cache_key
 
-    def _load_cached_prices(
+    def load_cached_prices(
         self, cache_path: Path, max_age_hours: int = DEFAULT_CACHE_TTL_HOURS
     ) -> pd.DataFrame | None:
         parquet_path = cache_path.with_suffix(".parquet")
@@ -132,7 +133,7 @@ class YahooFinanceRepository(DataRepository):
             metadata_path.unlink(missing_ok=True)
             return None
 
-    def _save_cached_prices(self, cache_path: Path, prices: pd.DataFrame) -> None:
+    def save_cached_prices(self, cache_path: Path, prices: pd.DataFrame) -> None:
         parquet_path = cache_path.with_suffix(".parquet")
         metadata_path = cache_path.with_suffix(".json")
 
@@ -240,7 +241,7 @@ class YahooFinanceRepository(DataRepository):
 
             for ticker in tickers:
                 single_cache_path = self._get_cache_path([ticker], start, end)
-                cached_data = self._load_cached_prices(
+                cached_data = self.load_cached_prices(
                     single_cache_path, max_age_hours=cache_ttl_hours
                 )
                 if cached_data is not None:
@@ -262,7 +263,7 @@ class YahooFinanceRepository(DataRepository):
                 for ticker in uncached_tickers:
                     if ticker in new_prices.columns:
                         single_cache_path = self._get_cache_path([ticker], start, end)
-                        self._save_cached_prices(single_cache_path, new_prices[[ticker]])
+                        self.save_cached_prices(single_cache_path, new_prices[[ticker]])
                         cached_results[ticker] = new_prices[ticker]
 
             if cached_results:
@@ -288,7 +289,7 @@ class YahooFinanceRepository(DataRepository):
         # Standard path: single ticker or cache disabled
         if use_cache:
             cache_path = self._get_cache_path(tickers, start, end)
-            cached_data = self._load_cached_prices(cache_path, max_age_hours=cache_ttl_hours)
+            cached_data = self.load_cached_prices(cache_path, max_age_hours=cache_ttl_hours)
             if cached_data is not None:
                 return cached_data
 
@@ -297,7 +298,7 @@ class YahooFinanceRepository(DataRepository):
 
         if use_cache:
             cache_path = self._get_cache_path(tickers, start, end)
-            self._save_cached_prices(cache_path, prices)
+            self.save_cached_prices(cache_path, prices)
 
         return prices
 
@@ -307,8 +308,6 @@ class YahooFinanceRepository(DataRepository):
             return []
 
         try:
-            import requests
-
             url = "https://query2.finance.yahoo.com/v1/finance/search"
             params = {
                 "q": query,

@@ -47,8 +47,8 @@ class TestYahooFinanceRepositoryCache:
                 index=pd.date_range("2020-01-01", periods=3),
             )
 
-            repo._save_cached_prices(cache_path, test_data)
-            loaded_data = repo._load_cached_prices(cache_path)
+            repo.save_cached_prices(cache_path, test_data)
+            loaded_data = repo.load_cached_prices(cache_path)
 
             assert loaded_data is not None
             pd.testing.assert_frame_equal(loaded_data, test_data, check_freq=False)
@@ -64,7 +64,7 @@ class TestYahooFinanceRepositoryCache:
                 index=pd.date_range("2020-01-01", periods=3),
             )
 
-            repo._save_cached_prices(cache_path, test_data)
+            repo.save_cached_prices(cache_path, test_data)
 
             # Backdate metadata to simulate stale cache
             metadata_path = cache_path.with_suffix(".json")
@@ -74,7 +74,7 @@ class TestYahooFinanceRepositoryCache:
             with open(metadata_path, "w") as f:
                 json.dump(metadata, f)
 
-            loaded = repo._load_cached_prices(cache_path, max_age_hours=24)
+            loaded = repo.load_cached_prices(cache_path, max_age_hours=24)
             assert loaded is None
             assert not cache_path.with_suffix(".parquet").exists()
             assert not cache_path.with_suffix(".json").exists()
@@ -83,7 +83,7 @@ class TestYahooFinanceRepositoryCache:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo = YahooFinanceRepository()
             cache_path = Path(tmpdir) / "nonexistent"
-            result = repo._load_cached_prices(cache_path)
+            result = repo.load_cached_prices(cache_path)
             assert result is None
 
 
@@ -144,11 +144,87 @@ class TestYahooFinanceRepositoryDownload:
                 "_get_cache_path",
                 return_value=Path(tmpdir) / cache_path.name,
             ):
-                repo._save_cached_prices(Path(tmpdir) / cache_path.name, cached)
+                repo.save_cached_prices(Path(tmpdir) / cache_path.name, cached)
                 result = repo.get_prices(["AAPL"], "2020-01-01", "2020-01-05", use_cache=True)
 
         mock_yf.assert_not_called()
         pd.testing.assert_frame_equal(result, cached, check_freq=False)
+
+
+class TestYahooFinanceRepositoryNetwork:
+    """Test Yahoo Finance network calls with mocked responses."""
+
+    @patch("app.data_repository.requests.get")
+    def test_search_tickers_success(self, mock_get):
+        repo = YahooFinanceRepository()
+        mock_get.return_value.json.return_value = {
+            "quotes": [
+                {"symbol": "AAPL", "longname": "Apple Inc."},
+                {"symbol": "MSFT", "longname": "Microsoft Corporation"},
+            ]
+        }
+        mock_get.return_value.raise_for_status = lambda: None
+
+        results = repo.search_tickers("apple", limit=5)
+
+        assert results == [("AAPL", "Apple Inc."), ("MSFT", "Microsoft Corporation")]
+        mock_get.assert_called_once()
+        _, kwargs = mock_get.call_args
+        assert kwargs["params"]["q"] == "apple"
+        assert kwargs["params"]["quotesCount"] == 5
+
+    @patch("app.data_repository.requests.get")
+    def test_search_tickers_empty_response(self, mock_get):
+        repo = YahooFinanceRepository()
+        mock_get.return_value.json.return_value = {"quotes": []}
+        mock_get.return_value.raise_for_status = lambda: None
+
+        results = repo.search_tickers("xyznonexistent")
+        assert results == []
+
+    @patch("app.data_repository.requests.get")
+    def test_search_tickers_network_error(self, mock_get):
+        repo = YahooFinanceRepository()
+        mock_get.side_effect = Exception("Connection timeout")
+
+        results = repo.search_tickers("AAPL")
+        assert results == []
+
+    @patch("app.data_repository.yf.Ticker")
+    def test_get_ticker_name_success(self, mock_ticker_cls):
+        repo = YahooFinanceRepository()
+        mock_ticker = mock_ticker_cls.return_value
+        mock_ticker.info = {"longName": "Apple Inc."}
+
+        name = repo.get_ticker_name("AAPL")
+        assert name == "Apple Inc."
+        mock_ticker_cls.assert_called_once_with("AAPL")
+
+    @patch("app.data_repository.yf.Ticker")
+    def test_get_ticker_name_short_name_fallback(self, mock_ticker_cls):
+        repo = YahooFinanceRepository()
+        mock_ticker = mock_ticker_cls.return_value
+        mock_ticker.info = {"shortName": "Apple"}
+
+        name = repo.get_ticker_name("AAPL")
+        assert name == "Apple"
+
+    @patch("app.data_repository.yf.Ticker")
+    def test_get_ticker_name_empty_info(self, mock_ticker_cls):
+        repo = YahooFinanceRepository()
+        mock_ticker = mock_ticker_cls.return_value
+        mock_ticker.info = {}
+
+        name = repo.get_ticker_name("AAPL")
+        assert name == ""
+
+    @patch("app.data_repository.yf.Ticker")
+    def test_get_ticker_name_error(self, mock_ticker_cls):
+        repo = YahooFinanceRepository()
+        mock_ticker_cls.side_effect = Exception("Network error")
+
+        name = repo.get_ticker_name("AAPL")
+        assert name == ""
 
 
 class TestMockRepository:

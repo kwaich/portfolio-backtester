@@ -836,171 +836,47 @@ class TestRetryLogic:
 
 
 class TestDownloadPrices:
-    """Test price download functionality"""
+    """Test price download functionality via repository delegation."""
 
-    @patch("backtest.yf.download")
-    @patch("backtest.load_cached_prices")
-    @patch("backtest.save_cached_prices")
-    def test_cache_hit(self, mock_save, mock_load, mock_yf_download):
-        """Test that cached data is used when available"""
+    def test_download_delegates_to_repository(self):
+        """Test that download_prices delegates to the repository."""
+        from app.data_repository import MockRepository, set_repository, get_repository
+        original_repo = get_repository()
+
         dates = pd.date_range("2020-01-01", periods=5, freq="D")
-        cached_data = pd.DataFrame({"AAPL": [100, 101, 102, 103, 104]}, index=dates)
-        mock_load.return_value = cached_data
+        mock_prices = pd.DataFrame({"AAPL": [100, 101, 102, 103, 104]}, index=dates)
+        mock_repo = MockRepository(prices=mock_prices)
+        set_repository(mock_repo)
 
-        result = backtest.download_prices(["AAPL"], "2020-01-01", "2020-01-05", use_cache=True)
+        try:
+            result = backtest.download_prices(["AAPL"], "2020-01-01", "2020-01-05", use_cache=False)
+            pd.testing.assert_frame_equal(result, mock_prices)
+            assert mock_repo.get_prices_calls == [(
+                ["AAPL"], "2020-01-01", "2020-01-05", False, backtest.DEFAULT_CACHE_TTL_HOURS
+            )]
+        finally:
+            set_repository(original_repo)
 
-        mock_load.assert_called_once()
-        mock_yf_download.assert_not_called()
-        mock_save.assert_not_called()
-        pd.testing.assert_frame_equal(result, cached_data)
+    def test_download_validates_tickers(self):
+        """Test that invalid tickers are rejected before repository call."""
+        with pytest.raises(ValueError, match="Invalid ticker"):
+            backtest.download_prices(["123"], "2020-01-01", "2020-01-05")
 
-    @patch("backtest.yf.download")
-    @patch("backtest.load_cached_prices")
-    @patch("backtest.save_cached_prices")
-    def test_cache_miss_downloads_and_caches(self, mock_save, mock_load, mock_yf_download):
-        """Test that data is downloaded and cached when not in cache"""
-        mock_load.return_value = None
+    def test_download_validates_price_data(self):
+        """Test that downloaded data is validated."""
+        from app.data_repository import MockRepository, set_repository, get_repository
+        original_repo = get_repository()
+
         dates = pd.date_range("2020-01-01", periods=5, freq="D")
-        downloaded_data = pd.DataFrame({"AAPL": [100, 101, 102, 103, 104]}, index=dates)
-        mock_yf_download.return_value = downloaded_data
+        # All NaN should trigger validation error
+        mock_prices = pd.DataFrame({"AAPL": [np.nan] * 5}, index=dates)
+        set_repository(MockRepository(prices=mock_prices))
 
-        result = backtest.download_prices(["AAPL"], "2020-01-01", "2020-01-05", use_cache=True)
-
-        mock_load.assert_called_once()
-        mock_yf_download.assert_called_once()
-        mock_save.assert_called_once()
-
-    @patch("backtest.yf.download")
-    def test_no_cache_skips_cache(self, mock_yf_download):
-        """Test that use_cache=False skips cache"""
-        dates = pd.date_range("2020-01-01", periods=5, freq="D")
-        downloaded_data = pd.DataFrame({"AAPL": [100, 101, 102, 103, 104]}, index=dates)
-        mock_yf_download.return_value = downloaded_data
-
-        with patch("backtest.load_cached_prices") as mock_load:
-            with patch("backtest.save_cached_prices") as mock_save:
-                result = backtest.download_prices(
-                    ["AAPL"], "2020-01-01", "2020-01-05", use_cache=False
-                )
-
-                mock_load.assert_not_called()
-                mock_save.assert_not_called()
-                mock_yf_download.assert_called_once()
-
-    @patch("backtest.yf.download")
-    @patch("backtest.load_cached_prices")
-    @patch("backtest.save_cached_prices")
-    def test_empty_data_raises_error(self, mock_save, mock_load, mock_yf_download):
-        """Test that empty data raises helpful error"""
-        mock_load.return_value = None
-        mock_yf_download.return_value = pd.DataFrame()
-
-        with pytest.raises(ValueError, match="No price data returned"):
-            backtest.download_prices(["INVALID"], "2020-01-01", "2020-01-05")
-
-    @patch("backtest.yf.download")
-    @patch("backtest.load_cached_prices")
-    @patch("backtest.save_cached_prices")
-    def test_batch_download_all_cached(self, mock_save, mock_load, mock_yf_download):
-        """Test batch download when all tickers are cached"""
-        dates = pd.date_range("2020-01-01", periods=5, freq="D")
-
-        # Mock cache returning data for each ticker
-        def cache_side_effect(path, *args, **kwargs):
-            # Determine which ticker based on the path
-            if "AAPL" in str(path):
-                return pd.DataFrame({"AAPL": [100, 101, 102, 103, 104]}, index=dates)
-            elif "MSFT" in str(path):
-                return pd.DataFrame({"MSFT": [200, 201, 202, 203, 204]}, index=dates)
-            elif "GOOGL" in str(path):
-                return pd.DataFrame({"GOOGL": [300, 301, 302, 303, 304]}, index=dates)
-            return None
-
-        # Use get_cache_path to determine ticker names
-        original_get_cache_path = backtest.get_cache_path
-        def get_cache_path_wrapper(tickers, *args, **kwargs):
-            result = original_get_cache_path(tickers, *args, **kwargs)
-            # Store ticker info in path name for identification (Parquet format uses no extension)
-            result = Path(f"{result}_{tickers[0]}")
-            return result
-
-        with patch("backtest.get_cache_path", side_effect=get_cache_path_wrapper):
-            mock_load.side_effect = cache_side_effect
-
-            result = backtest.download_prices(
-                ["AAPL", "MSFT", "GOOGL"], "2020-01-01", "2020-01-05", use_cache=True
-            )
-
-            # Should not download anything
-            mock_yf_download.assert_not_called()
-            # Should have loaded from cache 3 times
-            assert mock_load.call_count == 3
-            # Should have all three tickers
-            assert list(result.columns) == ["AAPL", "MSFT", "GOOGL"]
-
-    @patch("backtest.yf.download")
-    @patch("backtest.load_cached_prices")
-    @patch("backtest.save_cached_prices")
-    def test_batch_download_partial_cache(self, mock_save, mock_load, mock_yf_download):
-        """Test batch download when some tickers are cached"""
-        dates = pd.date_range("2020-01-01", periods=5, freq="D")
-
-        # Mock cache: AAPL cached, MSFT not cached
-        def cache_side_effect(path, *args, **kwargs):
-            if "AAPL" in str(path):
-                return pd.DataFrame({"AAPL": [100, 101, 102, 103, 104]}, index=dates)
-            return None  # MSFT not cached
-
-        original_get_cache_path = backtest.get_cache_path
-        def get_cache_path_wrapper(tickers, *args, **kwargs):
-            result = original_get_cache_path(tickers, *args, **kwargs)
-            # Store ticker info in path name for identification (Parquet format uses no extension)
-            result = Path(f"{result}_{tickers[0]}")
-            return result
-
-        # Mock yfinance download for uncached ticker
-        mock_yf_download.return_value = pd.DataFrame(
-            {"MSFT": [200, 201, 202, 203, 204]}, index=dates
-        )
-
-        with patch("backtest.get_cache_path", side_effect=get_cache_path_wrapper):
-            mock_load.side_effect = cache_side_effect
-
-            result = backtest.download_prices(
-                ["AAPL", "MSFT"], "2020-01-01", "2020-01-05", use_cache=True
-            )
-
-            # Should download only MSFT
-            mock_yf_download.assert_called_once()
-            # Should check cache for both tickers
-            assert mock_load.call_count == 2
-            # Should save only MSFT to cache
-            assert mock_save.call_count == 1
-            # Should have both tickers in result
-            assert list(result.columns) == ["AAPL", "MSFT"]
-
-    # Removed test_batch_download_no_cache_hits - requires network access to Yahoo Finance
-
-    @patch("backtest.yf.download")
-    def test_single_ticker_uses_standard_path(self, mock_yf_download):
-        """Test that single ticker doesn't use batch optimization"""
-        dates = pd.date_range("2020-01-01", periods=5, freq="D")
-        mock_yf_download.return_value = pd.DataFrame(
-            {"AAPL": [100, 101, 102, 103, 104]}, index=dates
-        )
-
-        with patch("backtest.load_cached_prices") as mock_load:
-            with patch("backtest.save_cached_prices") as mock_save:
-                mock_load.return_value = None
-
-                result = backtest.download_prices(
-                    ["AAPL"], "2020-01-01", "2020-01-05", use_cache=True
-                )
-
-                # Should use standard path (single cache check)
-                assert mock_load.call_count == 1
-                mock_yf_download.assert_called_once()
-                mock_save.assert_called_once()
+        try:
+            with pytest.raises(ValueError, match="all values are NaN"):
+                backtest.download_prices(["AAPL"], "2020-01-01", "2020-01-05", use_cache=False)
+        finally:
+            set_repository(original_repo)
 
 
 class TestDataValidation:

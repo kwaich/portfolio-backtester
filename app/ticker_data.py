@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import logging
 from typing import List, Optional
-import requests
-import yfinance as yf
 
 logger = logging.getLogger(__name__)
 
@@ -210,39 +208,10 @@ def format_ticker_option(ticker: str) -> str:
 def _get_ticker_name_impl(ticker: str) -> str:
     """Internal implementation of get_ticker_name.
 
-    This is separated to allow for flexible caching strategies.
-
-    Args:
-        ticker: Ticker symbol to look up
-
-    Returns:
-        Full company or fund name, or empty string if lookup fails
+    Delegates to the default DataRepository.
     """
-    if not ticker or not ticker.strip():
-        return ""
-
-    try:
-        yf_ticker = yf.Ticker(ticker)
-        info = yf_ticker.info
-
-        # info might be None or empty dict
-        if not info:
-            logger.warning(f"No info available for ticker: {ticker}")
-            return ""
-
-        # Try to get longName first, then shortName as fallback
-        name = info.get('longName') or info.get('shortName') or ""
-
-        if name:
-            logger.info(f"Fetched ticker name for {ticker}: {name}")
-        else:
-            logger.warning(f"No name fields available for ticker: {ticker}")
-
-        return name
-
-    except Exception as e:
-        logger.warning(f"Error fetching ticker name for {ticker}: {e}")
-        return ""
+    from .data_repository import get_repository
+    return get_repository().get_ticker_name(ticker)
 
 
 if HAS_STREAMLIT:
@@ -290,58 +259,10 @@ else:
 def _search_yahoo_finance_impl(query: str, limit: int = 10) -> List[tuple[str, str]]:
     """Internal implementation of Yahoo Finance search.
 
-    Args:
-        query: Search query string
-        limit: Maximum number of results to return
-
-    Returns:
-        List of (ticker, name) tuples matching the query
+    Delegates to the default DataRepository.
     """
-    if not query or len(query) < 1:
-        return []
-
-    try:
-        # Yahoo Finance autocomplete endpoint
-        url = "https://query2.finance.yahoo.com/v1/finance/search"
-        params = {
-            "q": query,
-            "quotesCount": limit,
-            "newsCount": 0,
-            "enableFuzzyQuery": False,
-            "quotesQueryId": "tss_match_phrase_query"
-        }
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "application/json",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Accept-Encoding": "gzip, deflate, br",
-            "Referer": "https://finance.yahoo.com",
-            "Origin": "https://finance.yahoo.com",
-        }
-
-        response = requests.get(url, params=params, headers=headers, timeout=5)
-        response.raise_for_status()
-
-        data = response.json()
-        quotes = data.get("quotes", [])
-
-        results = []
-        for quote in quotes[:limit]:
-            symbol = quote.get("symbol", "")
-            # Get long name or short name
-            name = quote.get("longname") or quote.get("shortname", "")
-            if symbol and name:
-                results.append((symbol, name))
-
-        logger.info(f"Yahoo Finance search for '{query}': found {len(results)} results")
-        return results
-
-    except requests.RequestException as e:
-        logger.warning(f"Yahoo Finance search failed for '{query}': {e}")
-        return []
-    except Exception as e:
-        logger.error(f"Unexpected error in Yahoo Finance search for '{query}': {e}")
-        return []
+    from .data_repository import get_repository
+    return get_repository().search_tickers(query, limit=limit)
 
 
 if HAS_STREAMLIT:

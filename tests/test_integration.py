@@ -32,27 +32,32 @@ class TestEndToEndWorkflow:
     # Removed test_cli_to_csv_workflow - requires network access to Yahoo Finance
     # Removed test_multi_ticker_portfolio_workflow - requires network access to Yahoo Finance
 
-    @patch("backtest.yf.download")
+    @patch("app.data_repository.yf.download")
     def test_cache_workflow(self, mock_download, tmp_path):
-        """Test caching workflow: download → cache → reload."""
+        """Test caching workflow at repository level."""
+        from app.data_repository import YahooFinanceRepository
+
+        repo = YahooFinanceRepository()
         dates = pd.date_range("2023-01-01", periods=50, freq="B")
         data = pd.DataFrame({"AAPL": np.linspace(150, 180, len(dates))}, index=dates)
         mock_download.return_value = data
 
-        # First call: should download and cache
-        with patch("backtest.Path.mkdir"):  # Mock cache dir creation
-            with patch("backtest.save_cached_prices") as mock_save:
-                with patch("backtest.load_cached_prices", return_value=None):
-                    prices1 = download_prices(["AAPL"], "2023-01-01", "2023-12-31", use_cache=True)
-                    mock_save.assert_called_once()
+        # Override cache dir to tmp_path
+        with patch.object(
+            repo,
+            "_get_cache_path",
+            side_effect=lambda tickers, start, end: tmp_path / repo._get_cache_key(tickers, start, end)
+        ):
+            # First call: should download and cache
+            prices1 = repo.get_prices(["AAPL"], "2023-01-01", "2023-12-31", use_cache=True)
+            mock_download.assert_called_once()
 
-        # Second call: should use cache
-        with patch("backtest.load_cached_prices", return_value=data):
-            prices2 = download_prices(["AAPL"], "2023-01-01", "2023-12-31", use_cache=True)
-            # yfinance should not be called again
-            assert mock_download.call_count == 1  # Only from first call
+            # Second call: should use cache
+            mock_download.reset_mock()
+            prices2 = repo.get_prices(["AAPL"], "2023-01-01", "2023-12-31", use_cache=True)
+            mock_download.assert_not_called()
 
-        pd.testing.assert_frame_equal(prices1, prices2)
+        pd.testing.assert_frame_equal(prices1, prices2, check_freq=False)
 
 
 class TestEdgeCases:
@@ -125,7 +130,7 @@ class TestEdgeCases:
         result = compute_metrics(prices, weights, benchmark, 100000)
         assert len(result) == 2
 
-    @patch("backtest.yf.download")
+    @patch("app.data_repository.yf.download")
     def test_missing_ticker_data(self, mock_download):
         """Test handling of tickers with missing data."""
         dates = pd.date_range("2020-01-01", periods=100, freq="D")
@@ -136,8 +141,11 @@ class TestEdgeCases:
             # MISSING: "INVALID" ticker
         }, index=dates)
 
+        from app.data_repository import YahooFinanceRepository
+        repo = YahooFinanceRepository()
+
         with pytest.raises(ValueError, match="Missing data for ticker"):
-            download_prices(["AAPL", "INVALID"], "2020-01-01", "2020-12-31", use_cache=False)
+            repo.get_prices(["AAPL", "INVALID"], "2020-01-01", "2020-12-31", use_cache=False)
 
     # Removed test_negative_returns - requires network access to Yahoo Finance
 

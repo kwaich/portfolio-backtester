@@ -36,6 +36,12 @@ except ImportError as exc:  # pragma: no cover - dependency guard
         "Missing dependency yfinance. Install it via 'pip install yfinance'."
     ) from exc
 
+try:
+    from app.data_repository import get_repository, YahooFinanceRepository
+except ImportError:  # pragma: no cover - may not be available in all contexts
+    get_repository = None  # type: ignore[misc,assignment]
+    YahooFinanceRepository = None  # type: ignore[misc,assignment]
+
 # Configure default logging (only if no handlers are already configured)
 if not logging.getLogger().handlers:
     logging.basicConfig(
@@ -429,151 +435,24 @@ def get_cache_path(tickers: List[str], start: str, end: str) -> Path:
 def load_cached_prices(cache_path: Path, max_age_hours: int = DEFAULT_CACHE_TTL_HOURS) -> pd.DataFrame | None:
     """Load cached price data if it exists and is not stale.
 
-    Uses Parquet format for data and JSON for metadata (more secure than pickle).
-
-    Args:
-        cache_path: Base path to cache files (without extension)
-        max_age_hours: Maximum age of cache in hours (default: 24)
-
-    Returns:
-        DataFrame if cache is valid and fresh, None otherwise
+    Backward-compatible wrapper around the default repository.
     """
-    parquet_path = cache_path.with_suffix('.parquet')
-    metadata_path = cache_path.with_suffix('.json')
-    old_pickle_path = cache_path.with_suffix('.pkl')
-
-    # Handle migration from old pickle format
-    if old_pickle_path.exists() and not parquet_path.exists():
-        logger.warning(f"Old pickle cache detected at {old_pickle_path}, migrating to Parquet")
-        try:
-            # Load old pickle cache
-            with open(old_pickle_path, "rb") as f:
-                import pickle
-                cache_data = pickle.load(f)
-
-            # Extract data (handle both dict and DataFrame formats)
-            if isinstance(cache_data, dict) and "data" in cache_data:
-                df = cache_data["data"]
-                timestamp = cache_data.get("timestamp", time.time())
-            elif isinstance(cache_data, pd.DataFrame):
-                df = cache_data
-                timestamp = time.time()
-            else:
-                raise ValueError("Unknown pickle cache format")
-
-            # Save in new format
-            df.to_parquet(parquet_path, compression='gzip', index=True)
-            metadata = {"timestamp": timestamp, "version": CACHE_VERSION}
-            with open(metadata_path, 'w') as f:
-                json.dump(metadata, f)
-
-            # Delete old pickle cache
-            old_pickle_path.unlink()
-            logger.info(f"Migrated pickle cache to Parquet: {parquet_path}")
-
-        except Exception as e:
-            logger.warning(f"Failed to migrate old cache: {e}")
-            try:
-                old_pickle_path.unlink()
-            except:
-                pass
-            return None
-
-    # Check if Parquet cache exists
-    if not parquet_path.exists() or not metadata_path.exists():
-        return None
-
-    try:
-        # Load metadata
-        with open(metadata_path, 'r') as f:
-            metadata = json.load(f)
-
-        # Check cache age
-        cache_age_hours = (time.time() - metadata["timestamp"]) / 3600
-        if cache_age_hours > max_age_hours:
-            logger.info(f"Cache expired (age: {cache_age_hours:.1f}h, max: {max_age_hours}h)")
-            parquet_path.unlink()
-            metadata_path.unlink()
-            return None
-
-        # Load price data
-        df = pd.read_parquet(parquet_path)
-
-        logger.info(f"Loaded cached data (age: {cache_age_hours:.1f}h from {parquet_path})")
-        return df
-
-    except Exception as e:
-        logger.warning(f"Failed to load cache: {e}")
-        # Try to clean up corrupted cache files
-        try:
-            if parquet_path.exists():
-                parquet_path.unlink()
-            if metadata_path.exists():
-                metadata_path.unlink()
-        except:
-            pass
-        return None
+    repo = get_repository()
+    if isinstance(repo, YahooFinanceRepository):
+        return repo.load_cached_prices(cache_path, max_age_hours=max_age_hours)
+    return None
 
 
 def save_cached_prices(cache_path: Path, prices: pd.DataFrame) -> None:
     """Save price data to cache with metadata.
 
-    Uses Parquet format for data and JSON for metadata (more secure than pickle).
-
-    Args:
-        cache_path: Base path where cache files will be saved (without extension)
-        prices: DataFrame containing price data to cache
+    Backward-compatible wrapper around the default repository.
     """
-    parquet_path = cache_path.with_suffix('.parquet')
-    metadata_path = cache_path.with_suffix('.json')
-
-    try:
-        # Save price data as Parquet (compressed)
-        prices.to_parquet(parquet_path, compression='gzip', index=True)
-
-        # Save metadata as JSON
-        metadata = {
-            "timestamp": time.time(),
-            "version": CACHE_VERSION
-        }
-        with open(metadata_path, 'w') as f:
-            json.dump(metadata, f)
-
-        logger.info(f"Saved data to cache: {parquet_path}")
-    except Exception as e:
-        logger.warning(f"Failed to save cache: {e}")
-        # Clean up partial saves
-        try:
-            if parquet_path.exists():
-                parquet_path.unlink()
-            if metadata_path.exists():
-                metadata_path.unlink()
-        except:
-            pass
+    repo = get_repository()
+    if isinstance(repo, YahooFinanceRepository):
+        repo.save_cached_prices(cache_path, prices)
 
 
-@retry_with_backoff(max_retries=3, base_delay=2.0)
-def _download_from_yfinance(tickers: List[str], start: str, end: str) -> Any:
-    """Internal function to download from yfinance with retry logic.
-
-    Args:
-        tickers: List of ticker symbols
-        start: Start date
-        end: End date
-
-    Returns:
-        Raw data from yfinance (format varies based on number of tickers)
-    """
-    logger.info(f"Downloading data for {len(tickers)} ticker(s) from {start} to {end}")
-
-    return yf.download(
-        tickers=tickers,
-        start=start,
-        end=end,
-        interval="1d",
-        auto_adjust=True,
-        progress=False,
-    )
 
 
 def validate_price_data(
@@ -651,85 +530,6 @@ def validate_price_data(
         )
 
 
-def _process_yfinance_data(data: Any, tickers: List[str], start: str, end: str) -> pd.DataFrame:
-    """Process raw yfinance data into standardized DataFrame format.
-
-    Args:
-        data: Raw data from yfinance
-        tickers: List of ticker symbols
-        start: Start date for error messages
-        end: End date for error messages
-
-    Returns:
-        DataFrame with adjusted close prices for all tickers
-
-    Raises:
-        ValueError: If data is empty or missing required tickers
-    """
-    # Check if data is empty
-    if data.empty:
-        raise ValueError(
-            f"No price data returned for period {start} to {end}.\n"
-            f"Tickers requested: {', '.join(tickers)}\n"
-            f"Please verify:\n"
-            f"  1. Tickers are valid symbols\n"
-            f"  2. Tickers were trading during this period\n"
-            f"  3. Date range is valid (not in the future)"
-        )
-
-    # Handle different yfinance return formats
-    if isinstance(data, pd.Series):  # single ticker result
-        prices = data.to_frame(name=tickers[0])
-    elif isinstance(data.columns, pd.MultiIndex):
-        level0 = data.columns.get_level_values(0)
-        price_field = None
-        for candidate in ("Adj Close", "Close"):
-            if candidate in level0:
-                price_field = candidate
-                break
-        if price_field is None:
-            price_field = level0[0]
-        prices = data.xs(price_field, axis=1, level=0)
-    else:
-        preferred = next((c for c in ("Adj Close", "Close") if c in data.columns), None)
-        column = preferred or data.columns[0]
-        prices = data[[column]].rename(columns={column: tickers[0]})
-
-    # Drop rows with all NaN values
-    prices = prices.dropna(how="all")
-    if prices.empty:
-        raise ValueError(
-            f"No price data returned for period {start} to {end}.\n"
-            f"Tickers requested: {', '.join(tickers)}\n"
-            f"Please verify:\n"
-            f"  1. Tickers are valid symbols\n"
-            f"  2. Tickers were trading during this period\n"
-            f"  3. Date range is valid (not in the future)"
-        )
-
-    # Ensure DataFrame format
-    if isinstance(prices, pd.Series):
-        prices = prices.to_frame(name=tickers[0])
-
-    # Check for missing tickers
-    missing = [ticker for ticker in tickers if ticker not in prices.columns]
-    if missing:
-        available = [t for t in tickers if t not in missing]
-        raise ValueError(
-            f"Missing data for ticker(s): {', '.join(missing)}\n"
-            f"Date range: {start} to {end}\n"
-            f"Available ticker(s): {', '.join(available) if available else 'None'}\n"
-            f"Verify the missing tickers were trading during this period."
-        )
-
-    # Return tickers in requested order
-    prices = prices.loc[:, tickers]
-
-    # Validate data quality
-    validate_price_data(prices, tickers)
-
-    return prices
-
 
 def download_prices(
     tickers: List[str],
@@ -740,10 +540,8 @@ def download_prices(
 ) -> pd.DataFrame:
     """Fetch adjusted closes for the requested tickers.
 
-    Implements optimized batch downloading with per-ticker caching:
-    - Checks cache individually for each ticker
-    - Downloads only uncached tickers
-    - Combines cached and fresh data efficiently
+    Delegates to the default DataRepository (YahooFinanceRepository).
+    Validates tickers before download and price data after download.
 
     Args:
         tickers: List of ticker symbols to download
@@ -758,77 +556,12 @@ def download_prices(
     Raises:
         ValueError: If any ticker is invalid
     """
-
-    # Validate tickers before attempting download
     validate_tickers(tickers)
 
-    # Optimized batch caching: check each ticker individually
-    if use_cache and len(tickers) > 1:
-        cached_results = {}
-        uncached_tickers = []
+    repo = get_repository()
+    prices = repo.get_prices(tickers, start, end, use_cache=use_cache, cache_ttl_hours=cache_ttl_hours)
 
-        for ticker in tickers:
-            # Check individual ticker cache
-            single_cache_path = get_cache_path([ticker], start, end)
-            cached_data = load_cached_prices(single_cache_path, max_age_hours=cache_ttl_hours)
-
-            if cached_data is not None:
-                cached_results[ticker] = cached_data[ticker]
-                logger.debug(f"Cache hit for {ticker}")
-            else:
-                uncached_tickers.append(ticker)
-
-        # Download only uncached tickers
-        if uncached_tickers:
-            logger.info(f"Downloading {len(uncached_tickers)} uncached ticker(s): {', '.join(uncached_tickers)}")
-            new_data = _download_from_yfinance(uncached_tickers, start, end)
-
-            # Process downloaded data
-            new_prices = _process_yfinance_data(new_data, uncached_tickers, start, end)
-
-            # Cache each newly downloaded ticker individually
-            for ticker in uncached_tickers:
-                if ticker in new_prices.columns:
-                    single_cache_path = get_cache_path([ticker], start, end)
-                    save_cached_prices(single_cache_path, new_prices[[ticker]])
-                    cached_results[ticker] = new_prices[ticker]
-
-        # Combine all results in original order
-        if cached_results:
-            combined_prices = pd.DataFrame({ticker: cached_results[ticker] for ticker in tickers if ticker in cached_results})
-
-            # Ensure all requested tickers are present
-            missing = [ticker for ticker in tickers if ticker not in combined_prices.columns]
-            if missing:
-                raise ValueError(
-                    f"Missing data for ticker(s): {', '.join(missing)}\n"
-                    f"Date range: {start} to {end}\n"
-                    f"Verify the missing tickers were trading during this period."
-                )
-
-            logger.info(f"Batch download complete: {len(cached_results)} ticker(s) ({len(cached_results) - len(uncached_tickers)} cached, {len(uncached_tickers)} downloaded)")
-            return combined_prices
-        else:
-            # Fallback to normal download if no cache hits
-            pass
-
-    # Standard path: single ticker or cache disabled
-    if use_cache:
-        cache_path = get_cache_path(tickers, start, end)
-        cached_data = load_cached_prices(cache_path, max_age_hours=cache_ttl_hours)
-        if cached_data is not None:
-            return cached_data
-
-    # Download with retry logic
-    data = _download_from_yfinance(tickers, start, end)
-
-    # Process the downloaded data
-    prices = _process_yfinance_data(data, tickers, start, end)
-
-    # Save to cache
-    if use_cache:
-        save_cached_prices(cache_path, prices)
-
+    validate_price_data(prices, tickers)
     return prices
 
 

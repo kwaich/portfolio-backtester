@@ -165,7 +165,7 @@ class TestTickerSearch:
         formatted = format_ticker_option("UNKNOWN")
         assert formatted == "UNKNOWN"
 
-    @patch('app.ticker_data.yf.Ticker')
+    @patch('app.data_repository.yf.Ticker')
     def test_get_ticker_name_known_ticker(self, mock_ticker):
         """Test get_ticker_name fetches from yfinance."""
         # Clear cache first
@@ -180,7 +180,7 @@ class TestTickerSearch:
         assert name == "SPDR S&P 500 ETF Trust"
         mock_ticker.assert_called_once_with("SPY")
 
-    @patch('app.ticker_data.yf.Ticker')
+    @patch('app.data_repository.yf.Ticker')
     def test_get_ticker_name_unknown_ticker(self, mock_ticker):
         """Test get_ticker_name with unknown ticker returns empty string."""
         # Clear cache first
@@ -194,7 +194,7 @@ class TestTickerSearch:
         name = get_ticker_name("UNKNOWN")
         assert name == ""
 
-    @patch('app.ticker_data.yf.Ticker')
+    @patch('app.data_repository.yf.Ticker')
     def test_get_ticker_name_uses_shortname_fallback(self, mock_ticker):
         """Test get_ticker_name falls back to shortName if longName missing."""
         # Clear cache first
@@ -208,7 +208,7 @@ class TestTickerSearch:
         name = get_ticker_name("AAPL")
         assert name == "Apple"
 
-    @patch('app.ticker_data.yf.Ticker')
+    @patch('app.data_repository.yf.Ticker')
     def test_get_ticker_name_error_handling(self, mock_ticker):
         """Test get_ticker_name handles errors gracefully."""
         # Clear cache first
@@ -233,7 +233,7 @@ class TestYahooFinanceSearch:
         results = search_yahoo_finance("")
         assert results == []
 
-    @patch('app.ticker_data.requests.get')
+    @patch('app.data_repository.requests.get')
     def test_search_yahoo_finance_successful(self, mock_get):
         """Test search_yahoo_finance with successful API response."""
         # Mock response
@@ -253,7 +253,7 @@ class TestYahooFinanceSearch:
         assert ("AAPL", "Apple Inc.") in results
         assert ("MSFT", "Microsoft Corporation") in results
 
-    @patch('app.ticker_data.requests.get')
+    @patch('app.data_repository.requests.get')
     def test_search_yahoo_finance_with_shortname(self, mock_get):
         """Test search_yahoo_finance when only shortname is available."""
         # Mock response with shortname instead of longname
@@ -271,7 +271,7 @@ class TestYahooFinanceSearch:
         assert len(results) == 1
         assert ("TEST", "Test Company") in results
 
-    @patch('app.ticker_data.requests.get')
+    @patch('app.data_repository.requests.get')
     def test_search_yahoo_finance_network_error(self, mock_get):
         """Test search_yahoo_finance handles network errors gracefully."""
         mock_get.side_effect = requests.RequestException("Network error")
@@ -281,7 +281,7 @@ class TestYahooFinanceSearch:
         # Should return empty list on error
         assert results == []
 
-    @patch('app.ticker_data.requests.get')
+    @patch('app.data_repository.requests.get')
     def test_search_yahoo_finance_invalid_json(self, mock_get):
         """Test search_yahoo_finance handles invalid JSON response."""
         mock_response = Mock()
@@ -294,7 +294,7 @@ class TestYahooFinanceSearch:
         # Should return empty list on error
         assert results == []
 
-    @patch('app.ticker_data.requests.get')
+    @patch('app.data_repository.requests.get')
     def test_search_yahoo_finance_limit(self, mock_get):
         """Test search_yahoo_finance respects limit parameter."""
         # Mock response with many results
@@ -312,7 +312,7 @@ class TestYahooFinanceSearch:
 
         assert len(results) == 5
 
-    @patch('app.ticker_data.requests.get')
+    @patch('app.data_repository.requests.get')
     def test_search_yahoo_finance_missing_data(self, mock_get):
         """Test search_yahoo_finance skips quotes with missing data."""
         # Mock response with incomplete data
@@ -335,7 +335,7 @@ class TestYahooFinanceSearch:
         assert ("AAPL", "Apple Inc.") in results
         assert ("GOOGL", "Alphabet") in results
 
-    @patch('app.ticker_data.requests.get')
+    @patch('app.data_repository.requests.get')
     def test_search_yahoo_finance_caching(self, mock_get):
         """Test that search_yahoo_finance caches results."""
         # Mock response
@@ -445,7 +445,7 @@ class TestTickerDataEdgeCases:
         results = search_tickers("  SPY  ")
         assert len(results) >= 1
 
-    @patch('app.ticker_data.requests.get')
+    @patch('app.data_repository.requests.get')
     def test_search_yahoo_finance_timeout(self, mock_get):
         """Test search_yahoo_finance handles timeout gracefully."""
         mock_get.side_effect = requests.Timeout("Request timed out")
