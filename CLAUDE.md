@@ -20,10 +20,10 @@ This is a lightweight Python-based Portfolio Backtesting utility that allows use
 **Primary Use Case**: Testing portfolio allocations (default: VDCP.L/VHYD.L vs VWRA.L benchmark)
 
 **Current Status**:
-- **Version**: v2.5.0-dev (Unreleased - 2025-11-17)
-- **Test Coverage**: ~88% (293 tests, 293 passing / 100% ✅)
-- **Progress**: Security hardening (Parquet caching), StateManager validation, UI improvements
-- **Branch**: claude/review-code-01FMcnN697didaPWUPyzpyT8
+- **Version**: v2.5.0-dev
+- **Test Coverage**: ~88% (404 tests, 404 passing / 100% ✅)
+- **Progress**: Security hardening (Parquet caching), StateManager validation, UI improvements, repository pattern
+- **Branch**: main
 
 ---
 
@@ -33,7 +33,7 @@ This is a lightweight Python-based Portfolio Backtesting utility that allows use
 portfolio-backtester/
 ├── .venv/                    # Python virtual environment (gitignored - create with: python -m venv .venv)
 ├── app.py                    # Streamlit web UI (backward compatibility wrapper - 43 lines)
-├── app/                      # Modular web UI package (12 modules, 2,871 lines)
+├── app/                      # Modular web UI package (13 modules)
 │   ├── __init__.py           # Package initialization
 │   ├── config.py             # Configuration constants (32 constants)
 │   ├── presets.py            # Portfolio and date presets
@@ -45,17 +45,22 @@ portfolio-backtester/
 │   ├── sidebar.py            # Form-based sidebar rendering (310 lines)
 │   ├── results.py            # Results display functions (330 lines)
 │   ├── utils.py              # URL params, error handling, progress (269 lines)
-│   └── main.py               # Application orchestration (reduced to 310 lines)
+│   ├── main.py               # Application orchestration (reduced to 310 lines)
+│   └── data_repository.py    # Repository pattern: DataRepository ABC, YahooFinanceRepository, MockRepository (413 lines)
 ├── backtest.py               # Core backtesting engine (830 lines - Phases 1 & 3)
 ├── plot_backtest.py          # Visualization utility (395 lines - Phases 2 & 3)
-├── tests/                    # Test suite (293 tests, ~88% coverage; see docs/TESTING_GUIDE.md)
+├── tests/                    # Test suite (404 tests, ~88% coverage; see docs/TESTING_GUIDE.md)
 │   ├── conftest.py           # pytest configuration (with session state reset fixture)
-│   ├── test_backtest.py      # Unit tests for backtest.py (93 tests)
-│   ├── test_app.py           # Unit tests for app.py UI (76 tests - includes URL params)
-│   ├── test_state_manager.py # Unit tests for state_manager.py (67 tests)
-│   ├── test_ticker_data.py   # Unit tests for ticker_data.py (32 tests)
-│   ├── test_ticker_names.py  # Placeholder for upcoming ticker name scenarios
-│   └── test_integration.py   # Integration tests (21 tests)
+│   ├── test_backtest.py      # Unit tests for backtest.py
+│   ├── test_app.py           # Unit tests for app.py UI (includes URL params)
+│   ├── test_state_manager.py # Unit tests for state_manager.py
+│   ├── test_ticker_data.py   # Unit tests for ticker_data.py
+│   ├── test_ticker_names.py  # Unit tests for ticker name fetching scenarios
+│   ├── test_integration.py   # Integration tests
+│   ├── test_benchmarks.py    # Unit tests for benchmark comparison logic
+│   ├── test_data_repository.py # Unit tests for DataRepository, YahooFinanceRepository, MockRepository
+│   ├── test_plot_backtest.py # Unit tests for visualization (plot_backtest.py)
+│   └── test_properties.py    # Property-based tests
 ├── requirements.txt          # Python dependencies (includes requests)
 ├── README.md                 # Main user documentation
 ├── CLAUDE.md                 # This file - AI assistant guide
@@ -107,7 +112,7 @@ portfolio-backtester/
 - DCA weekend handling: next available trading day
 - Contribution-adjusted returns: `(value_change - contribution_change) / previous_value`
 
-#### 2. Web UI (app/ package - 12 modules, 2,871 lines)
+#### 2. Web UI (app/ package - 13 modules)
 
 **Purpose**: High-performance interactive Streamlit dashboard with best practices
 
@@ -123,6 +128,7 @@ portfolio-backtester/
 - **results.py**: Results display functions (330 lines)
 - **utils.py**: URL params, error handling, progress tracking (269 lines)
 - **main.py**: Application orchestration (reduced to 310 lines from 764)
+- **data_repository.py**: Repository pattern — `DataRepository` ABC, `YahooFinanceRepository`, `MockRepository` (413 lines)
 - **app.py**: 43-line backward compatibility wrapper
 
 **Features**:
@@ -172,9 +178,20 @@ portfolio-backtester/
 - **Phase 2**: Logging instead of print statements
 - **Phase 3**: Data quality validation (min 2 rows, NaN checks)
 
-#### 4. Testing Infrastructure (5 test files, 293 tests)
+#### 4. Data Repository (app/data_repository.py - 413 lines)
 
-**Test Coverage**: ~88% overall, 100% pass rate (293/293 passing ✅)
+**Purpose**: Abstracts all external data sources behind a single interface
+
+**Classes**:
+- `DataRepository` (ABC): Interface defining `get_prices()`, `search_tickers()`, `get_ticker_name()`
+- `YahooFinanceRepository`: Production implementation backed by yfinance + Parquet cache
+- `MockRepository`: In-memory implementation for fast, deterministic tests
+
+**Pattern**: Module-level singleton via `get_repository()` / `set_repository()` — decouples business logic from yfinance, enables easy test mocking without patching internals
+
+#### 5. Testing Infrastructure (11 test files, 404 tests)
+
+**Test Coverage**: ~88% overall, 100% pass rate (404/404 passing ✅)
 
 **Test Files** (in `tests/` directory):
 - **tests/conftest.py**: pytest configuration with auto session state reset fixture
@@ -195,29 +212,27 @@ portfolio-backtester/
   - **URL Parameters**: 5 tests for capital/benchmarks sharing bug fixes
   - 16 test classes with comprehensive coverage
 
-- **tests/test_ticker_data.py** (32 tests): Unit tests for ticker search and name fetching
-  - Curated ticker list validation
-  - Search functionality (by symbol and name)
-  - Yahoo Finance API mocking (search and ticker info)
-  - Dynamic ticker name fetching with yfinance
-  - Fallback to shortName, error handling
-  - Cache clearing and edge cases
+- **tests/test_ticker_data.py**: Unit tests for ticker search and name fetching
+  - Curated ticker list validation, search by symbol/name, Yahoo Finance API mocking
 
-- **tests/test_state_manager.py** (67 tests): Unit tests for StateManager
-  - State getters and setters (39 tests - preserved)
-  - Input validation tests (28 tests - NEW)
-  - Type validation for all StateManager setter methods
-  - DateTime compatibility tests (accepts both datetime.datetime and datetime.date)
-  - 11 test classes with comprehensive validation coverage
+- **tests/test_state_manager.py**: Unit tests for StateManager
+  - State getters/setters, type validation for all setters, DateTime compatibility
 
-- **tests/test_integration.py** (21 tests): Integration tests
-  - End-to-end workflows, edge cases, data quality
-  - Statistical edge cases, multi-ticker scenarios
-  - 6 test classes covering real-world usage
+- **tests/test_integration.py**: Integration tests
+  - End-to-end workflows, edge cases, data quality, multi-ticker scenarios
 
-- **tests/conftest.py**: pytest configuration
-  - Automatically adds parent directory to Python path
-  - Enables tests to import modules from project root
+- **tests/test_benchmarks.py**: Unit tests for benchmark comparison logic
+
+- **tests/test_data_repository.py**: Unit tests for `DataRepository`, `YahooFinanceRepository`, `MockRepository`
+  - Repository interface contract, cache behavior, mock injection
+
+- **tests/test_plot_backtest.py**: Unit tests for visualization (plot_backtest.py)
+
+- **tests/test_properties.py**: Property-based tests for invariant checking
+
+- **tests/test_ticker_names.py**: Unit tests for ticker name fetching scenarios
+
+- **tests/conftest.py**: pytest configuration — adds parent directory to Python path
 
 **See**: [TESTING_GUIDE.md](docs/TESTING_GUIDE.md) for comprehensive testing rules and patterns.
 
@@ -509,6 +524,6 @@ git commit -m "feat: add new_metric calculation"
 
 ---
 
-**Last Updated**: 2026-04-30
+**Last Updated**: 2026-05-01
 **Version**: v2.5.0-dev
-**Test Coverage**: ~88% (293 tests, 100% passing ✅)
+**Test Coverage**: ~88% (404 tests, 100% passing ✅)
