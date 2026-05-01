@@ -22,6 +22,17 @@ from .config import (
 from .presets import get_portfolio_presets, get_date_presets
 from .state_manager import StateManager
 from .ui_components import render_searchable_ticker_input
+from .design_system import (
+    COLORS,
+    get_sidebar_badge_style,
+    get_pill_button_style,
+    get_run_button_style,
+)
+
+
+def _section_badge(title: str) -> None:
+    """Render a sidebar section badge label."""
+    st.markdown(f'<span class="sidebar-badge">{title}</span>', unsafe_allow_html=True)
 
 
 def render_sidebar_header() -> None:
@@ -156,7 +167,6 @@ def render_date_range_inputs() -> Tuple[datetime, datetime]:
         Tuple of (start_date, end_date)
     """
     st.sidebar.subheader("Date Range")
-    st.sidebar.caption("Quick Presets:")
 
     date_presets = get_date_presets()
     preset_cols = st.sidebar.columns(6)
@@ -204,48 +214,75 @@ def render_sidebar_form() -> Dict[str, Any]:
     Returns:
         Dictionary containing all form inputs
     """
+    st.sidebar.markdown(get_sidebar_badge_style(), unsafe_allow_html=True)
+    st.sidebar.markdown(get_pill_button_style(), unsafe_allow_html=True)
+    st.sidebar.markdown(get_run_button_style(), unsafe_allow_html=True)
+
     render_sidebar_header()
 
-    # Portfolio preset (outside form to enable dynamic updates)
-    selected_portfolio = render_portfolio_preset_selector()
+    with st.sidebar:
+        # Section 1 — PRESET (outside form to enable dynamic updates)
+        _section_badge("Preset")
+        selected_portfolio = render_portfolio_preset_selector()
 
-    # Handle portfolio preset selection
-    if selected_portfolio != StateManager.get_selected_portfolio():
-        StateManager.set_selected_portfolio(selected_portfolio)
-        if selected_portfolio != "Custom (Manual Entry)":
-            portfolio_presets = get_portfolio_presets()
-            portfolio_config = portfolio_presets[selected_portfolio]
-            StateManager.update_portfolio_preset(selected_portfolio, portfolio_config)
+        # Handle portfolio preset selection
+        if selected_portfolio != StateManager.get_selected_portfolio():
+            StateManager.set_selected_portfolio(selected_portfolio)
+            if selected_portfolio != "Custom (Manual Entry)":
+                portfolio_presets = get_portfolio_presets()
+                portfolio_config = portfolio_presets[selected_portfolio]
+                StateManager.update_portfolio_preset(selected_portfolio, portfolio_config)
 
-    # Number of tickers and benchmarks (outside form for immediate UI updates)
-    st.sidebar.subheader("Portfolio Size")
+        st.sidebar.divider()
 
-    num_tickers = st.sidebar.number_input(
-        "Number of Portfolio Tickers",
-        min_value=1,
-        max_value=MAX_TICKERS,
-        value=StateManager.get_num_tickers(),
-        step=1,
-        help="How many different assets in your portfolio?",
-        key="num_tickers_input"
-    )
+        # Section 2 — PORTFOLIO (outside form for immediate UI updates)
+        _section_badge("Portfolio")
 
-    # Use URL benchmarks count if available, otherwise default to 1
-    url_benchmarks = st.session_state.get('url_benchmarks', [])
-    default_num_benchmarks = len(url_benchmarks) if url_benchmarks else 1
-    num_benchmarks = st.sidebar.number_input(
-        "Number of Benchmarks",
-        min_value=MIN_BENCHMARKS,
-        max_value=MAX_BENCHMARKS,
-        value=default_num_benchmarks,
-        step=1,
-        help="Compare against multiple benchmarks",
-        key="num_benchmarks_input"
-    )
+        num_tickers = st.sidebar.number_input(
+            "Number of Portfolio Tickers",
+            min_value=1,
+            max_value=MAX_TICKERS,
+            value=StateManager.get_num_tickers(),
+            step=1,
+            help="How many different assets in your portfolio?",
+            key="num_tickers_input"
+        )
+
+        tickers, weights = render_portfolio_inputs(num_tickers)
+
+        st.sidebar.divider()
+
+        # Section 3 — BENCHMARKS (outside form for immediate UI updates)
+        _section_badge("Benchmarks")
+
+        # Use URL benchmarks count if available, otherwise default to 1
+        url_benchmarks = st.session_state.get('url_benchmarks', [])
+        default_num_benchmarks = len(url_benchmarks) if url_benchmarks else 1
+        num_benchmarks = st.sidebar.number_input(
+            "Number of Benchmarks",
+            min_value=MIN_BENCHMARKS,
+            max_value=MAX_BENCHMARKS,
+            value=default_num_benchmarks,
+            step=1,
+            help="Compare against multiple benchmarks",
+            key="num_benchmarks_input"
+        )
+
+        benchmarks = render_benchmark_inputs(num_benchmarks)
+
+        st.sidebar.divider()
+
+        # Section 4 — DATE RANGE (outside form for date preset buttons)
+        _section_badge("Date Range")
+        start_date, end_date = render_date_range_inputs()
+
+        st.sidebar.divider()
 
     # Form for main inputs (reduces reruns)
     with st.sidebar.form(key="backtest_config_form"):
-        st.subheader("Initial Capital")
+        # Section 5 — STRATEGY
+        _section_badge("Strategy")
+
         # Use URL parameter if available, otherwise use default
         default_capital = st.session_state.get('url_capital', DEFAULT_CAPITAL)
         capital = st.number_input(
@@ -260,7 +297,6 @@ def render_sidebar_form() -> Dict[str, Any]:
         )
 
         # Rebalancing strategy
-        st.subheader("Rebalancing Strategy")
         rebalance_strategy = st.selectbox(
             "Rebalancing Frequency",
             options=list(REBALANCE_OPTIONS.keys()),
@@ -271,7 +307,6 @@ def render_sidebar_form() -> Dict[str, Any]:
         rebalance_freq = REBALANCE_OPTIONS[rebalance_strategy]
 
         # DCA (Dollar-Cost Averaging) strategy
-        st.subheader("Dollar-Cost Averaging (DCA)")
         dca_frequency = st.selectbox(
             "DCA Contribution Frequency",
             options=list(DCA_FREQUENCY_OPTIONS.keys()),
@@ -299,8 +334,10 @@ def render_sidebar_form() -> Dict[str, Any]:
             if rebalance_freq is not None:
                 st.warning("⚠️ DCA and rebalancing are mutually exclusive. DCA will take precedence.")
 
-        # Cache option
-        st.subheader("Options")
+        st.divider()
+
+        # Section 6 — OPTIONS
+        _section_badge("Options")
         use_cache = st.checkbox(
             "Use cached data",
             value=True,
@@ -314,19 +351,15 @@ def render_sidebar_form() -> Dict[str, Any]:
             key="debug_logging_input"
         )
 
-        # Submit button
+        st.divider()
+
+        # Section 7 — RUN
+        _section_badge("Run")
         submit_button = st.form_submit_button(
             "🚀 Run Backtest",
             type="primary",
             use_container_width=True
         )
-
-    # Render portfolio and benchmark inputs outside the form (they need interactivity)
-    tickers, weights = render_portfolio_inputs(num_tickers)
-    benchmarks = render_benchmark_inputs(num_benchmarks)
-
-    # Render date range inputs outside the form (for date preset buttons)
-    start_date, end_date = render_date_range_inputs()
 
     return {
         'submit_clicked': submit_button,
