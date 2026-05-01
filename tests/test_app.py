@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 from datetime import datetime
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
@@ -16,6 +16,7 @@ from functools import lru_cache
 
 streamlit_mock = MagicMock()
 
+
 def mock_cache_data(*args, **kwargs):
     """Mock cache_data that actually caches using lru_cache."""
     def decorator(func):
@@ -26,11 +27,13 @@ def mock_cache_data(*args, **kwargs):
         return cached_func
     return decorator
 
+
 streamlit_mock.cache_data = mock_cache_data
+
 streamlit_mock.query_params = {}
 sys.modules['streamlit'] = streamlit_mock
 
-import backtest
+import backtest  # noqa: E402
 
 
 class TestMetricLabels:
@@ -514,12 +517,34 @@ class TestPortfolioPresets:
 
         # Portfolio preset data structure from app.py
         example_portfolios = {
-            "Custom (Manual Entry)": {"tickers": [], "weights": [], "benchmark": "VWRA.L"},
-            "Default UK ETFs": {"tickers": ["VDCP.L", "VHYD.L"], "weights": [0.5, 0.5], "benchmark": "VWRA.L"},
-            "60/40 US Stocks/Bonds": {"tickers": ["VOO", "BND"], "weights": [0.6, 0.4], "benchmark": "SPY"},
-            "Tech Giants": {"tickers": ["AAPL", "MSFT", "GOOGL", "AMZN"], "weights": [0.25, 0.25, 0.25, 0.25], "benchmark": "QQQ"},
-            "Dividend Aristocrats": {"tickers": ["JNJ", "PG", "KO", "PEP"], "weights": [0.25, 0.25, 0.25, 0.25], "benchmark": "SPY"},
-            "Global Diversified": {"tickers": ["VTI", "VXUS", "BND"], "weights": [0.5, 0.3, 0.2], "benchmark": "VT"}
+            "Custom (Manual Entry)": {
+                "tickers": [], "weights": [], "benchmark": "VWRA.L"
+            },
+            "Default UK ETFs": {
+                "tickers": ["VDCP.L", "VHYD.L"],
+                "weights": [0.5, 0.5],
+                "benchmark": "VWRA.L"
+            },
+            "60/40 US Stocks/Bonds": {
+                "tickers": ["VOO", "BND"],
+                "weights": [0.6, 0.4],
+                "benchmark": "SPY"
+            },
+            "Tech Giants": {
+                "tickers": ["AAPL", "MSFT", "GOOGL", "AMZN"],
+                "weights": [0.25, 0.25, 0.25, 0.25],
+                "benchmark": "QQQ"
+            },
+            "Dividend Aristocrats": {
+                "tickers": ["JNJ", "PG", "KO", "PEP"],
+                "weights": [0.25, 0.25, 0.25, 0.25],
+                "benchmark": "SPY"
+            },
+            "Global Diversified": {
+                "tickers": ["VTI", "VXUS", "BND"],
+                "weights": [0.5, 0.3, 0.2],
+                "benchmark": "VT"
+            }
         }
 
         # Verify all expected presets are defined
@@ -596,12 +621,34 @@ class TestPortfolioPresets:
     def test_all_presets_have_required_keys(self):
         """Verify all presets have tickers, weights, and benchmark keys"""
         example_portfolios = {
-            "Custom (Manual Entry)": {"tickers": [], "weights": [], "benchmark": "VWRA.L"},
-            "Default UK ETFs": {"tickers": ["VDCP.L", "VHYD.L"], "weights": [0.5, 0.5], "benchmark": "VWRA.L"},
-            "60/40 US Stocks/Bonds": {"tickers": ["VOO", "BND"], "weights": [0.6, 0.4], "benchmark": "SPY"},
-            "Tech Giants": {"tickers": ["AAPL", "MSFT", "GOOGL", "AMZN"], "weights": [0.25, 0.25, 0.25, 0.25], "benchmark": "QQQ"},
-            "Dividend Aristocrats": {"tickers": ["JNJ", "PG", "KO", "PEP"], "weights": [0.25, 0.25, 0.25, 0.25], "benchmark": "SPY"},
-            "Global Diversified": {"tickers": ["VTI", "VXUS", "BND"], "weights": [0.5, 0.3, 0.2], "benchmark": "VT"}
+            "Custom (Manual Entry)": {
+                "tickers": [], "weights": [], "benchmark": "VWRA.L"
+            },
+            "Default UK ETFs": {
+                "tickers": ["VDCP.L", "VHYD.L"],
+                "weights": [0.5, 0.5],
+                "benchmark": "VWRA.L"
+            },
+            "60/40 US Stocks/Bonds": {
+                "tickers": ["VOO", "BND"],
+                "weights": [0.6, 0.4],
+                "benchmark": "SPY"
+            },
+            "Tech Giants": {
+                "tickers": ["AAPL", "MSFT", "GOOGL", "AMZN"],
+                "weights": [0.25, 0.25, 0.25, 0.25],
+                "benchmark": "QQQ"
+            },
+            "Dividend Aristocrats": {
+                "tickers": ["JNJ", "PG", "KO", "PEP"],
+                "weights": [0.25, 0.25, 0.25, 0.25],
+                "benchmark": "SPY"
+            },
+            "Global Diversified": {
+                "tickers": ["VTI", "VXUS", "BND"],
+                "weights": [0.5, 0.3, 0.2],
+                "benchmark": "VT"
+            }
         }
 
         for preset_name, preset_config in example_portfolios.items():
@@ -612,11 +659,31 @@ class TestPortfolioPresets:
     def test_preset_weights_match_tickers(self):
         """Verify weights length matches tickers length for all presets"""
         example_portfolios = {
-            "Default UK ETFs": {"tickers": ["VDCP.L", "VHYD.L"], "weights": [0.5, 0.5], "benchmark": "VWRA.L"},
-            "60/40 US Stocks/Bonds": {"tickers": ["VOO", "BND"], "weights": [0.6, 0.4], "benchmark": "SPY"},
-            "Tech Giants": {"tickers": ["AAPL", "MSFT", "GOOGL", "AMZN"], "weights": [0.25, 0.25, 0.25, 0.25], "benchmark": "QQQ"},
-            "Dividend Aristocrats": {"tickers": ["JNJ", "PG", "KO", "PEP"], "weights": [0.25, 0.25, 0.25, 0.25], "benchmark": "SPY"},
-            "Global Diversified": {"tickers": ["VTI", "VXUS", "BND"], "weights": [0.5, 0.3, 0.2], "benchmark": "VT"}
+            "Default UK ETFs": {
+                "tickers": ["VDCP.L", "VHYD.L"],
+                "weights": [0.5, 0.5],
+                "benchmark": "VWRA.L"
+            },
+            "60/40 US Stocks/Bonds": {
+                "tickers": ["VOO", "BND"],
+                "weights": [0.6, 0.4],
+                "benchmark": "SPY"
+            },
+            "Tech Giants": {
+                "tickers": ["AAPL", "MSFT", "GOOGL", "AMZN"],
+                "weights": [0.25, 0.25, 0.25, 0.25],
+                "benchmark": "QQQ"
+            },
+            "Dividend Aristocrats": {
+                "tickers": ["JNJ", "PG", "KO", "PEP"],
+                "weights": [0.25, 0.25, 0.25, 0.25],
+                "benchmark": "SPY"
+            },
+            "Global Diversified": {
+                "tickers": ["VTI", "VXUS", "BND"],
+                "weights": [0.5, 0.3, 0.2],
+                "benchmark": "VT"
+            }
         }
 
         for preset_name, preset_config in example_portfolios.items():
@@ -1099,7 +1166,10 @@ class TestColorblindAccessibility:
         assert len(BENCHMARK_MARKERS) >= 3
 
         # Should be valid Plotly marker symbols
-        valid_markers = ["circle", "square", "diamond", "triangle-up", "triangle-down", "cross", "x"]
+        valid_markers = [
+            "circle", "square", "diamond", "triangle-up",
+            "triangle-down", "cross", "x"
+        ]
         assert PORTFOLIO_MARKER in valid_markers
         for marker in BENCHMARK_MARKERS:
             assert marker in valid_markers
@@ -1128,10 +1198,11 @@ class TestColorblindAccessibility:
             from app.charts import (
                 create_main_dashboard,
                 create_rolling_returns_chart,
-                create_rolling_sharpe_chart
+                create_rolling_sharpe_chart,
             )
-            # If imports succeed, config is properly integrated
-            assert True
+            # Use imports to silence F401 while verifying they work
+            _ = (create_main_dashboard, create_rolling_returns_chart,
+                 create_rolling_sharpe_chart)
         except ImportError as e:
             pytest.fail(f"Failed to import chart functions: {e}")
 
@@ -1167,7 +1238,9 @@ class TestColorblindAccessibility:
         # Wong palette is optimized for colorblind differentiation, not brightness contrast
         for bench_color in BENCHMARK_COLORS:
             ratio = contrast_ratio(PORTFOLIO_COLOR, bench_color)
-            assert ratio >= 1.4, f"Insufficient contrast between portfolio and benchmark: {ratio:.2f}"
+            assert ratio >= 1.4, (
+                f"Insufficient contrast between portfolio and benchmark: {ratio:.2f}"
+            )
 
 
 class TestURLParameters:
@@ -1270,18 +1343,18 @@ class TestSearchableTickerInput:
             'pending_value': None
         }
         mock_st.session_state = {}
-        
+
         # Mock columns to return context managers
         mock_col1 = MagicMock()
         mock_col2 = MagicMock()
         mock_st.columns.return_value = [mock_col1, mock_col2]
-        
+
         # Mock text_input return value
         mock_st.text_input.return_value = "AAPL"
-        
+
         # Execute
         result = render_searchable_ticker_input("Test Label", "AAPL", key="test_key")
-        
+
         # Verify
         assert result == "AAPL"
         mock_st.text_input.assert_called()
@@ -1305,27 +1378,27 @@ class TestSearchableTickerInput:
             'pending_value': None
         }
         mock_st.session_state = {'test_key_input': 'app'}
-        
+
         # Mock columns
         mock_st.columns.return_value = [MagicMock(), MagicMock()]
-        
+
         # Mock text_input
         mock_st.text_input.return_value = "app"
-        
+
         # Mock search results
         mock_search.return_value = [("AAPL", "Apple Inc."), ("APLE", "Apple Hospitality REIT")]
-        
+
         # Execute
         render_searchable_ticker_input("Test Label", "app", key="test_key")
-        
+
         # Verify search was called
         mock_search.assert_called_with("app", limit=10)
-        
+
         # Verify buttons created for results
         # We expect buttons for results + close button
         # Filter calls to button to check for result buttons
         button_calls = mock_st.button.call_args_list
-        
+
         # Check if result buttons were created
         found_aapl = any("AAPL - Apple Inc." in str(call) for call in button_calls)
         assert found_aapl, "Should display button for AAPL result"
@@ -1347,14 +1420,14 @@ class TestChartGeneration:
             'benchmark_value': np.linspace(100, 105, 10),
             'benchmark_return': np.linspace(0, 0.05, 10)
         }, index=dates)
-        
+
         all_benchmark_results = {
             'SPY': pd.DataFrame({
                 'benchmark_value': np.linspace(100, 105, 10),
                 'benchmark_return': np.linspace(0, 0.05, 10)
             }, index=dates)
         }
-        
+
         benchmarks = ['SPY']
 
         # Execute
@@ -1362,11 +1435,11 @@ class TestChartGeneration:
 
         # Verify
         assert isinstance(fig, go.Figure)
-        # Traces: Portfolio Value, Benchmark Value, Portfolio Return, Benchmark Return, 
+        # Traces: Portfolio Value, Benchmark Value, Portfolio Return, Benchmark Return,
         # Active Return (Pos), Active Return (Neg), Portfolio DD, Benchmark DD
         # Total at least 8 traces
         assert len(fig.data) >= 8
-        
+
         # Check titles
         assert "Portfolio vs Benchmark Value" in str(fig.layout)
 
@@ -1380,13 +1453,13 @@ class TestChartGeneration:
         results = pd.DataFrame({
             'portfolio_value': np.linspace(100, 200, 100)
         }, index=dates)
-        
+
         all_benchmark_results = {
             'SPY': pd.DataFrame({
                 'benchmark_value': np.linspace(100, 150, 100)
             }, index=dates)
         }
-        
+
         benchmarks = ['SPY']
         windows = [30]
 
@@ -1409,13 +1482,13 @@ class TestChartGeneration:
         results = pd.DataFrame({
             'portfolio_rolling_sharpe_12m': np.random.randn(50)
         }, index=dates)
-        
+
         all_benchmark_results = {
             'SPY': pd.DataFrame({
                 'benchmark_rolling_sharpe_12m': np.random.randn(50)
             }, index=dates)
         }
-        
+
         benchmarks = ['SPY']
 
         # Execute
@@ -1426,6 +1499,47 @@ class TestChartGeneration:
         # Traces: Portfolio, SPY
         assert len(fig.data) == 2
         assert fig.data[0].name == 'Portfolio'
+
+
+class TestMainEntryPoint:
+    """Regression tests for app.main.main() entry point."""
+
+    @patch('app.main.render_sidebar_form')
+    @patch('app.main._run_backtest')
+    @patch('app.main.initialize_session_state')
+    @patch('app.main._apply_url_parameters')
+    @patch('app.main.StateManager')
+    def test_setup_logging_called_on_submit(
+        self, mock_state_manager, mock_apply_url, mock_init_state, mock_run_backtest, mock_sidebar
+    ):
+        """Verify backtest._setup_logging is reachable when form is
+        submitted (regression for NameError)."""
+        from app.main import main
+        import backtest
+
+        mock_sidebar.return_value = {
+            'submit_clicked': True,
+            'debug_logging': True,
+            'tickers': ['AAPL'],
+            'benchmarks': ['SPY'],
+            'weights': [1.0],
+            'start_date': datetime(2020, 1, 1),
+            'end_date': datetime(2024, 1, 1),
+            'capital': 100000.0,
+            'rebalance_freq': None,
+            'dca_freq': None,
+            'dca_amount': None,
+            'use_cache': True,
+            'rebalance_strategy': 'Buy-and-Hold',
+            'dca_frequency': 'None (Lump Sum)',
+        }
+        mock_state_manager.is_backtest_completed.return_value = False
+
+        sys.modules['streamlit'].columns.return_value = [MagicMock(), MagicMock()]
+
+        with patch.object(backtest, '_setup_logging') as mock_setup_logging:
+            main()
+            mock_setup_logging.assert_called_once_with(verbose=True)
 
 
 if __name__ == "__main__":

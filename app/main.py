@@ -17,9 +17,6 @@ IMPROVEMENTS (Streamlit Best Practices):
 
 from __future__ import annotations
 
-import logging
-from datetime import datetime
-
 # Third-party imports with error handling
 try:
     import streamlit as st
@@ -31,15 +28,9 @@ except ImportError as e:
     )
     raise SystemExit(1)
 
-try:
-    import pandas as pd
-    import numpy as np
-except ImportError as e:
-    st.error(f"❌ Missing dependency: {e}\n\nInstall with: pip install -r requirements.txt")
-    st.stop()
-
 # Import backtest functions
 try:
+    import backtest
     from backtest import download_prices, compute_metrics, validate_tickers
 except ImportError as e:
     st.error(
@@ -63,7 +54,10 @@ try:
     from .state_manager import StateManager
     from .sidebar import render_sidebar_form
     from .results import render_results, render_welcome_screen
-    from .utils import get_query_params, set_query_params, show_error, show_success, show_info, ProgressTracker
+    from .utils import (
+        get_query_params, set_query_params, show_error, show_success,
+        show_info, ProgressTracker
+    )
 except ImportError as e:
     st.error(f"❌ Failed to import app modules: {e}")
     st.stop()
@@ -170,7 +164,9 @@ def _run_backtest(config: dict) -> None:
 
     # Use progress tracker for better UX
     try:
-        with ProgressTracker(["Downloading data", "Computing metrics", "Generating results"]) as tracker:
+        with ProgressTracker([
+            "Downloading data", "Computing metrics", "Generating results"
+        ]) as tracker:
             # Step 1: Download data
             tracker.step()
             universe = list(dict.fromkeys(tickers + benchmarks))
@@ -257,7 +253,10 @@ def _run_backtest(config: dict) -> None:
         show_error(
             "An error occurred during backtest execution",
             error=e,
-            help_text="Please check your inputs and try again. If the problem persists, try clearing the cache."
+            help_text=(
+                "Please check your inputs and try again. "
+                "If the problem persists, try clearing the cache."
+            )
         )
 
 
