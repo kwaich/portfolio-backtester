@@ -160,7 +160,7 @@ def render_charts(
 
     # Create main dashboard
     fig = create_main_dashboard(results, all_benchmark_results, benchmarks, log_scale=log_scale)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     # Rolling returns analysis
     st.divider()
@@ -168,7 +168,7 @@ def render_charts(
     st.caption("💡 Rolling returns show performance consistency over different time periods")
 
     fig_rolling = create_rolling_returns_chart(results, all_benchmark_results, benchmarks)
-    st.plotly_chart(fig_rolling, use_container_width=True)
+    st.plotly_chart(fig_rolling, width='stretch')
 
     # Rolling Sharpe ratio analysis
     st.divider()
@@ -176,7 +176,7 @@ def render_charts(
     st.caption("💡 Rolling Sharpe ratio shows how risk-adjusted performance evolves over time (12-month window)")
 
     fig_sharpe = create_rolling_sharpe_chart(results, all_benchmark_results, benchmarks)
-    st.plotly_chart(fig_sharpe, use_container_width=True)
+    st.plotly_chart(fig_sharpe, width='stretch')
 
     return fig  # Return main figure for download
 
@@ -203,7 +203,7 @@ def render_download_options(results: pd.DataFrame, main_fig) -> None:
             data=csv_data,
             file_name=f"backtest_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv",
-            use_container_width=True
+            width='stretch'
         )
 
     with col2:
@@ -215,7 +215,7 @@ def render_download_options(results: pd.DataFrame, main_fig) -> None:
             data=chart_html,
             file_name=f"backtest_charts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
             mime="text/html",
-            use_container_width=True
+            width='stretch'
         )
 
 
@@ -226,7 +226,7 @@ def render_raw_data(results: pd.DataFrame) -> None:
         results: Backtest results DataFrame
     """
     with st.expander("📋 View Raw Data"):
-        st.dataframe(results, use_container_width=True)
+        st.dataframe(results, width='stretch')
 
 
 def render_results(stored_results: Dict) -> None:
@@ -292,21 +292,21 @@ def render_results(stored_results: Dict) -> None:
     # ------------------------------------------------------------------
     display_section_header("Performance Overview")
     fig = create_main_dashboard(results, all_benchmark_results, benchmarks, log_scale=False)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     # ------------------------------------------------------------------
     # Rolling Returns
     # ------------------------------------------------------------------
     display_section_header("Rolling Returns")
     fig_rolling = create_rolling_returns_chart(results, all_benchmark_results, benchmarks)
-    st.plotly_chart(fig_rolling, use_container_width=True)
+    st.plotly_chart(fig_rolling, width='stretch')
 
     # ------------------------------------------------------------------
     # Rolling Sharpe
     # ------------------------------------------------------------------
     display_section_header("Rolling Sharpe Ratio")
     fig_sharpe = create_rolling_sharpe_chart(results, all_benchmark_results, benchmarks)
-    st.plotly_chart(fig_sharpe, use_container_width=True)
+    st.plotly_chart(fig_sharpe, width='stretch')
 
     # ------------------------------------------------------------------
     # Detailed Metrics Tables

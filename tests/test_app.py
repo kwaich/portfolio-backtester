@@ -1535,7 +1535,7 @@ class TestMainEntryPoint:
         }
         mock_state_manager.is_backtest_completed.return_value = False
 
-        sys.modules['streamlit'].columns.return_value = [MagicMock(), MagicMock()]
+        sys.modules['streamlit'].columns.return_value = [MagicMock(), MagicMock(), MagicMock()]
 
         with patch.object(backtest, '_setup_logging') as mock_setup_logging:
             main()

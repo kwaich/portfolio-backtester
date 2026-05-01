@@ -331,6 +331,10 @@ def create_main_dashboard(
 
     # Update layout with improved visual hierarchy
     fig.update_layout(
+        title=dict(
+            text="Portfolio vs Benchmark Performance",
+            font=dict(size=SUBPLOT_TITLE_FONT_SIZE)
+        ),
         height=DASHBOARD_HEIGHT,
         showlegend=True,
         legend=dict(

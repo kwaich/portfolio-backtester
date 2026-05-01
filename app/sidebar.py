@@ -175,7 +175,7 @@ def render_date_range_inputs() -> Tuple[datetime, datetime]:
     for idx, (label, date_value) in enumerate(date_presets.items()):
         if preset_cols[idx].button(
             label,
-            use_container_width=True,
+            width='stretch',
             help=f"Set range to {label}",
             key=f"date_preset_{label}"
         ):
@@ -356,7 +356,7 @@ def render_sidebar_form() -> Dict[str, Any]:
         submit_button = st.form_submit_button(
             "🚀 Run Backtest",
             type="primary",
-            use_container_width=True
+            width='stretch'
         )
 
     return {

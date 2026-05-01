@@ -17,11 +17,6 @@ import pandas as pd
 from .config import METRIC_LABELS
 from .ticker_data import get_all_tickers, format_ticker_option, search_tickers_with_yahoo, get_ticker_name
 from .state_manager import StateManager
-from app.design_system import (
-    COLORS,
-    TYPOGRAPHY,
-    SPACING,
-)
 
 
 def format_metric_value(key: str, value: float) -> str:
@@ -286,7 +281,7 @@ def render_searchable_ticker_input(
         )
 
     with col2:
-        search_clicked = st.button("🔍", key=search_key, use_container_width=True, help="Search tickers")
+        search_clicked = st.button("🔍", key=search_key, width='stretch', help="Search tickers")
 
     # If search button clicked, show search interface
     if search_clicked or widget_state.get('show_search', False):
@@ -309,7 +304,7 @@ def render_searchable_ticker_input(
                     button_key = f"{key}_result_{idx}_{ticker}"
                     display_text = f"{ticker} - {name}"
 
-                    if st.button(display_text, key=button_key, use_container_width=True):
+                    if st.button(display_text, key=button_key, width='stretch'):
                         # Store ticker in widget state for next run
                         widget_state['pending_value'] = ticker
                         widget_state['show_search'] = False
@@ -333,34 +328,18 @@ def render_searchable_ticker_input(
 
 def display_welcome_screen() -> None:
     """Display the centered welcome hero when no backtest has been run."""
-    st.html(
-        f"""
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 4rem 2rem;">
-            <div style="color: {COLORS['accent']}; font-size: 48px; margin-bottom: 1rem;">📈</div>
-            <div style="font-family: {TYPOGRAPHY['font_header']}; font-size: {TYPOGRAPHY['page_title_size']}; font-weight: {TYPOGRAPHY['page_title_weight']}; color: {COLORS['primary_text']}; margin-bottom: 0.5rem;">Portfolio Backtester</div>
-            <div style="font-family: {TYPOGRAPHY['font_body']}; font-size: 16px; color: {COLORS['muted']};">
-                Analyze historical portfolio performance<br>
-                Enter tickers in the sidebar and click "Run Backtest" to get started.
-            </div>
-        </div>
-        """
-    )
+    _, center, _ = st.columns([1, 2, 1])
+    with center:
+        st.markdown("## 📈 Portfolio Backtester")
+        st.caption(
+            "Analyze historical portfolio performance.  \n"
+            'Enter tickers in the sidebar and click **Run Backtest** to get started.'
+        )
 
 
 def display_section_header(title: str) -> None:
-    """Display a section header using the design system."""
-    st.html(
-        f"""
-        <h3 style="
-            font-family: {TYPOGRAPHY['font_header']};
-            font-size: {TYPOGRAPHY['section_header_size']};
-            font-weight: {TYPOGRAPHY['section_header_weight']};
-            color: {COLORS['primary_text']};
-            margin-top: {SPACING['section_gap']};
-            margin-bottom: 1rem;
-        ">{title}</h3>
-        """
-    )
+    """Display a section header."""
+    st.subheader(title)
 
 
 def display_info_bar(portfolio_tickers: list[str], weights: list[float], benchmarks: list[str], start_date: str, end_date: str) -> None:
@@ -371,58 +350,20 @@ def display_info_bar(portfolio_tickers: list[str], weights: list[float], benchma
     weight_strs = [f"{t} {w:.0%}" for t, w in zip(portfolio_tickers, weights)]
     portfolio_str = " · ".join(weight_strs)
     benchmark_str = ", ".join(benchmarks) if benchmarks else "—"
-    date_str = f"{start_date} – {end_date}"
-
-    st.html(
-        f"""
-        <div style="
-            background-color: {COLORS['bg_card']};
-            border-radius: 8px;
-            padding: 0.75rem 1rem;
-            border: 1px solid {COLORS['border']};
-            font-family: {TYPOGRAPHY['font_body']};
-            font-size: 14px;
-            color: {COLORS['muted']};
-            margin-bottom: 1rem;
-        ">
-            <strong style="color: {COLORS['primary_text']};">{portfolio_str}</strong>
-            <span style="margin: 0 0.5rem;">vs</span>
-            <strong style="color: {COLORS['primary_text']};">{benchmark_str}</strong>
-            <span style="margin: 0 0.5rem;">·</span>
-            {date_str}
-        </div>
-        """
-    )
+    st.caption(f"**{portfolio_str}** vs **{benchmark_str}** · {start_date} – {end_date}")
 
 
 def display_hero_metrics_row(metrics: dict[str, str]) -> None:
-    """Display the hero metrics row as a flexbox of metric cards.
+    """Display the hero metrics row.
 
     Args:
         metrics: Dict mapping label → formatted value string.
                  Expected keys: Ending Value, Total Return, CAGR, Sharpe Ratio, Max Drawdown
     """
-    cards_html = '<div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;">'
-    for label, value in metrics.items():
-        value_color = COLORS["primary_text"]
-        if any(k in label.lower() for k in ("return", "cagr")):
-            try:
-                num = float(value.replace("%", "").replace("$", "").replace(",", ""))
-                value_color = COLORS["success"] if num > 0 else COLORS["danger"] if num < 0 else COLORS["primary_text"]
-            except ValueError:
-                pass
-        elif "drawdown" in label.lower():
-            value_color = COLORS["danger"]
-
-        cards_html += f"""
-        <div style="background-color: {COLORS['bg_card']}; border-radius: {SPACING['card_radius']}; padding: {SPACING['card_padding']}; box-shadow: {SPACING['card_shadow']}; border: 1px solid {COLORS['border']}; text-align: center; flex: 1; min-width: 140px;">
-            <div style="font-family: {TYPOGRAPHY['font_body']}; font-size: {TYPOGRAPHY['metric_value_size']}; font-weight: {TYPOGRAPHY['metric_value_weight']}; color: {value_color}; margin-bottom: 4px;">{value}</div>
-            <div style="font-family: {TYPOGRAPHY['font_body']}; font-size: {TYPOGRAPHY['metric_label_size']}; font-weight: {TYPOGRAPHY['metric_label_weight']}; color: {COLORS['muted']};">{label}</div>
-        </div>
-        """
-    cards_html += "</div>"
-
-    st.html(cards_html)
+    cols = st.columns(len(metrics))
+    for col, (label, value) in zip(cols, metrics.items()):
+        with col:
+            st.metric(label, value)
 
 
 def display_metrics_tables(performance: dict[str, str], risk: dict[str, str]) -> None:
@@ -433,39 +374,19 @@ def display_metrics_tables(performance: dict[str, str], risk: dict[str, str]) ->
         risk: Dict of risk metric label → value
     """
     col1, col2 = st.columns(2)
-
-    def _build_table(title: str, data: dict[str, str]) -> str:
-        rows = ""
-        for label, value in data.items():
-            rows += f"""
-            <tr style="border-bottom: 1px solid {COLORS['border']};">
-                <td style="padding: 0.6rem 0; font-family: {TYPOGRAPHY['font_body']}; font-size: 14px; color: {COLORS['primary_text']};">{label}</td>
-                <td style="padding: 0.6rem 0; font-family: {TYPOGRAPHY['font_body']}; font-size: 14px; color: {COLORS['primary_text']}; text-align: right; font-weight: 500;">{value}</td>
-            </tr>
-            """
-        return f"""
-        <div style="background-color: {COLORS['bg_card']}; border-radius: {SPACING['card_radius']}; padding: {SPACING['card_padding']}; border: 1px solid {COLORS['border']}; margin-bottom: 1rem;">
-            <div style="font-family: {TYPOGRAPHY['font_header']}; font-size: 14px; font-weight: 600; color: {COLORS['muted']}; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;">{title}</div>
-            <table style="width: 100%; border-collapse: collapse;">{rows}</table>
-        </div>
-        """
-
     with col1:
-        st.html(_build_table("Performance", performance))
+        st.caption("PERFORMANCE")
+        perf_df = pd.DataFrame({"Metric": list(performance.keys()), "Value": list(performance.values())})
+        st.dataframe(perf_df, hide_index=True, width='stretch')
     with col2:
-        st.html(_build_table("Risk", risk))
+        st.caption("RISK")
+        risk_df = pd.DataFrame({"Metric": list(risk.keys()), "Value": list(risk.values())})
+        st.dataframe(risk_df, hide_index=True, width='stretch')
 
 
 def display_downloads(csv_data: bytes | None = None, chart_data: bytes | None = None) -> None:
-    """Display the downloads section with styled buttons."""
-    st.html(
-        f"""
-        <div style="background-color: {COLORS['bg_card']}; border-radius: {SPACING['card_radius']}; padding: {SPACING['card_padding']}; box-shadow: {SPACING['card_shadow']}; border: 1px solid {COLORS['border']}; margin-top: 1.5rem;">
-            <div style="font-family: {TYPOGRAPHY['font_header']}; font-size: 16px; font-weight: 500; color: {COLORS['primary_text']}; margin-bottom: 0.75rem;">Downloads</div>
-        </div>
-        """
-    )
-
+    """Display the downloads section."""
+    st.subheader("Downloads")
     col1, col2 = st.columns(2)
     with col1:
         if csv_data:
@@ -474,7 +395,7 @@ def display_downloads(csv_data: bytes | None = None, chart_data: bytes | None = 
                 data=csv_data,
                 file_name="backtest_results.csv",
                 mime="text/csv",
-                use_container_width=True,
+                width='stretch',
             )
     with col2:
         if chart_data:
@@ -483,5 +404,5 @@ def display_downloads(csv_data: bytes | None = None, chart_data: bytes | None = 
                 data=chart_data,
                 file_name="backtest_chart.png",
                 mime="image/png",
-                use_container_width=True,
+                width='stretch',
             )
