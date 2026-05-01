@@ -63,7 +63,9 @@ def render_summary_statistics(
         results["portfolio_value"],
         capital,
         total_contributions=portfolio_total_contrib,
-        contributions_series=results["portfolio_contributions"] if (dca_freq and dca_amount) else None
+        contributions_series=(
+            results["portfolio_contributions"] if (dca_freq and dca_amount) else None
+        )
     )
 
     # Compute summaries for all benchmarks
@@ -74,7 +76,9 @@ def render_summary_statistics(
             bench_result['benchmark_value'],
             capital,
             total_contributions=benchmark_total_contrib,
-            contributions_series=bench_result["benchmark_contributions"] if (dca_freq and dca_amount) else None
+            contributions_series=(
+                bench_result["benchmark_contributions"] if (dca_freq and dca_amount) else None
+            )
         )
 
     # Display in columns
@@ -84,7 +88,9 @@ def render_summary_statistics(
         render_metrics_column(portfolio_summary, "Portfolio")
 
     with col2:
-        render_metrics_column(all_benchmark_summaries[benchmarks[0]], f"Benchmark ({benchmarks[0]})")
+        primary_bench_name = benchmarks[0]
+        primary_bench_summary = all_benchmark_summaries[primary_bench_name]
+        render_metrics_column(primary_bench_summary, f"Benchmark ({primary_bench_name})")
 
     with col3:
         render_relative_metrics(portfolio_summary, all_benchmark_summaries[benchmarks[0]])
@@ -130,7 +136,10 @@ def render_portfolio_info(
 
     # Display investment strategy
     if dca_freq and dca_amount:
-        st.info(f"📊 **Strategy**: Dollar-Cost Averaging ({dca_frequency}, ${dca_amount:,.2f}/contribution)")
+        st.info(
+            f"📊 **Strategy**: Dollar-Cost Averaging "
+            f"({dca_frequency}, ${dca_amount:,.2f}/contribution)"
+        )
     elif rebalance_freq:
         st.info(f"📊 **Strategy**: {rebalance_strategy}")
     else:
@@ -175,7 +184,10 @@ def render_charts(
     # Rolling Sharpe ratio analysis
     st.divider()
     st.subheader("📈 Rolling 12-Month Sharpe Ratio")
-    st.caption("💡 Rolling Sharpe ratio shows how risk-adjusted performance evolves over time (12-month window)")
+    st.caption(
+        "💡 Rolling Sharpe ratio shows how risk-adjusted performance "
+        "evolves over time (12-month window)"
+    )
 
     fig_sharpe = create_rolling_sharpe_chart(results, all_benchmark_results, benchmarks)
     st.plotly_chart(fig_sharpe, width='stretch')
@@ -244,9 +256,6 @@ def render_results(stored_results: Dict) -> None:
     benchmarks = stored_results['benchmarks']
     weights_array = stored_results['weights_array']
     capital = stored_results['capital']
-    rebalance_strategy = stored_results['rebalance_strategy']
-    rebalance_freq = stored_results['rebalance_freq']
-    dca_frequency = stored_results.get('dca_frequency')
     dca_freq = stored_results.get('dca_freq')
     dca_amount = stored_results.get('dca_amount')
 
@@ -259,12 +268,16 @@ def render_results(stored_results: Dict) -> None:
             results["portfolio_value"],
             capital,
             total_contributions=portfolio_total_contrib,
-            contributions_series=results["portfolio_contributions"] if (dca_freq and dca_amount) else None
+            contributions_series=(
+                results["portfolio_contributions"] if (dca_freq and dca_amount) else None
+            )
         )
 
     # Get start/end dates from the results DataFrame index
-    start_date = str(results.index[0].date()) if hasattr(results.index[0], 'date') else str(results.index[0])
-    end_date = str(results.index[-1].date()) if hasattr(results.index[-1], 'date') else str(results.index[-1])
+    idx_start = results.index[0]
+    idx_end = results.index[-1]
+    start_date = str(idx_start.date()) if hasattr(idx_start, 'date') else str(idx_start)
+    end_date = str(idx_end.date()) if hasattr(idx_end, 'date') else str(idx_end)
 
     # Compute summaries for all benchmarks
     all_benchmark_summaries = {}
@@ -275,12 +288,10 @@ def render_results(stored_results: Dict) -> None:
                 bench_result['benchmark_value'],
                 capital,
                 total_contributions=benchmark_total_contrib,
-                contributions_series=bench_result["benchmark_contributions"] if (dca_freq and dca_amount) else None
+                contributions_series=(
+                    bench_result["benchmark_contributions"] if (dca_freq and dca_amount) else None
+                )
             )
-
-    # Get start/end dates from the results DataFrame index
-    start_date = str(results.index[0].date()) if hasattr(results.index[0], 'date') else str(results.index[0])
-    end_date = str(results.index[-1].date()) if hasattr(results.index[-1], 'date') else str(results.index[-1])
 
     # ------------------------------------------------------------------
     # Hero Metrics Row
@@ -296,14 +307,16 @@ def render_results(stored_results: Dict) -> None:
     display_hero_metrics_row(hero_metrics)
 
     primary_benchmark_name = benchmarks[0] if benchmarks else None
-    if primary_benchmark_name and primary_benchmark_name in all_benchmark_summaries:
+    primary_bench_summary = all_benchmark_summaries.get(primary_benchmark_name)
+    if primary_bench_summary:
         st.markdown("**Benchmark ({})**".format(primary_benchmark_name))
+        b_sum = primary_bench_summary
         benchmark_hero_metrics = {
-            "Ending Value": f"${all_benchmark_summaries[primary_benchmark_name].get('ending_value', 0):,.2f}",
-            "Total Return": f"{all_benchmark_summaries[primary_benchmark_name].get('total_return', 0):+.2%}",
-            "CAGR": f"{all_benchmark_summaries[primary_benchmark_name].get('cagr', 0):+.2%}",
-            "Sharpe Ratio": f"{all_benchmark_summaries[primary_benchmark_name].get('sharpe_ratio', 0):.2f}",
-            "Max Drawdown": f"{all_benchmark_summaries[primary_benchmark_name].get('max_drawdown', 0):.2%}",
+            "Ending Value": f"${b_sum.get('ending_value', 0):,.2f}",
+            "Total Return": f"{b_sum.get('total_return', 0):+.2%}",
+            "CAGR": f"{b_sum.get('cagr', 0):+.2%}",
+            "Sharpe Ratio": f"{b_sum.get('sharpe_ratio', 0):.2f}",
+            "Max Drawdown": f"{b_sum.get('max_drawdown', 0):.2%}",
         }
         display_hero_metrics_row(benchmark_hero_metrics)
 

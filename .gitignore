@@ -10,3 +10,4 @@ charts/
 htmlcov/
 .DS_Store
 .benchmarks/
+.flake8
