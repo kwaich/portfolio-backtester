@@ -264,9 +264,24 @@ def render_results(stored_results: Dict) -> None:
     start_date = str(results.index[0].date()) if hasattr(results.index[0], 'date') else str(results.index[0])
     end_date = str(results.index[-1].date()) if hasattr(results.index[-1], 'date') else str(results.index[-1])
 
+    # Compute primary benchmark summary for hero metrics
+    benchmark_summary = {}
+    primary_benchmark_name = benchmarks[0] if benchmarks else None
+    if summarize is not None and primary_benchmark_name:
+        bench_result = all_benchmark_results.get(primary_benchmark_name)
+        if bench_result is not None:
+            benchmark_total_contrib = bench_result["benchmark_contributions"].iloc[-1]
+            benchmark_summary = summarize(
+                bench_result["benchmark_value"],
+                capital,
+                total_contributions=benchmark_total_contrib,
+                contributions_series=bench_result["benchmark_contributions"] if (dca_freq and dca_amount) else None
+            )
+
     # ------------------------------------------------------------------
     # Hero Metrics Row
     # ------------------------------------------------------------------
+    st.markdown("**Portfolio**")
     hero_metrics = {
         "Ending Value": f"${portfolio_summary.get('ending_value', 0):,.2f}",
         "Total Return": f"{portfolio_summary.get('total_return', 0):+.2%}",
@@ -275,6 +290,17 @@ def render_results(stored_results: Dict) -> None:
         "Max Drawdown": f"{portfolio_summary.get('max_drawdown', 0):.2%}",
     }
     display_hero_metrics_row(hero_metrics)
+
+    if benchmark_summary:
+        st.markdown("**Benchmark ({})**".format(primary_benchmark_name))
+        benchmark_hero_metrics = {
+            "Ending Value": f"${benchmark_summary.get('ending_value', 0):,.2f}",
+            "Total Return": f"{benchmark_summary.get('total_return', 0):+.2%}",
+            "CAGR": f"{benchmark_summary.get('cagr', 0):+.2%}",
+            "Sharpe Ratio": f"{benchmark_summary.get('sharpe_ratio', 0):.2f}",
+            "Max Drawdown": f"{benchmark_summary.get('max_drawdown', 0):.2%}",
+        }
+        display_hero_metrics_row(benchmark_hero_metrics)
 
     # ------------------------------------------------------------------
     # Portfolio Info Bar
