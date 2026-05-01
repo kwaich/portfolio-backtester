@@ -17,7 +17,7 @@ A lightweight, flexible Python utility for backtesting portfolio strategies agai
 - **Easy CLI**: Simple command-line interface with sensible defaults
 - **Data Quality Validation**: Automatic detection of data issues (missing values, invalid prices, extreme changes)
 - **Optimized Performance**: Batch downloads with per-ticker caching for faster multi-ticker operations
-- **Well-Tested**: Comprehensive suite (293 tests, see `docs/TESTING_GUIDE.md`) with 100% pass rate
+- **Well-Tested**: Comprehensive suite (404 tests, see `docs/TESTING_GUIDE.md`) with 100% pass rate
 
 ## Quick Start
 
@@ -220,6 +220,7 @@ The web UI includes a powerful ticker search feature:
 | `--output` | None | CSV file path for detailed results |
 | `--cache-ttl` | 24 | Cache time-to-live in hours (configurable freshness) |
 | `--no-cache` | False | Disable data caching entirely |
+| `--verbose` / `-v` | False | Enable DEBUG-level logging for detailed diagnostics |
 | `--rebalance` | None | Rebalancing frequency: D/daily, W/weekly, M/monthly, Q/quarterly, Y/yearly |
 | `--dca-amount` | None | Dollar-cost averaging: amount to contribute at each interval |
 | `--dca-freq` | None | DCA frequency: D/daily, W/weekly, M/monthly, Q/quarterly, Y/yearly (requires --dca-amount) |
@@ -424,9 +425,10 @@ This optimization is especially beneficial when:
 ```
 portfolio-backtester/
 ├── app.py                  # Streamlit web UI (backward compat wrapper)
-├── app/                    # Modular web UI package (12 modules)
+├── app/                    # Modular web UI package (13 modules)
 │   ├── __init__.py         # Package initialization
 │   ├── config.py           # Configuration constants (32 constants)
+│   ├── data_repository.py  # Repository pattern: DataRepository ABC + YahooFinance + Mock
 │   ├── presets.py          # Portfolio and date presets
 │   ├── validation.py       # Input validation and session defaults
 │   ├── state_manager.py    # Centralized Streamlit session state
@@ -439,12 +441,15 @@ portfolio-backtester/
 │   └── main.py             # Main application orchestration
 ├── backtest.py             # Core backtesting engine
 ├── plot_backtest.py        # Visualization utility
-├── tests/                  # Test suite (293 tests, ~88% coverage; see docs/TESTING_GUIDE.md)
+├── tests/                  # Test suite (404 tests, ~88% coverage; see docs/TESTING_GUIDE.md)
 │   ├── test_backtest.py    # Unit tests for backtest engine
 │   ├── test_app.py         # Streamlit UI regression suite
+│   ├── test_data_repository.py  # Repository pattern tests (cache, mocks, network)
 │   ├── test_state_manager.py
 │   ├── test_ticker_data.py
 │   ├── test_ticker_names.py
+│   ├── test_properties.py  # Hypothesis property-based tests
+│   ├── test_benchmarks.py  # pytest-benchmark performance baselines
 │   └── test_integration.py
 ├── requirements.txt        # Python dependencies
 ├── README.md               # This file
@@ -468,11 +473,12 @@ The Streamlit web UI is organized as a clean, modular package:
 
 **Module Breakdown**:
 - `config.py`: All configuration constants, colors, labels
+- `data_repository.py`: Repository pattern for data access — `DataRepository` ABC, `YahooFinanceRepository`, `MockRepository`
 - `presets.py`: Portfolio and date range presets
 - `validation.py`: Input validation, session state management
 - `state_manager.py`: Centralized session state with type validation
 - `ui_components.py`: Reusable metric and table rendering
-- `ticker_data.py`: Ticker search + Yahoo Finance integration
+- `ticker_data.py`: Ticker search + Yahoo Finance integration (delegates to repository)
 - `charts.py`: Plotly chart generation functions
 - `sidebar.py`: Form-based sidebar (90% fewer reruns)
 - `results.py`: Results display functions
@@ -487,7 +493,7 @@ The Streamlit web UI is organized as a clean, modular package:
 See [`docs/TESTING_GUIDE.md`](docs/TESTING_GUIDE.md) for the authoritative breakdown, coverage targets, and workflow. Quick commands:
 
 ```bash
-# Entire suite (293 tests, ~88% coverage)
+# Entire suite (404 tests, ~88% coverage)
 pytest -v
 
 # Focus on a single area
@@ -544,7 +550,7 @@ The codebase follows professional conventions and best practices:
 
 ## Data Source
 
-Historical price data is fetched from Yahoo Finance via the [yfinance](https://github.com/ranaroussi/yfinance) library. An internet connection is required for initial data downloads (cached data can be used offline).
+Historical price data is fetched from Yahoo Finance via the [yfinance](https://github.com/ranaroussi/yfinance) library. All data access is abstracted behind a `DataRepository` interface (`app/data_repository.py`), making it easy to swap sources (CSV, database, API) or inject mocks for testing. An internet connection is required for initial data downloads (cached data can be used offline).
 
 ## Limitations
 
