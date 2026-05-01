@@ -2,8 +2,8 @@
 
 **Review Date:** 2025-11-17 (last updated: 2026-04-30)
 **Branch:** `main`
-**Total Lines:** ~9,489 Python code
-**Test Coverage:** ~88% (293 tests, 100% pass rate ✅)
+**Total Lines:** ~9,200 Python code
+**Test Coverage:** ~88% (404 tests, 100% pass rate ✅)
 
 ---
 
@@ -51,6 +51,12 @@
 - **Issue #5 (Frequency normalization)**: ✅ **Confirmed Fixed**. `normalize_frequency()` is called at lines 726, 798, 1444, 1449 — no duplication remains.
 - **Issue #11 (Ticker search URL injection)**: ✅ **Not an Issue**. `requests.get(url, params=dict)` automatically URL-encodes query parameters; no manual sanitization needed.
 - **Issue #4 (StateManager validation)**: Duplicate of Issue #2 (already fixed). Marked below.
+
+## Review Update (2026-05-01)
+
+**Status:** Issue #14 implemented and committed.
+
+- **Issue #14 (Repository pattern)**: ✅ **FIXED**. Created `app/data_repository.py` with `DataRepository` ABC, `YahooFinanceRepository` (price download, caching, ticker search, name lookup), `MockRepository` for deterministic testing, and module-level singleton (`get_repository`/`set_repository`). Scope B (price + search + name lookup) + Option A (module singleton) per CODE_REVIEW.md recommendation. Backward-compatible wrappers retained for `load_cached_prices`/`save_cached_prices` in `backtest.py`.
 
 ---
 
@@ -630,61 +636,50 @@ Frequency options were plain dictionaries, duplicated across UI and CLI with no 
 
 ## Architecture Suggestions
 
-### 14. Consider Repository Pattern for Data Access
+### 14. ✅ FIXED: Repository Pattern for Data Access
 
-**Current:** Direct yfinance calls throughout code
-**Recommendation:** Abstract data access layer
+**Status:** ✅ **COMPLETED** (2026-05-01)
 
-```python
-# data_repository.py
-class PriceDataRepository:
-    """Abstract interface for price data access."""
+**Original:** Direct yfinance calls throughout `backtest.py` and `app/ticker_data.py`
 
-    def get_prices(
-        self,
-        tickers: List[str],
-        start_date: str,
-        end_date: str
-    ) -> pd.DataFrame:
-        """Get price data for tickers."""
-        raise NotImplementedError
+**Implementation:**
+Created `app/data_repository.py` with clean abstraction layer:
 
-class YahooFinanceRepository(PriceDataRepository):
-    """Yahoo Finance implementation."""
+- **`DataRepository` ABC** — three abstract methods: `get_prices`, `search_tickers`, `get_ticker_name`
+- **`YahooFinanceRepository`** — real implementation with:
+  - Per-ticker Parquet caching (migrated from `backtest.py`)
+  - Pickle-to-Parquet migration support
+  - yfinance batch download with `auto_adjust=True`
+  - Yahoo Finance autocomplete API for ticker search
+  - yfinance `Ticker.info` for name lookup
+- **`MockRepository`** — deterministic test implementation with call tracking
+- **Module-level singleton** — `get_repository()` (lazy init) + `set_repository()` (override)
 
-    def __init__(self, cache_manager: CacheManager):
-        self.cache_manager = cache_manager
+**Integration (Option A — module-level default):**
+- `backtest.download_prices` delegates to `get_repository().get_prices(...)`
+- `backtest.load_cached_prices` / `save_cached_prices` are backward-compatible wrappers delegating to `YahooFinanceRepository`
+- `app/ticker_data.py` `_get_ticker_name_impl` and `_search_yahoo_finance_impl` delegate to repository
+- Removed `_download_from_yfinance` and `_process_yfinance_data` from `backtest.py`
 
-    def get_prices(self, tickers, start_date, end_date):
-        # Check cache first
-        cached = self.cache_manager.get(tickers, start_date, end_date)
-        if cached is not None:
-            return cached
+**Test Coverage:** 404/404 tests passing (100% ✅)
+- 22 tests in `tests/test_data_repository.py` covering cache, download, MockRepository, network mocks, singleton
+- Existing tests updated to patch `app.data_repository` or use `MockRepository`
 
-        # Download from yfinance
-        data = self._download_from_yfinance(tickers, start_date, end_date)
-
-        # Cache for future use
-        self.cache_manager.set(tickers, start_date, end_date, data)
-
-        return data
-
-class MockRepository(PriceDataRepository):
-    """Mock implementation for testing."""
-
-    def get_prices(self, tickers, start_date, end_date):
-        # Return fake data for tests
-        return pd.DataFrame(...)
-```
+**Files Changed:**
+- `app/data_repository.py` (new)
+- `tests/test_data_repository.py` (new)
+- `backtest.py` (delegation, backward-compat wrappers)
+- `app/ticker_data.py` (delegation)
+- `tests/test_backtest.py`, `tests/test_integration.py`, `tests/test_ticker_data.py` (updated)
 
 **Benefits:**
-- Easier testing (no network calls)
-- Can swap data sources (CSV, database, API)
-- Clearer separation of concerns
+- ✅ Easier testing (MockRepository, no network calls in unit tests)
+- ✅ Can swap data sources (CSV, database, API) by implementing `DataRepository`
+- ✅ Clearer separation of concerns (I/O isolated from portfolio math)
+- ✅ 100% backward compatible (existing `load_cached_prices`/`save_cached_prices` still work)
 
 **Priority:** LOW
-**Effort:** 8-12 hours (significant refactoring)
-**Impact:** Medium - Better testability and flexibility
+**Effort:** ~3 hours (significantly less than estimated 8-12 due to focused Scope B + Option A)
 
 ---
 
@@ -744,7 +739,7 @@ ADR-00X: Migrate to Parquet for safer caching
 11. ✅ **Sanitize ticker search input** (Security) — Not an issue; `requests` handles encoding
 12. ✅ **Add property-based tests** (Test quality) — Fixed 2026-04-30
 13. ✅ **Add performance benchmarks** (Monitoring) — Fixed 2026-04-30
-14. ⬜ **Consider repository pattern** (Architecture)
+14. ✅ **Repository pattern** (Architecture) — Fixed 2026-05-01
 15. ⬜ **Document architectural decisions** (Knowledge transfer)
 
 ---
@@ -782,5 +777,5 @@ The recommendations above would elevate it from "excellent" to "outstanding" by 
 ---
 
 *Generated by Claude Code Review*
-*Initial review: 2025-11-17 | Last updated: 2026-04-30*
-*Issues 12 & 13 fixed: 2026-04-30*
+*Initial review: 2025-11-17 | Last updated: 2026-05-01*
+*Issues 12 & 13 fixed: 2026-04-30 | Issue 14 fixed: 2026-05-01*
