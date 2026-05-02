@@ -15,7 +15,7 @@ Add a small suite of end-to-end tests that launch the Streamlit app in a real br
 
 We create an `e2e/` directory with standalone Python scripts. Each script manages its own Streamlit subprocess lifecycle, opens a browser via `playwright.sync_api`, interacts with the UI, and asserts on page content.
 
-Mock data is injected through an existing hook: `app.data_repository.set_repository(MockRepository(...))`. A thin wrapper entry point (`e2e/run_app.py`) imports the real app, sets a mock repository with deterministic prices, and starts Streamlit. No production code is modified.
+Mock data is injected through an existing hook: `app.data_repository.set_repository(MockRepository(...))`. A thin wrapper entry point (`e2e/run_app.py`) adjusts `sys.path` so `app` and `backtest` modules resolve correctly when Streamlit launches from `e2e/`, sets a mock repository with deterministic prices, and calls `app.main.main()`. No production code is modified.
 
 ---
 
@@ -79,25 +79,25 @@ with StreamlitServer(entrypoint="e2e/run_app.py") as url:
 2. Navigate to app.
 3. In sidebar, enter ticker `AAPL`, weight `0.6`.
 4. Enter ticker `MSFT`, weight `0.4`.
-5. Leave dates at defaults (or set a known range).
+5. Set start date to `2020-01-01` and end date to `2020-12-31` (deterministic range).
 6. Click "Run Backtest".
 7. Wait for "Summary Statistics" heading.
-8. Assert page contains pre-calculated "Ending Value" and "CAGR".
+8. Assert page contains pre-calculated "Ending Value" (`$145,000.00`) and "CAGR" (`45.00%`).
 
 ### `test_preset_flow.py`
 1. Start server.
 2. Navigate to app.
 3. Select a portfolio preset (e.g., "VDCP/VHYD vs VWRA") from the dropdown.
-4. Assert ticker inputs are auto-populated.
+4. Assert the first ticker input contains a preset value (e.g., read widget value via Playwright locator).
 5. Click "Run Backtest".
-6. Wait for results and assert a metric is visible.
+6. Wait for "Summary Statistics" heading and assert "Ending Value" is visible.
 
 ### `test_error_handling.py`
 1. Start server.
 2. Navigate to app.
 3. Enter an invalid ticker (e.g., `INVALID123`).
 4. Click "Run Backtest".
-5. Assert an error message (e.g., "Invalid ticker") appears in the main content area.
+5. Assert the main content area contains "Ticker Validation Failed" (the `st.error()` title emitted by `_run_backtest()`).
 
 ### `test_dca_strategy.py`
 1. Start server.
