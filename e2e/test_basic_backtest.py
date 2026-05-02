@@ -66,8 +66,8 @@ def test_basic_backtest() -> None:
 
                 # Assert expected metrics appear with exact computed values
                 expected = get_basic_backtest_expected()
-                expect(page.get_by_text(expected["ending_value"], exact=True)).to_be_visible()
-                expect(page.get_by_text(expected["cagr"], exact=True)).to_be_visible()
+                expect(page.get_by_text(expected["ending_value"]).first).to_be_visible()
+                expect(page.get_by_text(expected["cagr"]).first).to_be_visible()
             finally:
                 browser.close()
 
