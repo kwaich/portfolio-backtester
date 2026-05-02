@@ -21,9 +21,9 @@ def test_basic_backtest() -> None:
     with streamlit_server() as url:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            page.set_viewport_size({"width": 1280, "height": 720})
             try:
+                page = browser.new_page()
+                page.set_viewport_size({"width": 1280, "height": 720})
                 page.goto(url)
 
                 # Wait for the sidebar form to render
@@ -66,8 +66,8 @@ def test_basic_backtest() -> None:
 
                 # Assert expected metrics appear with exact computed values
                 expected = get_basic_backtest_expected()
-                expect(page.get_by_text(expected["ending_value"])).to_be_visible()
-                expect(page.get_by_text(expected["cagr"])).to_be_visible()
+                expect(page.get_by_text(expected["ending_value"], exact=True)).to_be_visible()
+                expect(page.get_by_text(expected["cagr"], exact=True)).to_be_visible()
             finally:
                 browser.close()
 
