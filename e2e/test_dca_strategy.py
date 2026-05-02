@@ -14,6 +14,7 @@ from e2e.server import streamlit_server
 
 
 def test_dca_strategy() -> None:
+    """Test that DCA strategy inputs work and produce DCA-specific output."""
     with streamlit_server() as url:
         with sync_playwright() as p:
             with p.chromium.launch(headless=True) as browser:
@@ -39,19 +40,18 @@ def test_dca_strategy() -> None:
                 # so it only appears after the first submission)
                 page.get_by_role("button", name="Run Backtest").click()
 
-                # Wait for results from first run
-                page.wait_for_selector("text=Summary Statistics", timeout=30000)
-
-                # Now fill the DCA amount that appeared after form submission
+                # Wait for the DCA amount field to appear after form rerender
                 dca_amount = page.get_by_role("spinbutton", name="DCA Contribution Amount ($)")
+                dca_amount.wait_for(timeout=10000)
                 dca_amount.fill("1000")
 
                 # Click Run Backtest again with DCA amount set
                 page.get_by_role("button", name="Run Backtest").click()
 
-                # Wait for results and assert DCA-specific label
+                # Wait for results and assert DCA-specific labels
                 page.wait_for_selector("text=Summary Statistics", timeout=30000)
                 expect(page.get_by_text("Total Contributions").first).to_be_visible()
+                expect(page.get_by_text("IRR").first).to_be_visible()
 
 
 if __name__ == "__main__":
