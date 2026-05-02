@@ -19,6 +19,8 @@ def create_mock_prices(
     """
     dates = pd.bdate_range(start=start, end=end)
     n = len(dates)
+    if n < 2:
+        raise ValueError(f"Date range must span at least 2 business days, got {n}")
     data: dict[str, pd.Series] = {}
     for i, ticker in enumerate(tickers):
         # Slightly different slopes per ticker to avoid identical columns
@@ -34,9 +36,10 @@ def get_basic_backtest_expected() -> dict[str, str]:
     Uses AAPL + MSFT, 2020-01-01 to 2020-12-31, weights 0.6 / 0.4,
     capital $100,000.
     """
-    # These values will be verified empirically in the first test run
-    # and then hardcoded here.
+    # Computed from create_mock_prices(["AAPL", "MSFT"], start="2020-01-01",
+    # end="2020-12-31", start_price=100.0, end_price=150.0) with weights 0.6/0.4
+    # and capital $100,000 (buy-and-hold, no benchmark).
     return {
-        "ending_value": "$145,000.00",
-        "cagr": "45.00%",
+        "ending_value": "$152,000.00",
+        "cagr": "52.00%",
     }
