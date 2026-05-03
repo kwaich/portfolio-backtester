@@ -43,8 +43,7 @@ except ImportError as e:
 # Import app modules
 try:
     from .config import (
-        PAGE_TITLE, PAGE_ICON, PAGE_LAYOUT, SIDEBAR_STATE,
-        CUSTOM_CSS, MAIN_TITLE, SUBTITLE
+        PAGE_TITLE, PAGE_ICON, PAGE_LAYOUT, SIDEBAR_STATE
     )
     from .presets import get_portfolio_presets
     from .validation import (

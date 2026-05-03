@@ -5,22 +5,17 @@ These tests verify end-to-end workflows, edge cases, and system integration.
 
 from __future__ import annotations
 
-import tempfile
-from pathlib import Path
-from unittest.mock import patch, MagicMock
 from datetime import datetime, timedelta
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
 import pytest
 
-import backtest
 from backtest import (
-    download_prices,
     compute_metrics,
     summarize,
     validate_ticker,
-    validate_tickers,
     validate_date_string,
     validate_price_data,
 )
@@ -46,7 +41,9 @@ class TestEndToEndWorkflow:
         with patch.object(
             repo,
             "_get_cache_path",
-            side_effect=lambda tickers, start, end: tmp_path / repo._get_cache_key(tickers, start, end)
+            side_effect=lambda tickers, start, end: (
+                tmp_path / repo._get_cache_key(tickers, start, end)
+            )
         ):
             # First call: should download and cache
             prices1 = repo.get_prices(["AAPL"], "2023-01-01", "2023-12-31", use_cache=True)

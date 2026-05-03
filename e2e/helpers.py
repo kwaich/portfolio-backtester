@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import sys
-import traceback
 from pathlib import Path
 from typing import Callable
 
@@ -14,7 +13,7 @@ repo_root = Path(__file__).resolve().parent.parent
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from e2e.server import streamlit_server
+from e2e.server import streamlit_server  # noqa: E402
 
 
 def _screenshot_on_failure(page: Page, test_name: str) -> None:

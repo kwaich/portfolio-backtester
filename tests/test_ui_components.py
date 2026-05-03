@@ -1,9 +1,7 @@
 """Tests for app/ui_components.py display functions."""
 from __future__ import annotations
 
-from unittest.mock import MagicMock, call, patch
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 
 # ---------------------------------------------------------------------------
@@ -16,8 +14,9 @@ class TestDisplayWelcomeScreen:
         mock_col.__enter__ = lambda s: s
         mock_col.__exit__ = MagicMock(return_value=False)
 
-        with patch("streamlit.columns", return_value=[MagicMock(), mock_col, MagicMock()]) as mock_cols, \
-             patch("streamlit.markdown") as mock_md, \
+        cols = [MagicMock(), mock_col, MagicMock()]
+        with patch("streamlit.columns", return_value=cols) as mock_cols, \
+             patch("streamlit.markdown"), \
              patch("streamlit.caption"):
             from app.ui_components import display_welcome_screen
             display_welcome_screen()
@@ -200,8 +199,9 @@ class TestDisplayDownloads:
         return m
 
     def test_shows_subheader(self):
+        cols = [self._make_col_mock(), self._make_col_mock()]
         with patch("streamlit.subheader") as mock_sub, \
-             patch("streamlit.columns", return_value=[self._make_col_mock(), self._make_col_mock()]), \
+             patch("streamlit.columns", return_value=cols), \
              patch("streamlit.download_button"):
             from app.ui_components import display_downloads
             display_downloads()
@@ -209,8 +209,9 @@ class TestDisplayDownloads:
         mock_sub.assert_called_once_with("Downloads")
 
     def test_csv_button_shown_when_data_provided(self):
+        cols = [self._make_col_mock(), self._make_col_mock()]
         with patch("streamlit.subheader"), \
-             patch("streamlit.columns", return_value=[self._make_col_mock(), self._make_col_mock()]), \
+             patch("streamlit.columns", return_value=cols), \
              patch("streamlit.download_button") as mock_dl:
             from app.ui_components import display_downloads
             display_downloads(csv_data=b"data,here")
@@ -219,8 +220,9 @@ class TestDisplayDownloads:
         assert any("backtest_results.csv" in c for c in calls)
 
     def test_chart_button_shown_when_data_provided(self):
+        cols = [self._make_col_mock(), self._make_col_mock()]
         with patch("streamlit.subheader"), \
-             patch("streamlit.columns", return_value=[self._make_col_mock(), self._make_col_mock()]), \
+             patch("streamlit.columns", return_value=cols), \
              patch("streamlit.download_button") as mock_dl:
             from app.ui_components import display_downloads
             display_downloads(chart_data=b"\x89PNG")
@@ -229,8 +231,9 @@ class TestDisplayDownloads:
         assert any("backtest_chart.png" in c for c in calls)
 
     def test_no_buttons_when_no_data(self):
+        cols = [self._make_col_mock(), self._make_col_mock()]
         with patch("streamlit.subheader"), \
-             patch("streamlit.columns", return_value=[self._make_col_mock(), self._make_col_mock()]), \
+             patch("streamlit.columns", return_value=cols), \
              patch("streamlit.download_button") as mock_dl:
             from app.ui_components import display_downloads
             display_downloads()

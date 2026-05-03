@@ -12,14 +12,14 @@ from typing import Dict, List
 
 def get_portfolio_presets() -> Dict[str, Dict[str, any]]:
     """Return dictionary of predefined portfolio configurations.
-    
+
     Returns:
         Dictionary mapping portfolio names to their configurations.
         Each configuration contains:
         - tickers: List of ticker symbols
         - weights: List of portfolio weights
         - benchmark: Benchmark ticker symbol
-    
+
     Examples:
         >>> presets = get_portfolio_presets()
         >>> tech = presets["Tech Giants"]
@@ -62,11 +62,11 @@ def get_portfolio_presets() -> Dict[str, Dict[str, any]]:
 
 def get_date_presets() -> Dict[str, datetime]:
     """Return dictionary of predefined date ranges.
-    
+
     Returns:
         Dictionary mapping preset names to start dates.
         End date is always today.
-    
+
     Available presets:
         - "1Y": 1 year ago
         - "3Y": 3 years ago
@@ -74,14 +74,14 @@ def get_date_presets() -> Dict[str, datetime]:
         - "10Y": 10 years ago
         - "YTD": Start of current year
         - "Max": January 1, 2010
-    
+
     Examples:
         >>> presets = get_date_presets()
         >>> start_date = presets["5Y"]
         >>> # Returns datetime 5 years ago from today
     """
     today = datetime.today()
-    
+
     return {
         "1Y": today - timedelta(days=365),
         "3Y": today - timedelta(days=365 * 3),
@@ -94,7 +94,7 @@ def get_date_presets() -> Dict[str, datetime]:
 
 def get_portfolio_preset_names() -> List[str]:
     """Get list of all available portfolio preset names.
-    
+
     Returns:
         List of portfolio preset names
     """
@@ -103,7 +103,7 @@ def get_portfolio_preset_names() -> List[str]:
 
 def get_date_preset_names() -> List[str]:
     """Get list of all available date preset names.
-    
+
     Returns:
         List of date preset names
     """

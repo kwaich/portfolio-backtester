@@ -20,7 +20,7 @@ def get_query_params() -> Dict[str, Any]:
         Dictionary of parsed query parameters
 
     Examples:
-        >>> # URL: ?tickers=AAPL,MSFT&weights=0.6,0.4&benchmark=SPY
+        >>>  # URL: ?tickers=AAPL,MSFT&weights=0.6,0.4&benchmark=SPY
         >>> params = get_query_params()
         >>> params['tickers']
         ['AAPL', 'MSFT']
@@ -50,7 +50,9 @@ def get_query_params() -> Dict[str, Any]:
         # Parse benchmarks (multiple)
         if 'benchmarks' in query_params:
             benchmarks_str = query_params['benchmarks']
-            parsed['benchmarks'] = [b.strip().upper() for b in benchmarks_str.split(',') if b.strip()]
+            parsed['benchmarks'] = [
+                b.strip().upper() for b in benchmarks_str.split(',') if b.strip()
+            ]
 
         # Parse dates
         if 'start_date' in query_params:
@@ -78,7 +80,7 @@ def get_query_params() -> Dict[str, Any]:
 
         return parsed
 
-    except Exception as e:
+    except Exception:
         # If query params fail, return empty dict
         return {}
 
@@ -218,7 +220,9 @@ class ProgressTracker:
     """Context manager for tracking multi-step progress.
 
     Examples:
-        >>> with ProgressTracker(["Download data", "Compute metrics", "Generate charts"]) as tracker:
+        >>> with ProgressTracker([
+        ...     "Download data", "Compute metrics", "Generate charts"
+        ... ]) as tracker:
         ...     tracker.step("Download data")
         ...     # ... do work ...
         ...     tracker.step("Compute metrics")

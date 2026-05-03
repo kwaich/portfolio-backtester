@@ -130,8 +130,14 @@ class TestFrequencyEnums:
 
     def test_frequency_from_code_or_name(self):
         """Test lookup by code or name"""
-        assert backtest.RebalanceFrequency.from_code_or_name("M") == backtest.RebalanceFrequency.MONTHLY
-        assert backtest.RebalanceFrequency.from_code_or_name("monthly") == backtest.RebalanceFrequency.MONTHLY
+        assert (
+            backtest.RebalanceFrequency.from_code_or_name("M")
+            == backtest.RebalanceFrequency.MONTHLY
+        )
+        assert (
+            backtest.RebalanceFrequency.from_code_or_name("monthly")
+            == backtest.RebalanceFrequency.MONTHLY
+        )
         assert backtest.RebalanceFrequency.from_code_or_name("invalid") is None
         assert backtest.RebalanceFrequency.from_code_or_name(None) is None
 
@@ -180,7 +186,7 @@ class TestCacheFunctions:
         assert key1 != key2
 
     def test_cache_path_creation(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory():
             with patch("backtest.Path") as mock_path:
                 mock_cache_dir = MagicMock()
                 mock_path.return_value = mock_cache_dir
@@ -359,7 +365,9 @@ class TestSummarize:
 
     def test_dca_drawdown_not_triggered_by_contributions(self):
         dates = pd.date_range("2020-01-01", periods=6, freq="ME")
-        contributions = pd.Series([1000 * (i + 1) for i in range(len(dates))], index=dates, dtype=float)
+        contributions = pd.Series(
+            [1000 * (i + 1) for i in range(len(dates))], index=dates, dtype=float
+        )
         values = contributions.copy()  # portfolio value only grows via contributions
 
         stats = backtest.summarize(
@@ -376,7 +384,9 @@ class TestSummarize:
 
     def test_dca_drawdown_tracks_equity_decline(self):
         dates = pd.date_range("2020-01-01", periods=5, freq="ME")
-        contributions = pd.Series([1000 * (i + 1) for i in range(len(dates))], index=dates, dtype=float)
+        contributions = pd.Series(
+            [1000 * (i + 1) for i in range(len(dates))], index=dates, dtype=float
+        )
         values = pd.Series([1000, 2100, 3200, 2800, 3600], index=dates, dtype=float)
 
         stats = backtest.summarize(
@@ -751,7 +761,10 @@ class TestDateValidation:
                         ])
 
                     # Check for warning
-                    assert any("Short backtest period" in record.message for record in caplog.records)
+                    assert any(
+                        "Short backtest period" in record.message
+                        for record in caplog.records
+                    )
 
     def test_parse_args_with_date_validation(self):
         """Test that argparse uses date validation."""
@@ -1020,7 +1033,9 @@ class TestDCA:
         dca_amount = 1000
         dca_freq = "M"
 
-        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(prices, weights, capital, dca_amount, dca_freq)
+        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(
+            prices, weights, capital, dca_amount, dca_freq
+        )
 
         # Check that portfolio value increases due to contributions and price appreciation
         assert portfolio_value.iloc[0] > 0
@@ -1045,17 +1060,21 @@ class TestDCA:
         dca_amount = 500
         dca_freq = "W"
 
-        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(prices, weights, capital, dca_amount, dca_freq)
+        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(
+            prices, weights, capital, dca_amount, dca_freq
+        )
 
         # With constant price, portfolio value should equal total contributions
-        # DCA dates include first date + weekly dates (first date is added if not in weekly schedule)
+        # DCA dates include first date + weekly dates
+        # (first date is added if not in weekly schedule)
         weekly_dates = pd.date_range(dates[0], dates[-1], freq="W").intersection(dates)
         if dates[0] not in weekly_dates:
             num_dca_dates = len(weekly_dates) + 1  # Add 1 for initial date
         else:
             num_dca_dates = len(weekly_dates)
 
-        expected_value = capital + (dca_amount * (num_dca_dates - 1))  # -1 because first is initial capital
+        expected_value = capital + (dca_amount * (num_dca_dates - 1))
+        # -1 because first is initial capital
 
         # Check contributions match expected
         assert cumulative_contributions.iloc[-1] == expected_value
@@ -1075,7 +1094,9 @@ class TestDCA:
         dca_amount = 1000
         dca_freq = "M"
 
-        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(prices, weights, capital, dca_amount, dca_freq)
+        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(
+            prices, weights, capital, dca_amount, dca_freq
+        )
 
         # Check that contributions are split according to weights
         assert portfolio_value.iloc[0] == capital
@@ -1094,7 +1115,9 @@ class TestDCA:
         dca_amount = 1000
         dca_freq = "M"
 
-        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(prices, weights, capital, dca_amount, dca_freq)
+        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(
+            prices, weights, capital, dca_amount, dca_freq
+        )
 
         # Portfolio value should decline due to price decline
         # but cumulative contributions continue to grow
@@ -1109,13 +1132,13 @@ class TestDCA:
         weights = np.array([1.0])
         capital = 10000
         dca_amount = 1000
-        dca_freq = "M"
 
         # Test with very short period where no DCA dates are generated
-        short_dates = dates[:5]  # Only 5 days
         short_prices = prices.iloc[:5]
 
-        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(short_prices, weights, capital, dca_amount, "Q")
+        portfolio_value, cumulative_contributions = backtest._calculate_dca_portfolio(
+            short_prices, weights, capital, dca_amount, "Q"
+        )
 
         # Should have at least initial investment
         assert portfolio_value.iloc[0] == capital
@@ -1154,7 +1177,8 @@ class TestDCA:
         assert results['benchmark_value'].iloc[-1] > capital
 
         # Check contributions are tracked correctly
-        # DCA dates include first date + monthly dates (first date is added if not in monthly schedule)
+        # DCA dates include first date + monthly dates
+        # (first date is added if not in monthly schedule)
         monthly_dates = pd.date_range(dates[0], dates[-1], freq="ME").intersection(dates)
         if dates[0] not in monthly_dates:
             num_dca_dates = len(monthly_dates) + 1  # Add 1 for initial date
@@ -1460,7 +1484,11 @@ class TestMain:
                     }
 
                     # Weights that don't sum to 1, using C as benchmark
-                    backtest.main(["--tickers", "A", "B", "--weights", "2", "3", "--benchmark", "C"])
+                    backtest.main([
+                        "--tickers", "A", "B",
+                        "--weights", "2", "3",
+                        "--benchmark", "C"
+                    ])
 
                     # Check that normalized weights were passed
                     call_args = mock_compute.call_args
@@ -1472,7 +1500,6 @@ class TestMain:
         """Test that mismatched weights and tickers raises error"""
         with pytest.raises(SystemExit, match="Number of weights must match"):
             backtest.main(["--tickers", "A", "B", "--weights", "0.5"])
-
 
 
 class TestXIRR:
@@ -1590,7 +1617,10 @@ class TestAlignAndValidateData:
         # Ticker B starts later — result should start when both are available
         idx_a = pd.date_range("2020-01-01", periods=10, freq="D")
         idx_b = pd.date_range("2020-01-05", periods=6, freq="D")
-        prices = pd.DataFrame({"A": pd.Series(100.0, index=idx_a), "B": pd.Series(100.0, index=idx_b)})
+        prices = pd.DataFrame({
+            "A": pd.Series(100.0, index=idx_a),
+            "B": pd.Series(100.0, index=idx_b),
+        })
         benchmark = self._make_benchmark("2020-01-01", 10)
         aligned, bench = backtest._align_and_validate_data(prices, benchmark)
         assert aligned.index[0] == pd.Timestamp("2020-01-05")
@@ -1639,7 +1669,8 @@ class TestAlignAndValidateData:
 
     def test_raises_when_benchmark_ends_before_portfolio_starts(self):
         prices = self._make_prices("2020-02-01", 10)
-        benchmark = self._make_benchmark("2020-01-01", 10)  # ends 2020-01-10, before portfolio starts
+        benchmark = self._make_benchmark("2020-01-01", 10)
+        # ends 2020-01-10, before portfolio starts
         with pytest.raises(ValueError, match="Benchmark has no overlapping data"):
             backtest._align_and_validate_data(prices, benchmark)
 
@@ -1654,7 +1685,9 @@ class TestCalculateSeriesValue:
     def test_buy_and_hold_returns_constant_capital_with_flat_prices(self):
         prices = self._flat_prices()
         weights = np.array([0.5, 0.5])
-        value, contributions = backtest._calculate_series_value(prices, weights, 10_000, None, None, None)
+        value, contributions = backtest._calculate_series_value(
+            prices, weights, 10_000, None, None, None
+        )
         assert value.iloc[0] == pytest.approx(10_000.0)
         assert value.iloc[-1] == pytest.approx(10_000.0)
         assert (contributions == 10_000.0).all()
@@ -1670,7 +1703,9 @@ class TestCalculateSeriesValue:
     def test_dca_grows_with_regular_contributions(self):
         prices = self._flat_prices(periods=90, price=100.0)
         weights = np.array([0.5, 0.5])
-        value, contributions = backtest._calculate_series_value(prices, weights, 1_000, 500, "ME", None)
+        value, contributions = backtest._calculate_series_value(
+            prices, weights, 1_000, 500, "ME", None
+        )
         # With flat prices contributions accumulate and value grows
         assert value.iloc[-1] > 1_000.0
         assert contributions.iloc[-1] > 1_000.0
@@ -1687,21 +1722,29 @@ class TestCalculateSeriesValue:
     def test_contributions_constant_for_non_dca(self):
         prices = self._flat_prices()
         weights = np.array([0.5, 0.5])
-        _, contributions = backtest._calculate_series_value(prices, weights, 5_000, None, None, None)
+        _, contributions = backtest._calculate_series_value(
+            prices, weights, 5_000, None, None, None
+        )
         assert (contributions == 5_000.0).all()
 
     def test_contributions_constant_for_rebalancing(self):
         prices = self._flat_prices()
         weights = np.array([0.5, 0.5])
-        _, contributions = backtest._calculate_series_value(prices, weights, 5_000, None, None, "ME")
+        _, contributions = backtest._calculate_series_value(
+            prices, weights, 5_000, None, None, "ME"
+        )
         assert (contributions == 5_000.0).all()
 
     def test_dca_takes_precedence_over_rebalancing(self):
         # When both dca_freq and rebalance_freq are set, DCA path must win
         prices = self._flat_prices(periods=90)
         weights = np.array([0.5, 0.5])
-        value_dca, contribs_dca = backtest._calculate_series_value(prices, weights, 1_000, 500, "ME", None)
-        value_both, contribs_both = backtest._calculate_series_value(prices, weights, 1_000, 500, "ME", "ME")
+        value_dca, contribs_dca = backtest._calculate_series_value(
+            prices, weights, 1_000, 500, "ME", None
+        )
+        value_both, contribs_both = backtest._calculate_series_value(
+            prices, weights, 1_000, 500, "ME", "ME"
+        )
         pd.testing.assert_series_equal(value_dca, value_both)
         pd.testing.assert_series_equal(contribs_dca, contribs_both)
 
@@ -1739,8 +1782,12 @@ class TestCalculateRollingSharpeMLevel:
         weights = np.array([0.5, 0.5])
         benchmark = pd.Series(price_vals, index=idx)
         table = backtest.compute_metrics(prices, weights, benchmark, 10_000)
-        standalone = backtest._calculate_rolling_sharpe(table["portfolio_value"], 252, table["portfolio_contributions"])
-        pd.testing.assert_series_equal(standalone, table["portfolio_rolling_sharpe_12m"], check_names=False)
+        standalone = backtest._calculate_rolling_sharpe(
+            table["portfolio_value"], 252, table["portfolio_contributions"]
+        )
+        pd.testing.assert_series_equal(
+            standalone, table["portfolio_rolling_sharpe_12m"], check_names=False
+        )
 
 
 class TestPlotBacktestArgs:

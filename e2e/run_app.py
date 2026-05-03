@@ -13,11 +13,11 @@ from pathlib import Path
 repo_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(repo_root))
 
-from app.data_repository import MockRepository, set_repository
-from app.main import main
+from app.data_repository import MockRepository, set_repository  # noqa: E402
+from app.main import main  # noqa: E402
 
 # Import fixtures to build deterministic mock data
-from e2e.fixtures import create_mock_prices
+from e2e.fixtures import create_mock_prices  # noqa: E402
 
 # Build mock prices for the tickers used in e2e tests
 _mock_prices = create_mock_prices(

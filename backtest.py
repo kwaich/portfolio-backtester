@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import json
 import logging
 import re
 import sys
@@ -28,13 +27,6 @@ from typing import Any, Callable, List, Optional
 
 import numpy as np
 import pandas as pd
-
-try:
-    import yfinance as yf
-except ImportError as exc:  # pragma: no cover - dependency guard
-    raise SystemExit(
-        "Missing dependency yfinance. Install it via 'pip install yfinance'."
-    ) from exc
 
 try:
     from app.data_repository import get_repository, YahooFinanceRepository
@@ -62,13 +54,19 @@ def _setup_logging(verbose: bool = False) -> None:
     logging.getLogger().setLevel(level)
     logging.getLogger(__name__).setLevel(level)
 
+
 # Constants
-TRADING_DAYS_PER_YEAR = 252  # ~252 trading days/year (excludes weekends and ~9 market holidays)
-DEFAULT_CACHE_TTL_HOURS = 24  # Daily refresh; intraday price data changes every trading day
-CACHE_VERSION = "2.0"  # v2.0: Parquet format (was pickle in v1.0)
-MAX_DAILY_PRICE_CHANGE = 0.9  # 90% single-day move threshold; flags data errors (splits, bad prints)
-                              # while allowing extreme but legitimate moves
-ROLLING_SHARPE_WINDOW = 252  # ~12 months of trading days for rolling Sharpe calculation
+# ~252 trading days/year (excludes weekends and ~9 market holidays)
+TRADING_DAYS_PER_YEAR = 252
+# Daily refresh; intraday price data changes every trading day
+DEFAULT_CACHE_TTL_HOURS = 24
+# v2.0: Parquet format (was pickle in v1.0)
+CACHE_VERSION = "2.0"
+# 90% single-day move threshold; flags data errors (splits, bad prints)
+# while allowing extreme but legitimate moves
+MAX_DAILY_PRICE_CHANGE = 0.9
+# ~12 months of trading days for rolling Sharpe calculation
+ROLLING_SHARPE_WINDOW = 252
 
 
 class _FrequencyBase(Enum):
@@ -373,20 +371,29 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
         type=str,
         default=None,
         choices=RebalanceFrequency.get_choices(),
-        help="Rebalancing frequency: D/daily, W/weekly, M/monthly, Q/quarterly, Y/yearly (default: None = buy-and-hold)",
+        help=(
+            "Rebalancing frequency: D/daily, W/weekly, M/monthly, "
+            "Q/quarterly, Y/yearly (default: None = buy-and-hold)"
+        ),
     )
     parser.add_argument(
         "--dca-amount",
         type=float,
         default=None,
-        help="Dollar-cost averaging: amount to contribute at each interval (default: None = lump sum)",
+        help=(
+            "Dollar-cost averaging: amount to contribute at each interval "
+            "(default: None = lump sum)"
+        ),
     )
     parser.add_argument(
         "--dca-freq",
         type=str,
         default=None,
         choices=DcaFrequency.get_choices(),
-        help="DCA frequency: D/daily, W/weekly, M/monthly, Q/quarterly, Y/yearly (requires --dca-amount)",
+        help=(
+            "DCA frequency: D/daily, W/weekly, M/monthly, "
+            "Q/quarterly, Y/yearly (requires --dca-amount)"
+        ),
     )
     parser.add_argument(
         "--verbose", "-v",
@@ -432,7 +439,9 @@ def get_cache_path(tickers: List[str], start: str, end: str) -> Path:
     return cache_dir / cache_key
 
 
-def load_cached_prices(cache_path: Path, max_age_hours: int = DEFAULT_CACHE_TTL_HOURS) -> pd.DataFrame | None:
+def load_cached_prices(
+    cache_path: Path, max_age_hours: int = DEFAULT_CACHE_TTL_HOURS
+) -> pd.DataFrame | None:
     """Load cached price data if it exists and is not stale.
 
     Backward-compatible wrapper around the default repository.
@@ -451,8 +460,6 @@ def save_cached_prices(cache_path: Path, prices: pd.DataFrame) -> None:
     repo = get_repository()
     if isinstance(repo, YahooFinanceRepository):
         repo.save_cached_prices(cache_path, prices)
-
-
 
 
 def validate_price_data(
@@ -530,7 +537,6 @@ def validate_price_data(
         )
 
 
-
 def download_prices(
     tickers: List[str],
     start: str,
@@ -559,7 +565,9 @@ def download_prices(
     validate_tickers(tickers)
 
     repo = get_repository()
-    prices = repo.get_prices(tickers, start, end, use_cache=use_cache, cache_ttl_hours=cache_ttl_hours)
+    prices = repo.get_prices(
+        tickers, start, end, use_cache=use_cache, cache_ttl_hours=cache_ttl_hours
+    )
 
     validate_price_data(prices, tickers)
     return prices
@@ -599,7 +607,10 @@ def _calculate_rebalanced_portfolio(
     rebalance_dates = rebalance_dates.intersection(prices.index)
 
     if len(rebalance_dates) == 0:
-        logger.warning(f"No rebalancing dates found for frequency '{rebalance_freq}'. Using buy-and-hold.")
+        logger.warning(
+            f"No rebalancing dates found for frequency '{rebalance_freq}'. "
+            "Using buy-and-hold."
+        )
         first_prices = prices.iloc[0]
         units = (capital * weights) / first_prices
         return (prices * units).sum(axis=1)
@@ -618,7 +629,10 @@ def _calculate_rebalanced_portfolio(
             # Rebalance: allocate current_value according to target weights
             current_prices = prices.loc[date]
             current_units = (current_value * weights) / current_prices
-            logger.debug(f"Rebalancing on {date.strftime('%Y-%m-%d')}: portfolio value = ${current_value:,.2f}")
+            logger.debug(
+                f"Rebalancing on {date.strftime('%Y-%m-%d')}: "
+                f"portfolio value = ${current_value:,.2f}"
+            )
 
         # Calculate portfolio value for this date
         current_value = (prices.loc[date] * current_units).sum()
@@ -681,7 +695,9 @@ def _calculate_dca_portfolio(
             continue
 
         actual_date = available_dates[0]
-        contribution_schedule[actual_date] = contribution_schedule.get(actual_date, 0.0) + contribution
+        contribution_schedule[actual_date] = (
+            contribution_schedule.get(actual_date, 0.0) + contribution
+        )
 
     dca_dates = pd.DatetimeIndex(sorted(contribution_schedule.keys()))
 
@@ -878,7 +894,12 @@ def compute_metrics(
     """
     aligned, benchmark = _align_and_validate_data(prices, benchmark)
 
-    if dca_freq is not None and dca_amount is not None and dca_amount > 0 and rebalance_freq is not None:
+    if (
+        dca_freq is not None
+        and dca_amount is not None
+        and dca_amount > 0
+        and rebalance_freq is not None
+    ):
         logger.warning(
             "Both DCA and rebalancing specified. Using DCA strategy only. "
             "DCA and rebalancing are mutually exclusive."
@@ -908,8 +929,12 @@ def compute_metrics(
             "active_return": portfolio_return - bench_return,
         }
     )
-    table["portfolio_rolling_sharpe_12m"] = _calculate_rolling_sharpe(portfolio_value, window, portfolio_contributions)
-    table["benchmark_rolling_sharpe_12m"] = _calculate_rolling_sharpe(bench_value, window, bench_contributions)
+    table["portfolio_rolling_sharpe_12m"] = _calculate_rolling_sharpe(
+        portfolio_value, window, portfolio_contributions
+    )
+    table["benchmark_rolling_sharpe_12m"] = _calculate_rolling_sharpe(
+        bench_value, window, bench_contributions
+    )
 
     logger.info(
         f"Calculated rolling 12-month Sharpe ratio "
@@ -919,8 +944,15 @@ def compute_metrics(
     return table
 
 
-def _calculate_xirr(cashflows: np.ndarray, dates_in_days: np.ndarray, guess: float = 0.1, max_iterations: int = 100, tolerance: float = 1e-6) -> float:
-    """Calculate XIRR (time-weighted Internal Rate of Return) using Newton-Raphson with Bisection fallback.
+def _calculate_xirr(
+    cashflows: np.ndarray,
+    dates_in_days: np.ndarray,
+    guess: float = 0.1,
+    max_iterations: int = 100,
+    tolerance: float = 1e-6,
+) -> float:
+    """Calculate XIRR (time-weighted Internal Rate of Return)
+    using Newton-Raphson with Bisection fallback.
 
     Args:
         cashflows: Array of cashflows (negative for outflows, positive for inflows)
@@ -959,7 +991,7 @@ def _calculate_xirr(cashflows: np.ndarray, dates_in_days: np.ndarray, guess: flo
             years = days / 365.0
             # Protect against domain errors
             if rate <= -1.0:
-                discount_factor = (1e-9) ** years # Avoid zero/negative base
+                discount_factor = (1e-9) ** years  # Avoid zero/negative base
             else:
                 discount_factor = (1 + rate) ** years
 
@@ -972,7 +1004,7 @@ def _calculate_xirr(cashflows: np.ndarray, dates_in_days: np.ndarray, guess: flo
             return rate
 
         if abs(npv_derivative) < 1e-10:
-            break # Derivative too small, switch to fallback
+            break  # Derivative too small, switch to fallback
 
         new_rate = rate - npv / npv_derivative
 
@@ -986,10 +1018,10 @@ def _calculate_xirr(cashflows: np.ndarray, dates_in_days: np.ndarray, guess: flo
     # Search range: -99% to 1000%
     # We use a grid to find a sign change, as the function might not be monotonic
     # or might have multiple roots. We want the one closest to the guess or 0.
-    
+
     # Grid points to check for sign changes
     grid = [-0.99, -0.9, -0.75, -0.5, -0.25, -0.1, 0.0, 0.1, 0.25, 0.5, 0.75, 1.0, 2.0, 5.0, 10.0]
-    
+
     def calculate_npv(r):
         val = 0.0
         for cf, days in zip(cashflows, dates_in_days):
@@ -1008,24 +1040,26 @@ def _calculate_xirr(cashflows: np.ndarray, dates_in_days: np.ndarray, guess: flo
         r2 = grid[i+1]
         npv1 = calculate_npv(r1)
         npv2 = calculate_npv(r2)
-        
+
         if npv1 * npv2 <= 0:
             low_bound = r1
             high_bound = r2
             found_bracket = True
             break
-            
+
     if not found_bracket:
-        logger.warning(f"XIRR: No sign change found in grid search between {min(grid):.0%} and {max(grid):.0%}. Returning None.")
+        logger.warning(
+            f"XIRR: No sign change found in grid search "
+            f"between {min(grid):.0%} and {max(grid):.0%}. Returning None."
+        )
         return None
 
     # Bisection on the found bracket
     low = low_bound
     high = high_bound
 
-    # Cache NPV values at bracket endpoints to avoid redundant calculations
+    # Cache NPV value at low endpoint to avoid redundant calculations
     npv_low = calculate_npv(low)
-    npv_high = calculate_npv(high)
 
     for _ in range(max_iterations):
         mid = (low + high) / 2
@@ -1038,17 +1072,21 @@ def _calculate_xirr(cashflows: np.ndarray, dates_in_days: np.ndarray, guess: flo
         if npv_low * npv_mid < 0:
             # Root is between low and mid
             high = mid
-            npv_high = npv_mid
         else:
             # Root is between mid and high
             low = mid
             npv_low = npv_mid
 
-    logger.warning(f"XIRR calculation did not converge (Bisection). Returning best guess {mid:.2%}.")
+    logger.warning(
+        "XIRR calculation did not converge (Bisection). "
+        f"Returning best guess {mid:.2%}."
+    )
     return mid
 
 
-def _calculate_daily_returns(series: pd.Series, contributions_series: Optional[pd.Series] = None) -> pd.Series:
+def _calculate_daily_returns(
+    series: pd.Series, contributions_series: Optional[pd.Series] = None
+) -> pd.Series:
     """Calculate daily returns, optionally removing contribution effects."""
     if series.empty:
         return pd.Series(dtype=float)
@@ -1195,7 +1233,8 @@ def summarize(
     # Calculate IRR for DCA strategies (more accurate than CAGR)
     irr = None
     if contributions_series is not None:
-        # Build cashflow array: contributions as outflows (negative), final value as inflow (positive)
+        # Build cashflow array: contributions as outflows (negative),
+        # final value as inflow (positive)
         contrib_changes = contributions_series.diff().fillna(contributions_series.iloc[0])
 
         # Find dates where contributions occurred (non-zero changes)
@@ -1246,7 +1285,11 @@ def summarize(
 
     # Sortino ratio (downside deviation only)
     downside_returns = daily_returns[daily_returns < 0]
-    downside_std = downside_returns.std() * np.sqrt(TRADING_DAYS_PER_YEAR) if len(downside_returns) > 0 else 0.0
+    downside_std = (
+        downside_returns.std() * np.sqrt(TRADING_DAYS_PER_YEAR)
+        if len(downside_returns) > 0
+        else 0.0
+    )
     sortino_ratio = (annualized_return / downside_std) if downside_std > 0 else 0.0
 
     metrics = {
@@ -1326,7 +1369,9 @@ def main(argv: List[str]) -> None:
     dca_freq = normalize_frequency(dca_freq)
 
     # Validate DCA parameters
-    if (dca_freq is not None and dca_amount is None) or (dca_amount is not None and dca_freq is None):
+    if (dca_freq is not None and dca_amount is None) or (
+        dca_amount is not None and dca_freq is None
+    ):
         raise SystemExit("DCA requires both --dca-amount and --dca-freq to be specified")
 
     if dca_amount is not None and dca_amount <= 0:
@@ -1373,7 +1418,9 @@ def main(argv: List[str]) -> None:
     print(f"Benchmark: {args.benchmark}")
 
     # Show strategy
-    rebalance_names = {k: v for k, v in RebalanceFrequency.get_code_to_display().items() if k is not None}
+    rebalance_names = {
+        k: v for k, v in RebalanceFrequency.get_code_to_display().items() if k is not None
+    }
     dca_names = {k: v for k, v in DcaFrequency.get_code_to_display().items() if k is not None}
     freq_names = {**rebalance_names, **dca_names}
     if dca_freq and dca_amount:
@@ -1383,7 +1430,7 @@ def main(argv: List[str]) -> None:
         strategy_name = freq_names.get(rebalance_freq, rebalance_freq)
         print(f"Strategy: {strategy_name} Rebalancing")
     else:
-        print(f"Strategy: Buy-and-Hold")
+        print("Strategy: Buy-and-Hold")
 
     print("-"*70)
 

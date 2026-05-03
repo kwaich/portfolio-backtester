@@ -8,7 +8,7 @@ lazy search from Yahoo Finance.
 from __future__ import annotations
 
 import logging
-from typing import List, Optional
+from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -243,7 +243,7 @@ if HAS_STREAMLIT:
         """Clear the get_ticker_name cache (Streamlit version)."""
         try:
             get_ticker_name.clear()
-        except:
+        except Exception:
             pass  # Streamlit cache might not support clear() in all versions
 
     get_ticker_name.cache_clear = _clear_ticker_name_cache
@@ -301,7 +301,7 @@ if HAS_STREAMLIT:
         """Clear the search_yahoo_finance cache (Streamlit version)."""
         try:
             search_yahoo_finance.clear()
-        except:
+        except Exception:
             pass  # Streamlit cache might not support clear() in all versions
 
     search_yahoo_finance.cache_clear = _clear_yahoo_search_cache

@@ -8,7 +8,6 @@ import time
 from pathlib import Path
 from unittest.mock import patch
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -17,7 +16,6 @@ from app.data_repository import (
     MockRepository,
     get_repository,
     set_repository,
-    DataRepository,
     DEFAULT_CACHE_TTL_HOURS,
 )
 

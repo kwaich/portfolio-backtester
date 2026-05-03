@@ -9,26 +9,26 @@ centralized widget state API, reducing complexity.
 
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Dict
 
 import streamlit as st
 import pandas as pd
 
 from .config import METRIC_LABELS
-from .ticker_data import get_all_tickers, format_ticker_option, search_tickers_with_yahoo, get_ticker_name
+from .ticker_data import search_tickers_with_yahoo, get_ticker_name
 from .state_manager import StateManager
 
 
 def format_metric_value(key: str, value: float) -> str:
     """Format metric value based on metric type.
-    
+
     Args:
         key: Metric key (e.g., 'cagr', 'sharpe_ratio')
         value: Metric value to format
-    
+
     Returns:
         Formatted string representation of the value
-    
+
     Examples:
         >>> format_metric_value("ending_value", 150000.5)
         '$150,000.50'
@@ -47,28 +47,31 @@ def format_metric_value(key: str, value: float) -> str:
         return f"{value:.2f}"
 
 
-def render_metric(key: str, value: float, label: str = None, delta: str = None, delta_color: str = "normal") -> None:
+def render_metric(
+    key: str, value: float, label: str = None,
+    delta: str = None, delta_color: str = "normal"
+) -> None:
     """Render a single metric with appropriate formatting.
-    
+
     Args:
         key: Metric key for determining format
         label: Optional custom label (uses METRIC_LABELS if not provided)
         value: Metric value
         delta: Optional delta value to display
         delta_color: Color for delta ("normal", "inverse", "off")
-    
+
     Examples:
         >>> render_metric("cagr", 0.0856)
         # Displays "CAGR: 8.56%"
-        
+
         >>> render_metric("sharpe_ratio", 1.234, delta="0.5", delta_color="normal")
         # Displays "Sharpe Ratio: 1.234" with green +0.5 delta
     """
     if label is None:
         label = METRIC_LABELS.get(key, key)
-    
+
     formatted_value = format_metric_value(key, value)
-    
+
     if delta is not None:
         st.metric(label, formatted_value, delta=delta, delta_color=delta_color)
     else:
@@ -77,11 +80,11 @@ def render_metric(key: str, value: float, label: str = None, delta: str = None, 
 
 def render_metrics_column(summary: Dict[str, float], title: str) -> None:
     """Render a column of metrics.
-    
+
     Args:
         summary: Dictionary of metric keys and values
         title: Column title (e.g., "Portfolio", "Benchmark")
-    
+
     Examples:
         >>> summary = {
         ...     "ending_value": 150000,
@@ -92,7 +95,7 @@ def render_metrics_column(summary: Dict[str, float], title: str) -> None:
         # Renders markdown header and all metrics
     """
     st.markdown(f"### {title}")
-    
+
     for key, value in summary.items():
         label = METRIC_LABELS.get(key, key)
         formatted_value = format_metric_value(key, value)
@@ -104,11 +107,11 @@ def render_relative_metrics(
     benchmark_summary: Dict[str, float]
 ) -> None:
     """Render relative performance metrics with delta indicators.
-    
+
     Args:
         portfolio_summary: Portfolio metrics dictionary
         benchmark_summary: Benchmark metrics dictionary
-    
+
     The function calculates and displays:
     - Excess Return (portfolio - benchmark)
     - Excess CAGR
@@ -117,7 +120,7 @@ def render_relative_metrics(
     - Sortino Difference
     """
     st.markdown("### Relative Performance")
-    
+
     # Excess Return
     excess_return = portfolio_summary["total_return"] - benchmark_summary["total_return"]
     st.metric(
@@ -126,7 +129,7 @@ def render_relative_metrics(
         delta=f"{excess_return:.2%}",
         delta_color="normal"
     )
-    
+
     # Excess CAGR
     excess_cagr = portfolio_summary["cagr"] - benchmark_summary["cagr"]
     st.metric(
@@ -154,7 +157,7 @@ def render_relative_metrics(
         delta=f"{vol_diff:.2%}",
         delta_color="inverse"  # Lower is better for volatility
     )
-    
+
     # Sharpe Difference
     sharpe_diff = portfolio_summary["sharpe_ratio"] - benchmark_summary["sharpe_ratio"]
     st.metric(
@@ -163,7 +166,7 @@ def render_relative_metrics(
         delta=f"{sharpe_diff:.3f}",
         delta_color="normal"
     )
-    
+
     # Sortino Difference
     sortino_diff = portfolio_summary["sortino_ratio"] - benchmark_summary["sortino_ratio"]
     st.metric(
@@ -342,7 +345,10 @@ def display_section_header(title: str) -> None:
     st.subheader(title)
 
 
-def display_info_bar(portfolio_tickers: list[str], weights: list[float], benchmarks: list[str], start_date: str, end_date: str) -> None:
+def display_info_bar(
+    portfolio_tickers: list[str], weights: list[float],
+    benchmarks: list[str], start_date: str, end_date: str
+) -> None:
     """Display a compact portfolio info bar."""
     if not portfolio_tickers or not weights:
         return
@@ -376,11 +382,15 @@ def display_metrics_tables(performance: dict[str, str], risk: dict[str, str]) ->
     col1, col2 = st.columns(2)
     with col1:
         st.caption("PERFORMANCE")
-        perf_df = pd.DataFrame({"Metric": list(performance.keys()), "Value": list(performance.values())})
+        perf_df = pd.DataFrame({
+            "Metric": list(performance.keys()), "Value": list(performance.values())
+        })
         st.dataframe(perf_df, hide_index=True, width='stretch')
     with col2:
         st.caption("RISK")
-        risk_df = pd.DataFrame({"Metric": list(risk.keys()), "Value": list(risk.values())})
+        risk_df = pd.DataFrame({
+            "Metric": list(risk.keys()), "Value": list(risk.values())
+        })
         st.dataframe(risk_df, hide_index=True, width='stretch')
 
 

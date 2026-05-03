@@ -9,7 +9,6 @@ Tests ticker data functionality including:
 from __future__ import annotations
 
 import sys
-import pytest
 from unittest.mock import patch, Mock, MagicMock
 import requests
 
@@ -17,6 +16,7 @@ import requests
 from functools import lru_cache
 
 streamlit_mock = MagicMock()
+
 
 def mock_cache_data(*args, **kwargs):
     """Mock cache_data that actually caches using lru_cache."""
@@ -28,11 +28,12 @@ def mock_cache_data(*args, **kwargs):
         return cached_func
     return decorator
 
+
 streamlit_mock.cache_data = mock_cache_data
 streamlit_mock.query_params = {}
 sys.modules['streamlit'] = streamlit_mock
 
-from app.ticker_data import (
+from app.ticker_data import (  # noqa: E402
     get_all_tickers,
     get_ticker_symbols,
     search_tickers,
@@ -385,7 +386,7 @@ class TestCombinedSearch:
         ]
 
         # Search for something that might not be in curated list
-        results = search_tickers_with_yahoo("rare", limit=10)
+        search_tickers_with_yahoo("rare", limit=10)
 
         # Should call Yahoo Finance for supplemental results
         assert mock_yahoo.called

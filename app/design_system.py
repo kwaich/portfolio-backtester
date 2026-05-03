@@ -62,11 +62,13 @@ SPACING = {
 # Global CSS injection
 # ---------------------------------------------------------------------------
 
+
 def get_global_css() -> str:
     """Return the full <style> block for injection via st.markdown."""
     return f"""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&'
+                'family=Outfit:wght@500;600;700&display=swap');
 
     html, body, [class*="css"] {{
         font-family: {TYPOGRAPHY["font_body"]};

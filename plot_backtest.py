@@ -40,6 +40,7 @@ def _setup_logging(verbose: bool = False) -> None:
     logging.getLogger().setLevel(level)
     logging.getLogger(__name__).setLevel(level)
 
+
 # Colorblind-friendly color scheme (Wong palette)
 # Avoids problematic blue-purple and red-green combinations
 PORTFOLIO_COLOR = "#0173B2"  # Blue
@@ -210,7 +211,10 @@ def create_returns_plot(df: pd.DataFrame, style: str) -> tuple:
         label="Benchmark"
     )
 
-    ax.axhline(0, color='black', linewidth=REFERENCE_LINE_WIDTH, linestyle='-', alpha=REFERENCE_OPACITY)
+    ax.axhline(
+        0, color='black', linewidth=REFERENCE_LINE_WIDTH,
+        linestyle='-', alpha=REFERENCE_OPACITY
+    )
     ax.set_title("Cumulative Returns Comparison", fontsize=TITLE_FONT_SIZE, fontweight='bold')
     ax.set_ylabel("Return (%)", fontsize=AXIS_LABEL_FONT_SIZE)
     ax.set_xlabel("Date", fontsize=AXIS_LABEL_FONT_SIZE)
@@ -264,11 +268,19 @@ def create_active_return_plot(df: pd.DataFrame, style: str) -> tuple:
     )
 
     # Plot the line
-    active_return_pct.plot(ax=ax, color=ACTIVE_COLOR, linewidth=PORTFOLIO_LINE_WIDTH,
-                          alpha=PORTFOLIO_OPACITY, label="Active Return")
+    active_return_pct.plot(
+        ax=ax, color=ACTIVE_COLOR, linewidth=PORTFOLIO_LINE_WIDTH,
+        alpha=PORTFOLIO_OPACITY, label="Active Return"
+    )
 
-    ax.axhline(0, color='black', linewidth=REFERENCE_LINE_WIDTH, linestyle='-', alpha=REFERENCE_OPACITY)
-    ax.set_title("Active Return (Portfolio - Benchmark)", fontsize=TITLE_FONT_SIZE, fontweight='bold')
+    ax.axhline(
+        0, color='black', linewidth=REFERENCE_LINE_WIDTH,
+        linestyle='-', alpha=REFERENCE_OPACITY
+    )
+    ax.set_title(
+        "Active Return (Portfolio - Benchmark)",
+        fontsize=TITLE_FONT_SIZE, fontweight='bold'
+    )
     ax.set_ylabel("Active Return (%)", fontsize=AXIS_LABEL_FONT_SIZE)
     ax.set_xlabel("Date", fontsize=AXIS_LABEL_FONT_SIZE)
     ax.legend(loc="upper left", framealpha=0.9, fontsize=LEGEND_FONT_SIZE)
@@ -319,12 +331,19 @@ def create_drawdown_plot(df: pd.DataFrame, style: str) -> tuple:
     )
 
     # Plot lines
-    portfolio_dd.plot(ax=ax, color=PORTFOLIO_COLOR, linewidth=PORTFOLIO_LINE_WIDTH,
-                     linestyle='-', alpha=PORTFOLIO_OPACITY)
-    benchmark_dd.plot(ax=ax, color=BENCHMARK_COLOR, linewidth=BENCHMARK_LINE_WIDTH,
-                     linestyle='--', alpha=BENCHMARK_OPACITY)
+    portfolio_dd.plot(
+        ax=ax, color=PORTFOLIO_COLOR, linewidth=PORTFOLIO_LINE_WIDTH,
+        linestyle='-', alpha=PORTFOLIO_OPACITY
+    )
+    benchmark_dd.plot(
+        ax=ax, color=BENCHMARK_COLOR, linewidth=BENCHMARK_LINE_WIDTH,
+        linestyle='--', alpha=BENCHMARK_OPACITY
+    )
 
-    ax.axhline(0, color='black', linewidth=REFERENCE_LINE_WIDTH, linestyle='-', alpha=REFERENCE_OPACITY)
+    ax.axhline(
+        0, color='black', linewidth=REFERENCE_LINE_WIDTH,
+        linestyle='-', alpha=REFERENCE_OPACITY
+    )
     ax.set_title("Drawdown Over Time", fontsize=TITLE_FONT_SIZE, fontweight='bold')
     ax.set_ylabel("Drawdown (%)", fontsize=AXIS_LABEL_FONT_SIZE)
     ax.set_xlabel("Date", fontsize=AXIS_LABEL_FONT_SIZE)
@@ -373,7 +392,10 @@ def create_rolling_sharpe_plot(df: pd.DataFrame, style: str) -> tuple:
     fig, ax = plt.subplots(figsize=(12, 5))
 
     # Check if rolling Sharpe columns exist
-    if 'portfolio_rolling_sharpe_12m' not in df.columns or 'benchmark_rolling_sharpe_12m' not in df.columns:
+    if (
+        'portfolio_rolling_sharpe_12m' not in df.columns
+        or 'benchmark_rolling_sharpe_12m' not in df.columns
+    ):
         logger.warning("Rolling Sharpe columns not found in CSV. Skipping rolling Sharpe plot.")
         plt.close(fig)
         return None, None
@@ -397,11 +419,18 @@ def create_rolling_sharpe_plot(df: pd.DataFrame, style: str) -> tuple:
     )
 
     # Add reference lines (using colorblind-safe teal color)
-    ax.axhline(0, color='black', linewidth=REFERENCE_LINE_WIDTH, linestyle='-', alpha=REFERENCE_OPACITY)
-    ax.axhline(1, color='#029E73', linewidth=REFERENCE_LINE_WIDTH, linestyle='--',
-              alpha=REFERENCE_OPACITY, label="Sharpe = 1")
-    ax.axhline(2, color='#029E73', linewidth=REFERENCE_LINE_WIDTH, linestyle='--',
-              alpha=REFERENCE_OPACITY, label="Sharpe = 2")
+    ax.axhline(
+        0, color='black', linewidth=REFERENCE_LINE_WIDTH,
+        linestyle='-', alpha=REFERENCE_OPACITY
+    )
+    ax.axhline(
+        1, color='#029E73', linewidth=REFERENCE_LINE_WIDTH, linestyle='--',
+        alpha=REFERENCE_OPACITY, label="Sharpe = 1"
+    )
+    ax.axhline(
+        2, color='#029E73', linewidth=REFERENCE_LINE_WIDTH, linestyle='--',
+        alpha=REFERENCE_OPACITY, label="Sharpe = 2"
+    )
 
     ax.set_title("Rolling 12-Month Sharpe Ratio", fontsize=TITLE_FONT_SIZE, fontweight='bold')
     ax.set_ylabel("Rolling 12-Month Sharpe Ratio", fontsize=AXIS_LABEL_FONT_SIZE)
@@ -445,11 +474,18 @@ def create_dashboard(df: pd.DataFrame, style: str) -> tuple:
     axes[0, 0].grid(True, alpha=GRID_OPACITY, linestyle='--', linewidth=GRID_LINE_WIDTH)
 
     # Top right: Cumulative Returns
-    (df["portfolio_return"] * 100).plot(ax=axes[0, 1], color=PORTFOLIO_COLOR, linewidth=PORTFOLIO_LINE_WIDTH,
-                                       linestyle='-', alpha=PORTFOLIO_OPACITY, label="Portfolio")
-    (df["benchmark_return"] * 100).plot(ax=axes[0, 1], color=BENCHMARK_COLOR, linewidth=BENCHMARK_LINE_WIDTH,
-                                       linestyle='--', alpha=BENCHMARK_OPACITY, label="Benchmark")
-    axes[0, 1].axhline(0, color='black', linewidth=REFERENCE_LINE_WIDTH, linestyle='-', alpha=REFERENCE_OPACITY)
+    (df["portfolio_return"] * 100).plot(
+        ax=axes[0, 1], color=PORTFOLIO_COLOR, linewidth=PORTFOLIO_LINE_WIDTH,
+        linestyle='-', alpha=PORTFOLIO_OPACITY, label="Portfolio"
+    )
+    (df["benchmark_return"] * 100).plot(
+        ax=axes[0, 1], color=BENCHMARK_COLOR, linewidth=BENCHMARK_LINE_WIDTH,
+        linestyle='--', alpha=BENCHMARK_OPACITY, label="Benchmark"
+    )
+    axes[0, 1].axhline(
+        0, color='black', linewidth=REFERENCE_LINE_WIDTH,
+        linestyle='-', alpha=REFERENCE_OPACITY
+    )
     axes[0, 1].set_title("Cumulative Returns", fontsize=12, fontweight='bold')
     axes[0, 1].set_ylabel("Return (%)", fontsize=10)
     axes[0, 1].legend(loc="upper left", fontsize=9)
@@ -461,8 +497,14 @@ def create_dashboard(df: pd.DataFrame, style: str) -> tuple:
                             color=POSITIVE_COLOR, alpha=FILL_OPACITY, interpolate=True)
     axes[1, 0].fill_between(df.index, active_return_pct, 0, where=(active_return_pct < 0),
                             color=NEGATIVE_COLOR, alpha=FILL_OPACITY, interpolate=True)
-    active_return_pct.plot(ax=axes[1, 0], color=ACTIVE_COLOR, linewidth=PORTFOLIO_LINE_WIDTH, alpha=PORTFOLIO_OPACITY)
-    axes[1, 0].axhline(0, color='black', linewidth=REFERENCE_LINE_WIDTH, linestyle='-', alpha=REFERENCE_OPACITY)
+    active_return_pct.plot(
+        ax=axes[1, 0], color=ACTIVE_COLOR,
+        linewidth=PORTFOLIO_LINE_WIDTH, alpha=PORTFOLIO_OPACITY
+    )
+    axes[1, 0].axhline(
+        0, color='black', linewidth=REFERENCE_LINE_WIDTH,
+        linestyle='-', alpha=REFERENCE_OPACITY
+    )
     axes[1, 0].set_title("Active Return", fontsize=12, fontweight='bold')
     axes[1, 0].set_ylabel("Active Return (%)", fontsize=10)
     axes[1, 0].grid(True, alpha=GRID_OPACITY, linestyle='--', linewidth=GRID_LINE_WIDTH)
@@ -470,13 +512,26 @@ def create_dashboard(df: pd.DataFrame, style: str) -> tuple:
     # Bottom right: Drawdown
     portfolio_dd = (df["portfolio_value"] / df["portfolio_value"].cummax() - 1) * 100
     benchmark_dd = (df["benchmark_value"] / df["benchmark_value"].cummax() - 1) * 100
-    axes[1, 1].fill_between(df.index, portfolio_dd, 0, alpha=FILL_OPACITY, color=PORTFOLIO_COLOR, label="Portfolio")
-    axes[1, 1].fill_between(df.index, benchmark_dd, 0, alpha=FILL_OPACITY, color=BENCHMARK_COLOR, label="Benchmark")
-    portfolio_dd.plot(ax=axes[1, 1], color=PORTFOLIO_COLOR, linewidth=PORTFOLIO_LINE_WIDTH,
-                     linestyle='-', alpha=PORTFOLIO_OPACITY)
-    benchmark_dd.plot(ax=axes[1, 1], color=BENCHMARK_COLOR, linewidth=BENCHMARK_LINE_WIDTH,
-                     linestyle='--', alpha=BENCHMARK_OPACITY)
-    axes[1, 1].axhline(0, color='black', linewidth=REFERENCE_LINE_WIDTH, linestyle='-', alpha=REFERENCE_OPACITY)
+    axes[1, 1].fill_between(
+        df.index, portfolio_dd, 0,
+        alpha=FILL_OPACITY, color=PORTFOLIO_COLOR, label="Portfolio"
+    )
+    axes[1, 1].fill_between(
+        df.index, benchmark_dd, 0,
+        alpha=FILL_OPACITY, color=BENCHMARK_COLOR, label="Benchmark"
+    )
+    portfolio_dd.plot(
+        ax=axes[1, 1], color=PORTFOLIO_COLOR,
+        linewidth=PORTFOLIO_LINE_WIDTH, linestyle='-', alpha=PORTFOLIO_OPACITY
+    )
+    benchmark_dd.plot(
+        ax=axes[1, 1], color=BENCHMARK_COLOR,
+        linewidth=BENCHMARK_LINE_WIDTH, linestyle='--', alpha=BENCHMARK_OPACITY
+    )
+    axes[1, 1].axhline(
+        0, color='black', linewidth=REFERENCE_LINE_WIDTH,
+        linestyle='-', alpha=REFERENCE_OPACITY
+    )
     axes[1, 1].set_title("Drawdown", fontsize=12, fontweight='bold')
     axes[1, 1].set_ylabel("Drawdown (%)", fontsize=10)
     axes[1, 1].legend(loc="lower left", fontsize=9)
@@ -484,7 +539,10 @@ def create_dashboard(df: pd.DataFrame, style: str) -> tuple:
 
     # Rotate x-axis labels for all subplots
     for ax in axes.flat:
-        plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right', fontsize=TICK_LABEL_FONT_SIZE)
+        plt.setp(
+            ax.xaxis.get_majorticklabels(),
+            rotation=45, ha='right', fontsize=TICK_LABEL_FONT_SIZE
+        )
         plt.setp(ax.yaxis.get_majorticklabels(), fontsize=TICK_LABEL_FONT_SIZE)
         ax.set_xlabel("Date", fontsize=10)
 
@@ -544,7 +602,10 @@ def main() -> None:
                 f"Charts may be incomplete."
             )
 
-    logger.info(f"Data validated: {len(df)} rows, date range: {df.index[0].date()} to {df.index[-1].date()}")
+    logger.info(
+        f"Data validated: {len(df)} rows, date range: "
+        f"{df.index[0].date()} to {df.index[-1].date()}"
+    )
 
     if args.dashboard:
         # Create single dashboard

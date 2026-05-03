@@ -267,9 +267,10 @@ class YahooFinanceRepository(DataRepository):
                         cached_results[ticker] = new_prices[ticker]
 
             if cached_results:
-                combined_prices = pd.DataFrame(
-                    {ticker: cached_results[ticker] for ticker in tickers if ticker in cached_results}
-                )
+                combined_prices = pd.DataFrame({
+                    ticker: cached_results[ticker]
+                    for ticker in tickers if ticker in cached_results
+                })
                 missing = [ticker for ticker in tickers if ticker not in combined_prices.columns]
                 if missing:
                     raise ValueError(

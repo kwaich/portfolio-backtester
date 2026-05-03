@@ -12,7 +12,7 @@ This test suite validates:
 from __future__ import annotations
 
 from datetime import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 import pytest
 import numpy as np
 import pandas as pd
@@ -24,6 +24,7 @@ from functools import lru_cache
 
 streamlit_mock = MagicMock()
 
+
 def mock_cache_data(*args, **kwargs):
     """Mock cache_data that actually caches using lru_cache."""
     def decorator(func):
@@ -34,12 +35,13 @@ def mock_cache_data(*args, **kwargs):
         return cached_func
     return decorator
 
+
 streamlit_mock.cache_data = mock_cache_data
 streamlit_mock.query_params = {}
 streamlit_mock.session_state = {}
 sys.modules['streamlit'] = streamlit_mock
 
-from app.state_manager import StateManager, StateKeys, ValidationError
+from app.state_manager import StateManager, StateKeys, ValidationError  # noqa: E402
 
 
 class TestStateKeys:
@@ -117,8 +119,6 @@ class TestStateManagerInitialization:
         import streamlit as st
 
         StateManager.initialize()
-        original_portfolio = st.session_state[StateKeys.SELECTED_PORTFOLIO]
-
         # Modify state
         st.session_state[StateKeys.SELECTED_PORTFOLIO] = "Tech Portfolio"
 
@@ -207,8 +207,6 @@ class TestPortfolioConfiguration:
 
     def test_update_portfolio_preset_ignores_custom(self):
         """Should not update state when preset is Custom."""
-        import streamlit as st
-
         # Set initial values
         StateManager.set_num_tickers(3)
         StateManager.set_preset_tickers(["A", "B", "C"])
@@ -404,8 +402,6 @@ class TestWidgetState:
 
     def test_clear_widget_state(self):
         """Should clear widget state."""
-        import streamlit as st
-
         StateManager.set_widget_state("ticker_0", {"value": "AAPL"})
         assert StateManager.get_widget_state("ticker_0") is not None
 
@@ -458,8 +454,6 @@ class TestUtilityMethods:
 
     def test_reset_all_clears_state(self):
         """Should clear all state and reinitialize with defaults."""
-        import streamlit as st
-
         # Set some custom values
         StateManager.set_selected_portfolio("Custom Portfolio")
         StateManager.set_num_tickers(5)

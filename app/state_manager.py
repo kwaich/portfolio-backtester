@@ -31,7 +31,9 @@ class ValidationError(ValueError):
     pass
 
 
-def _validate_positive_int(value: Any, name: str, min_value: int = 1, max_value: Optional[int] = None) -> None:
+def _validate_positive_int(
+    value: Any, name: str, min_value: int = 1, max_value: Optional[int] = None
+) -> None:
     """Validate that a value is a positive integer within bounds.
 
     Args:
@@ -125,7 +127,9 @@ def _validate_datetime(value: Any, name: str) -> None:
     """
     from datetime import date
     if not isinstance(value, (datetime, date)):
-        raise ValidationError(f"{name} must be a datetime or date object, got {type(value).__name__}")
+        raise ValidationError(
+            f"{name} must be a datetime or date object, got {type(value).__name__}"
+        )
 
 
 def _session_state() -> MutableMapping[str, Any]:
@@ -356,7 +360,7 @@ class StateManager:
             ...     datetime(2020, 1, 1),
             ...     datetime.today()
             ... )
-            >>> # Also works with date objects from st.date_input
+            >>>  # Also works with date objects from st.date_input
             >>> StateManager.set_date_range(
             ...     date(2020, 1, 1),
             ...     date.today()
@@ -374,7 +378,9 @@ class StateManager:
             end_date = datetime.combine(end_date, datetime.min.time())
 
         if start_date >= end_date:
-            raise ValidationError(f"start_date must be before end_date (got {start_date} >= {end_date})")
+            raise ValidationError(
+                f"start_date must be before end_date (got {start_date} >= {end_date})"
+            )
 
         _session_state()[StateKeys.START_DATE] = start_date
         _session_state()[StateKeys.END_DATE] = end_date
@@ -480,11 +486,15 @@ class StateManager:
         if not isinstance(results, pd.DataFrame):
             raise ValidationError(f"results must be a DataFrame, got {type(results).__name__}")
         if not isinstance(all_benchmark_results, dict):
-            raise ValidationError(f"all_benchmark_results must be a dict, got {type(all_benchmark_results).__name__}")
+            raise ValidationError(
+                f"all_benchmark_results must be a dict, got {type(all_benchmark_results).__name__}"
+            )
         _validate_string_list(tickers, "tickers")
         _validate_string_list(benchmarks, "benchmarks")
         if not isinstance(weights_array, np.ndarray):
-            raise ValidationError(f"weights_array must be a numpy array, got {type(weights_array).__name__}")
+            raise ValidationError(
+                f"weights_array must be a numpy array, got {type(weights_array).__name__}"
+            )
         if not isinstance(capital, (int, float)) or capital <= 0:
             raise ValidationError(f"capital must be a positive number, got {capital}")
         _validate_non_empty_string(rebalance_strategy, "rebalance_strategy")
@@ -493,10 +503,14 @@ class StateManager:
         if dca_frequency is not None:
             _validate_non_empty_string(dca_frequency, "dca_frequency")
         if dca_freq is not None and not isinstance(dca_freq, str):
-            raise ValidationError(f"dca_freq must be a string or None, got {type(dca_freq).__name__}")
+            raise ValidationError(
+                f"dca_freq must be a string or None, got {type(dca_freq).__name__}"
+            )
         if dca_amount is not None:
             if not isinstance(dca_amount, (int, float)) or dca_amount <= 0:
-                raise ValidationError(f"dca_amount must be a positive number or None, got {dca_amount}")
+                raise ValidationError(
+                    f"dca_amount must be a positive number or None, got {dca_amount}"
+                )
 
         _session_state()[StateKeys.BACKTEST_RESULTS] = {
             'results': results,
@@ -602,8 +616,10 @@ class StateManager:
                 del _session_state()[key]
 
         # Clear all widget state
-        widget_keys = [k for k in _session_state().keys()
-                      if k.startswith(StateKeys.WIDGET_PREFIX)]
+        widget_keys = [
+            k for k in _session_state().keys()
+            if k.startswith(StateKeys.WIDGET_PREFIX)
+        ]
         for key in widget_keys:
             del _session_state()[key]
 

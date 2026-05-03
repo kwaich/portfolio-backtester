@@ -1,7 +1,5 @@
 """Tests for the design system module."""
 
-import pytest
-
 from app.design_system import (
     COLORS,
     TYPOGRAPHY,

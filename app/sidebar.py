@@ -10,7 +10,6 @@ from datetime import datetime
 from typing import Tuple, List, Dict, Any
 
 import streamlit as st
-import numpy as np
 
 from .config import (
     SIDEBAR_HEADER, MAX_TICKERS, MIN_BENCHMARKS, MAX_BENCHMARKS,
@@ -30,7 +29,10 @@ from .design_system import (
 def _section_badge(title: str) -> None:
     """Render a sidebar section badge label."""
     st.sidebar.markdown(
-        f'<span style="font-family: Inter, sans-serif; font-size: 10px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; display: block;">{title}</span>',
+        f'<span style="font-family: Inter, sans-serif; font-size: 10px; '
+        f'font-weight: 600; color: #64748b; text-transform: uppercase; '
+        f'letter-spacing: 0.05em; margin-bottom: 8px; display: block;">'
+        f'{title}</span>',
         unsafe_allow_html=True
     )
 
@@ -330,7 +332,10 @@ def render_sidebar_form() -> Dict[str, Any]:
 
             # Show warning if both DCA and rebalancing are enabled
             if rebalance_freq is not None:
-                st.warning("⚠️ DCA and rebalancing are mutually exclusive. DCA will take precedence.")
+                st.warning(
+                    "⚠️ DCA and rebalancing are mutually exclusive. "
+                    "DCA will take precedence."
+                )
 
         st.divider()
 

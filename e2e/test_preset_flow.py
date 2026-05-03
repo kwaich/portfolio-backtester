@@ -9,9 +9,9 @@ repo_root = Path(__file__).resolve().parent.parent
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-from playwright.sync_api import expect
+from playwright.sync_api import expect  # noqa: E402
 
-from e2e.helpers import with_page
+from e2e.helpers import with_page  # noqa: E402
 
 SELECTED_PRESET = "Default UK ETFs"
 EXPECTED_TICKER1 = "VDCP.L"

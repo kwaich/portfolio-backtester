@@ -8,7 +8,7 @@ Note: May fail if Yahoo Finance API is rate-limited or blocked.
 import sys
 sys.path.insert(0, '.')
 
-from app.ticker_data import get_ticker_name, get_all_tickers
+from app.ticker_data import get_ticker_name, get_all_tickers  # noqa: E402
 
 print("=" * 70)
 print("TICKER NAME FUNCTIONALITY TEST (Live Yahoo Finance)")
@@ -59,8 +59,8 @@ print()
 # Test 5: Simulate render_portfolio_composition
 print("Test 5: Simulate render_portfolio_composition()")
 print("-" * 70)
-import pandas as pd
-import numpy as np
+import pandas as pd  # noqa: E402
+import numpy as np  # noqa: E402
 
 tickers = ["VDCP.L", "VHYD.L"]
 weights = np.array([0.5, 0.5])

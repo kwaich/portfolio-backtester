@@ -13,10 +13,10 @@ repo_root = Path(__file__).resolve().parent.parent
 if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
-import numpy as np
+import numpy as np  # noqa: E402
 
-from e2e.fixtures import create_mock_prices, get_basic_backtest_expected
-from backtest import compute_metrics, summarize
+from e2e.fixtures import create_mock_prices, get_basic_backtest_expected  # noqa: E402
+from backtest import compute_metrics, summarize  # noqa: E402
 
 
 def test_fixture_values_match_engine() -> None:
