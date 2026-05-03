@@ -17,3 +17,5 @@ Recent history shows imperative, scope-tagged commits (`Accessibility & Visual H
 
 ## Agent & Automation Notes
 If you are using AI tooling, review `CLAUDE.md` alongside this guide: it defines agent permissions, escalation rules, and safe-edit workflows specific to the portfolio backtester. Align prompts with those guardrails, log every automated change, and ensure agents defer to human reviewers for financial or compliance-sensitive updates.
+
+[include](CLAUDE.md)
