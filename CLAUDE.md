@@ -21,7 +21,7 @@ This is a lightweight Python-based Portfolio Backtesting utility that allows use
 
 **Current Status**:
 - **Version**: v2.5.0-dev
-- **Test Coverage**: ~88% (404 tests, 404 passing / 100% ✅)
+- **Test Coverage**: ~88% (435 tests, 435 passing / 100% ✅)
 - **Progress**: Security hardening (Parquet caching), StateManager validation, UI improvements, repository pattern
 - **Branch**: main
 
@@ -33,23 +33,35 @@ This is a lightweight Python-based Portfolio Backtesting utility that allows use
 portfolio-backtester/
 ├── .venv/                    # Python virtual environment (gitignored - create with: python -m venv .venv)
 ├── app.py                    # Streamlit web UI (backward compatibility wrapper - 43 lines)
-├── app/                      # Modular web UI package (13 modules)
+├── app/                      # Modular web UI package (14 modules)
 │   ├── __init__.py           # Package initialization
-│   ├── config.py             # Configuration constants (32 constants)
+│   ├── config.py             # Configuration constants
+│   ├── design_system.py      # Design tokens & CSS helpers (colors, typography, spacing)
 │   ├── presets.py            # Portfolio and date presets
 │   ├── validation.py         # Input validation (delegates to StateManager)
-│   ├── state_manager.py      # Centralized session state management (507 lines)
+│   ├── state_manager.py      # Centralized session state management (~667 lines)
 │   ├── ui_components.py      # Reusable UI rendering with searchable inputs
 │   ├── ticker_data.py        # Ticker search & Yahoo Finance integration (w/ caching)
 │   ├── charts.py             # Plotly chart generation
-│   ├── sidebar.py            # Form-based sidebar rendering (310 lines)
-│   ├── results.py            # Results display functions (330 lines)
-│   ├── utils.py              # URL params, error handling, progress (269 lines)
-│   ├── main.py               # Application orchestration (reduced to 310 lines)
-│   └── data_repository.py    # Repository pattern: DataRepository ABC, YahooFinanceRepository, MockRepository (413 lines)
-├── backtest.py               # Core backtesting engine (830 lines - Phases 1 & 3)
-├── plot_backtest.py          # Visualization utility (395 lines - Phases 2 & 3)
-├── tests/                    # Test suite (404 tests, ~88% coverage; see docs/TESTING_GUIDE.md)
+│   ├── sidebar.py            # Form-based sidebar rendering
+│   ├── results.py            # Results display functions
+│   ├── utils.py              # URL params, error handling, progress
+│   ├── main.py               # Application orchestration
+│   └── data_repository.py    # Repository pattern: DataRepository ABC, YahooFinanceRepository, MockRepository
+├── backtest.py               # Core backtesting engine (~1400 lines - Phases 1 & 3)
+├── plot_backtest.py          # Visualization utility (~600 lines - Phases 2 & 3)
+├── e2e/                      # End-to-end browser tests (Playwright + pytest)
+│   ├── server.py             # StreamlitServer context manager for subprocess lifecycle
+│   ├── run_app.py            # Entry point that injects MockRepository (deterministic tests)
+│   ├── fixtures.py           # Deterministic mock price data
+│   ├── helpers.py            # Shared browser interaction helpers
+│   ├── test_basic_backtest.py
+│   ├── test_contract.py
+│   ├── test_dca_strategy.py
+│   ├── test_error_handling.py
+│   ├── test_preset_flow.py
+│   └── test_rebalancing.py
+├── tests/                    # Unit/integration test suite (435 tests, ~88% coverage; see docs/TESTING_GUIDE.md)
 │   ├── conftest.py           # pytest configuration (with session state reset fixture)
 │   ├── test_backtest.py      # Unit tests for backtest.py
 │   ├── test_app.py           # Unit tests for app.py UI (includes URL params)
@@ -60,6 +72,8 @@ portfolio-backtester/
 │   ├── test_benchmarks.py    # Unit tests for benchmark comparison logic
 │   ├── test_data_repository.py # Unit tests for DataRepository, YahooFinanceRepository, MockRepository
 │   ├── test_plot_backtest.py # Unit tests for visualization (plot_backtest.py)
+│   ├── test_design_system.py # Unit tests for design_system.py
+│   ├── test_ui_components.py # Unit tests for ui_components.py
 │   └── test_properties.py    # Property-based tests
 ├── requirements.txt          # Python dependencies (includes requests)
 ├── README.md                 # Main user documentation
@@ -84,7 +98,7 @@ portfolio-backtester/
 
 ### Key Subsystems
 
-#### 1. Core Backtesting Engine (backtest.py - 830 lines)
+#### 1. Core Backtesting Engine (backtest.py - ~1400 lines)
 
 **Purpose**: Download prices, compute metrics, calculate statistics
 
@@ -112,23 +126,24 @@ portfolio-backtester/
 - DCA weekend handling: next available trading day
 - Contribution-adjusted returns: `(value_change - contribution_change) / previous_value`
 
-#### 2. Web UI (app/ package - 13 modules)
+#### 2. Web UI (app/ package - 14 modules)
 
 **Purpose**: High-performance interactive Streamlit dashboard with best practices
 
 **Architecture** (Best Practices Refactor):
-- **config.py**: Centralized configuration (32 constants)
+- **config.py**: Centralized configuration constants
+- **design_system.py**: Single source of truth for colors, typography, spacing, CSS snippets
 - **presets.py**: Portfolio & date presets (6 portfolios + 6 date ranges)
 - **validation.py**: Session state management & input validation
-- **state_manager.py**: Centralized session state management with comprehensive type validation (507 lines)
+- **state_manager.py**: Centralized session state management with comprehensive type validation
 - **ui_components.py**: Reusable UI rendering with searchable ticker inputs
 - **ticker_data.py**: Ticker search with @st.cache_data (1h TTL for names, 30min for search)
 - **charts.py**: Plotly chart generation (interactive visualizations)
-- **sidebar.py**: Form-based sidebar rendering (310 lines) - 90% fewer reruns
-- **results.py**: Results display functions (330 lines)
-- **utils.py**: URL params, error handling, progress tracking (269 lines)
-- **main.py**: Application orchestration (reduced to 310 lines from 764)
-- **data_repository.py**: Repository pattern — `DataRepository` ABC, `YahooFinanceRepository`, `MockRepository` (413 lines)
+- **sidebar.py**: Form-based sidebar rendering - 90% fewer reruns
+- **results.py**: Results display functions
+- **utils.py**: URL params, error handling, progress tracking
+- **main.py**: Application orchestration
+- **data_repository.py**: Repository pattern — `DataRepository` ABC, `YahooFinanceRepository`, `MockRepository`
 - **app.py**: 43-line backward compatibility wrapper
 
 **Features**:
@@ -158,7 +173,7 @@ portfolio-backtester/
 - ✅ **Error Handling**: Contextual error messages with help text
 - ✅ **Progress Tracking**: ProgressTracker context manager for long operations
 
-#### 3. Visualization (plot_backtest.py - 395 lines)
+#### 3. Visualization (plot_backtest.py - ~600 lines)
 
 **Purpose**: Generate professional charts from backtest CSV output
 
@@ -178,7 +193,7 @@ portfolio-backtester/
 - **Phase 2**: Logging instead of print statements
 - **Phase 3**: Data quality validation (min 2 rows, NaN checks)
 
-#### 4. Data Repository (app/data_repository.py - 413 lines)
+#### 4. Data Repository (app/data_repository.py)
 
 **Purpose**: Abstracts all external data sources behind a single interface
 
@@ -189,50 +204,33 @@ portfolio-backtester/
 
 **Pattern**: Module-level singleton via `get_repository()` / `set_repository()` — decouples business logic from yfinance, enables easy test mocking without patching internals
 
-#### 5. Testing Infrastructure (11 test files, 404 tests)
+#### 5. Testing Infrastructure (13 unit/integration test files + 6 e2e test files, 435 tests)
 
-**Test Coverage**: ~88% overall, 100% pass rate (404/404 passing ✅)
+**Test Coverage**: ~88% overall, 100% pass rate (435/435 passing ✅)
 
-**Test Files** (in `tests/` directory):
+**Unit/Integration Test Files** (in `tests/` directory):
 - **tests/conftest.py**: pytest configuration with auto session state reset fixture
-- **tests/test_backtest.py** (93 tests): Unit tests for backtest engine
-  - Cache expiration, retry logic, ticker/date validation
-  - Batch downloads, data quality validation
-  - Rolling 12-month Sharpe ratio calculation and edge cases
-  - **DCA tests**: Monthly/weekly contributions, multi-ticker, price decline, precedence, weekend handling
-  - **IRR/XIRR tests**: Basic calculation, multiple contributions, negative/zero returns, convergence
-  - 13 test classes covering all major functions
+- **tests/test_backtest.py**: Unit tests for backtest engine (DCA, IRR/XIRR, Sharpe, cache, retry)
+- **tests/test_app.py**: Unit tests for web UI (presets, benchmarks, DCA metrics, colorblind palette, URL params)
+- **tests/test_ticker_data.py**: Ticker search and name fetching
+- **tests/test_state_manager.py**: StateManager getters/setters and type validation
+- **tests/test_integration.py**: End-to-end workflows, edge cases, multi-ticker scenarios
+- **tests/test_benchmarks.py**: Benchmark comparison logic
+- **tests/test_data_repository.py**: DataRepository interface contract, cache behavior, mock injection
+- **tests/test_plot_backtest.py**: Visualization (plot_backtest.py)
+- **tests/test_properties.py**: Property-based invariant tests
+- **tests/test_ticker_names.py**: Ticker name fetching scenarios
+- **tests/test_design_system.py**: Design token exports and CSS helpers
+- **tests/test_ui_components.py**: Reusable UI component rendering
 
-- **tests/test_app.py** (76 tests): Unit tests for web UI
-  - Portfolio presets, date presets, multiple benchmarks
-  - Delta indicators, rolling returns, metric formatting
-  - Portfolio composition with ticker names (fetched from yfinance)
-  - **DCA metrics**: IRR and total_contributions display
-  - **Colorblind accessibility**: 8 tests for Wong palette validation
-  - **URL Parameters**: 5 tests for capital/benchmarks sharing bug fixes
-  - 16 test classes with comprehensive coverage
+**E2E Test Files** (in `e2e/` directory — Playwright browser tests):
+- **e2e/server.py**: `StreamlitServer` context manager — launches/tears down Streamlit subprocess
+- **e2e/run_app.py**: Entry point injecting `MockRepository` so e2e tests use deterministic mock data (not live Yahoo Finance)
+- **e2e/fixtures.py**: Deterministic mock price data for reproducible assertions
+- **e2e/helpers.py**: Shared `with_page()` helper and browser utilities
+- **e2e/test_basic_backtest.py**, **test_preset_flow.py**, **test_dca_strategy.py**, **test_error_handling.py**, **test_contract.py**, **test_rebalancing.py**
 
-- **tests/test_ticker_data.py**: Unit tests for ticker search and name fetching
-  - Curated ticker list validation, search by symbol/name, Yahoo Finance API mocking
-
-- **tests/test_state_manager.py**: Unit tests for StateManager
-  - State getters/setters, type validation for all setters, DateTime compatibility
-
-- **tests/test_integration.py**: Integration tests
-  - End-to-end workflows, edge cases, data quality, multi-ticker scenarios
-
-- **tests/test_benchmarks.py**: Unit tests for benchmark comparison logic
-
-- **tests/test_data_repository.py**: Unit tests for `DataRepository`, `YahooFinanceRepository`, `MockRepository`
-  - Repository interface contract, cache behavior, mock injection
-
-- **tests/test_plot_backtest.py**: Unit tests for visualization (plot_backtest.py)
-
-- **tests/test_properties.py**: Property-based tests for invariant checking
-
-- **tests/test_ticker_names.py**: Unit tests for ticker name fetching scenarios
-
-- **tests/conftest.py**: pytest configuration — adds parent directory to Python path
+**Key E2E Pattern**: Tests never hit Yahoo Finance — `run_app.py` calls `set_repository(MockRepository(...))` before launching Streamlit, so prices are fully deterministic.
 
 **See**: [TESTING_GUIDE.md](docs/TESTING_GUIDE.md) for comprehensive testing rules and patterns.
 
@@ -373,11 +371,14 @@ python backtest.py --tickers AAPL MSFT --weights 0.6 0.4 --benchmark SPY
 # Plot results
 python plot_backtest.py --csv results/backtest.csv --output charts/test
 
-# Run all tests
+# Run all unit/integration tests
 pytest -v
 
 # Run with coverage
 pytest --cov=backtest --cov=app --cov-report=term-missing
+
+# Run e2e browser tests (requires playwright: pip install playwright && playwright install)
+pytest e2e/ -v
 
 # Clear cache
 rm -rf .cache/
@@ -524,6 +525,6 @@ git commit -m "feat: add new_metric calculation"
 
 ---
 
-**Last Updated**: 2026-05-01
+**Last Updated**: 2026-05-03
 **Version**: v2.5.0-dev
-**Test Coverage**: ~88% (404 tests, 100% passing ✅)
+**Test Coverage**: ~88% (435 tests, 100% passing ✅)
