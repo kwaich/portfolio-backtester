@@ -36,6 +36,9 @@ set_repository(
             ("AAPL", "Apple Inc."),
             ("MSFT", "Microsoft Corp."),
             ("SPY", "SPDR S&P 500 ETF Trust"),
+            ("VWRA.L", "Vanguard FTSE All-World UCITS ETF"),
+            ("VDCP.L", "Vanguard Dividend Appreciation ETF"),
+            ("VHYD.L", "Vanguard High Dividend Yield ETF"),
         ],
         ticker_names={
             "AAPL": "Apple Inc.",

@@ -11,3 +11,4 @@ htmlcov/
 .DS_Store
 .benchmarks/
 .flake8
+e2e/screenshots/

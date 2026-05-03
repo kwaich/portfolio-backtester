@@ -3,20 +3,18 @@
 from __future__ import annotations
 
 import contextlib
-import select
 import socket
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Generator
 
 
-# Timeout constants
-STARTUP_TIMEOUT = 30.0  # seconds to wait for "You can now view"
-KILL_TIMEOUT = 5.0      # seconds to wait after terminate() before kill()
-HEALTH_POLL_INTERVAL = 0.5  # seconds between stdout polls
-STARTUP_OUTPUT_TAIL = 30   # last N lines to include in startup failure
+STARTUP_TIMEOUT = 30.0
+KILL_TIMEOUT = 5.0
+STARTUP_OUTPUT_TAIL = 30
 
 
 def _find_free_port() -> int:
@@ -34,6 +32,21 @@ def _shutdown(proc: subprocess.Popen[str]) -> None:
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.wait()
+
+
+def _read_stdout(
+    proc: subprocess.Popen[str],
+    lines: list[str],
+    stop_event: threading.Event,
+) -> None:
+    """Background thread: read stdout lines into *lines* until *stop_event*."""
+    if proc.stdout is None:
+        return
+    for line in iter(proc.stdout.readline, ""):
+        if stop_event.is_set():
+            break
+        if line:
+            lines.append(line)
 
 
 @contextlib.contextmanager
@@ -67,27 +80,28 @@ def streamlit_server(
         text=True,
     )
 
-    # Poll stdout for the "ready" signal
+    lines: list[str] = []
+    stop_event = threading.Event()
+    reader = threading.Thread(
+        target=_read_stdout, args=(proc, lines, stop_event), daemon=True
+    )
+    reader.start()
+
     ready = False
     start = time.time()
-    output_lines: list[str] = []
-    assert proc.stdout is not None
     while time.time() - start < STARTUP_TIMEOUT:
-        # Use select to avoid blocking indefinitely on readline()
-        readable, _, _ = select.select([proc.stdout], [], [], HEALTH_POLL_INTERVAL)
-        if readable:
-            line = proc.stdout.readline()
-            if line:
-                output_lines.append(line)
-                if "You can now view your Streamlit app" in line:
-                    ready = True
-                    break
+        if any("You can now view your Streamlit app" in ln for ln in lines):
+            ready = True
+            break
         if proc.poll() is not None:
             break
+        time.sleep(0.5)
 
     if not ready:
         _shutdown(proc)
-        tail = "".join(output_lines[-STARTUP_OUTPUT_TAIL:])
+        stop_event.set()
+        reader.join(timeout=2.0)
+        tail = "".join(lines[-STARTUP_OUTPUT_TAIL:])
         raise RuntimeError(
             f"Streamlit did not start within {STARTUP_TIMEOUT}s. "
             f"Exit code: {proc.returncode}\n"
@@ -99,3 +113,5 @@ def streamlit_server(
         yield url
     finally:
         _shutdown(proc)
+        stop_event.set()
+        reader.join(timeout=2.0)
