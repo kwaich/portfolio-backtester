@@ -17,7 +17,7 @@ A lightweight, flexible Python utility for backtesting portfolio strategies agai
 - **Easy CLI**: Simple command-line interface with sensible defaults
 - **Data Quality Validation**: Automatic detection of data issues (missing values, invalid prices, extreme changes)
 - **Optimized Performance**: Batch downloads with per-ticker caching for faster multi-ticker operations
-- **Well-Tested**: Comprehensive suite (404 tests, see `docs/TESTING_GUIDE.md`) with 100% pass rate
+- **Well-Tested**: Comprehensive suite (435 tests, see `docs/TESTING_GUIDE.md`) with 100% pass rate
 
 ## Quick Start
 
@@ -31,6 +31,8 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 ```
+
+> **Note**: `playwright` is required only for end-to-end tests. Install browsers with `playwright install chromium` if running e2e tests.
 
 ### Basic Usage
 
@@ -425,10 +427,11 @@ This optimization is especially beneficial when:
 ```
 portfolio-backtester/
 ├── app.py                  # Streamlit web UI (backward compat wrapper)
-├── app/                    # Modular web UI package (13 modules)
+├── app/                    # Modular web UI package (14 modules)
 │   ├── __init__.py         # Package initialization
 │   ├── config.py           # Configuration constants (32 constants)
 │   ├── data_repository.py  # Repository pattern: DataRepository ABC + YahooFinance + Mock
+│   ├── design_system.py    # Visual design tokens and CSS helpers
 │   ├── presets.py          # Portfolio and date presets
 │   ├── validation.py       # Input validation and session defaults
 │   ├── state_manager.py    # Centralized Streamlit session state
@@ -441,20 +444,35 @@ portfolio-backtester/
 │   └── main.py             # Main application orchestration
 ├── backtest.py             # Core backtesting engine
 ├── plot_backtest.py        # Visualization utility
-├── tests/                  # Test suite (404 tests, ~88% coverage; see docs/TESTING_GUIDE.md)
+├── tests/                  # Test suite (435 tests, ~88% coverage; see docs/TESTING_GUIDE.md)
 │   ├── test_backtest.py    # Unit tests for backtest engine
 │   ├── test_app.py         # Streamlit UI regression suite
 │   ├── test_data_repository.py  # Repository pattern tests (cache, mocks, network)
+│   ├── test_design_system.py    # Design system token tests
 │   ├── test_state_manager.py
 │   ├── test_ticker_data.py
 │   ├── test_ticker_names.py
+│   ├── test_ui_components.py    # UI component rendering tests
 │   ├── test_properties.py  # Hypothesis property-based tests
 │   ├── test_benchmarks.py  # pytest-benchmark performance baselines
 │   ├── test_plot_backtest.py  # Matplotlib chart regression tests
 │   └── test_integration.py
+├── e2e/                    # Playwright end-to-end tests
+│   ├── fixtures.py         # Deterministic mock price fixtures
+│   ├── helpers.py          # Shared e2e helper functions
+│   ├── run_app.py          # Wrapper entry point with MockRepository injection
+│   ├── server.py           # StreamlitServer context manager for subprocess lifecycle
+│   ├── test_basic_backtest.py
+│   ├── test_contract.py
+│   ├── test_dca_strategy.py
+│   ├── test_error_handling.py
+│   ├── test_preset_flow.py
+│   └── test_rebalancing.py
 ├── requirements.txt        # Python dependencies
 ├── README.md               # This file
 ├── CLAUDE.md               # AI assistant guide
+├── AGENTS.md               # Agent automation guidelines
+├── CODE_REVIEW.md          # Code review checklist and issue tracker
 ├── docs/                   # Documentation directory
 │   ├── FILE_REFERENCE.md         # Detailed file documentation
 │   ├── TESTING_GUIDE.md          # TDD rules and test patterns
@@ -462,6 +480,7 @@ portfolio-backtester/
 │   ├── CHANGELOG.md              # Version history
 │   ├── PROJECT_SUMMARY.md        # Project roadmap and architecture
 │   └── superpowers/              # Agent skill definitions
+├── scripts/                # Utility scripts
 ├── .gitignore              # Git ignore rules
 ├── .venv/                  # Virtual environment (gitignored)
 ├── .cache/                 # Price data cache (gitignored)
@@ -476,6 +495,7 @@ The Streamlit web UI is organized as a clean, modular package:
 **Module Breakdown**:
 - `config.py`: All configuration constants, colors, labels
 - `data_repository.py`: Repository pattern for data access — `DataRepository` ABC, `YahooFinanceRepository`, `MockRepository`
+- `design_system.py`: Visual design tokens (colors, typography, spacing) and reusable CSS snippets
 - `presets.py`: Portfolio and date range presets
 - `validation.py`: Input validation, session state management
 - `state_manager.py`: Centralized session state with type validation
@@ -495,7 +515,7 @@ The Streamlit web UI is organized as a clean, modular package:
 See [`docs/TESTING_GUIDE.md`](docs/TESTING_GUIDE.md) for the authoritative breakdown, coverage targets, and workflow. Quick commands:
 
 ```bash
-# Entire suite (404 tests, ~88% coverage)
+# Entire suite (435 tests, ~88% coverage)
 pytest -v
 
 # Focus on a single area
@@ -506,6 +526,9 @@ pytest tests/test_app.py -v
 pytest --cov=backtest --cov=app --cov-report=term-missing
 pytest --cov=backtest --cov=app --cov-report=html
 open htmlcov/index.html
+
+# End-to-end browser tests (requires playwright install chromium)
+pytest e2e/ -v
 ```
 
 ### Test Coverage
@@ -522,6 +545,12 @@ Up-to-date coverage statistics, module-level breakdowns, and TDD expectations li
 - Data quality validation
 - Input validation edge cases
 - Statistical sanity checks for Sharpe, Sortino, drawdown, etc.
+
+**End-to-End Tests** (Playwright):
+- Full browser automation testing the Streamlit UI
+- Covers preset flows, DCA strategies, rebalancing, and error handling
+- Uses MockRepository for deterministic, network-free execution
+- Run with: `pytest e2e/ -v` (requires `playwright install chromium`)
 
 All tests pass with **100% success rate**.
 
@@ -549,6 +578,10 @@ The codebase follows professional conventions and best practices:
 - streamlit >= 1.28.0 (for web UI)
 - plotly >= 5.14.0 (for interactive charts)
 - pyarrow >= 10.0.0 (for secure Parquet cache storage)
+- requests >= 2.28.0 (for ticker name lookups)
+- hypothesis >= 6.88.0 (for property-based testing)
+- pytest-benchmark >= 4.0.0 (for performance baselines)
+- playwright >= 1.40.0 (for end-to-end browser tests)
 
 ## Data Source
 
